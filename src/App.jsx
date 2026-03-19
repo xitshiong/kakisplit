@@ -855,9 +855,14 @@ async function save(d) {
 }
 
 async function load(code) {
-  const { data } = await supabase.from("sessions").select("*").eq("code", code).single();
-  if (!data) return null;
-  return { code: data.code, items: data.items, qrImage: data.qr_image, paid: data.paid };
+  const { data, error } = await supabase
+    .from("sessions")
+    .select("*")
+    .eq("code", code)
+    .limit(1);
+  if (!data || error || data.length === 0) return null;
+  const row = data[0];
+  return { code: row.code, items: row.items, qrImage: row.qr_image, paid: row.paid };
 }
 
 async function savePaid(itemId, name) {
