@@ -1340,16 +1340,6 @@ function GuestCode({ onJoin, onBack }) {
 }
 
 // ── ROOT ──────────────────────────────────────────────────────
-if (initializing) return (
-  <><style>{css}</style><div className="bg" />
-    <div className="app" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
-      <div style={{ textAlign: "center", color: "var(--paper)" }}>
-        <div className="spinner" style={{ margin: "0 auto 16px" }} />
-        <div style={{ fontSize: "0.8rem", letterSpacing: 2, textTransform: "uppercase", opacity: 0.5 }}>Loading...</div>
-      </div>
-    </div>
-  </>
-);
 function HostReturn({ onHome }) {
   const [session, setSession] = useState(null);
   const [paidMap, setPaidMap] = useState({});
@@ -1451,6 +1441,17 @@ export default function KakiSplit() {
       setInitializing(false);
     }
   }, []);
+
+  if (initializing) return (
+    <><style>{css}</style><div className="bg" />
+      <div className="app" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
+        <div style={{ textAlign: "center", color: "var(--paper)" }}>
+          <div className="spinner" style={{ margin: "0 auto 16px" }} />
+          <div style={{ fontSize: "0.8rem", letterSpacing: 2, textTransform: "uppercase", opacity: 0.5 }}>Loading...</div>
+        </div>
+      </div>
+    </>
+  );
 
   return (
     <>
