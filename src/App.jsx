@@ -1423,6 +1423,7 @@ function HostReturn({ onHome }) {
     </div>
   );
 }
+
 export default function KakiSplit() {
   const [mode, setMode] = useState(null);
   const [guestSession, setGuestSession] = useState(null);
@@ -1442,26 +1443,25 @@ export default function KakiSplit() {
     }
   }, []);
 
-  if (initializing) return (
-    <><style>{css}</style><div className="bg" />
-      <div className="app" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
-        <div style={{ textAlign: "center", color: "var(--paper)" }}>
-          <div className="spinner" style={{ margin: "0 auto 16px" }} />
-          <div style={{ fontSize: "0.8rem", letterSpacing: 2, textTransform: "uppercase", opacity: 0.5 }}>Loading...</div>
-        </div>
-      </div>
-    </>
-  );
-
   return (
     <>
       <style>{css}</style>
       <div className="bg" />
       <div className="app">
 
-        {/* HOME */}
-        {!mode && (
-          <>
+        {initializing && (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
+            <div style={{ textAlign: "center", color: "var(--paper)" }}>
+              <div className="spinner" style={{ margin: "0 auto 16px" }} />
+              <div style={{ fontSize: "0.8rem", letterSpacing: 2, textTransform: "uppercase", opacity: 0.5 }}>Loading...</div>
+            </div>
+          </div>
+        )}
+
+        {!initializing && <>
+
+          {/* HOME */}
+          {!mode && (
             <div className="receipt">
               <div className="header-receipt">
                 <img src={LOGO_SRC} alt="KakiSplit" className="logo-img" />
@@ -1504,56 +1504,57 @@ export default function KakiSplit() {
                 </div>
               </div>
             </div>
-          </>
-        )}
+          )}
 
-        {mode === "host" && <HostView onHome={() => setMode(null)} />}
-        {mode === "host-return" && <HostReturn onHome={() => setMode(null)} />}
+          {mode === "host" && <HostView onHome={() => setMode(null)} />}
+          {mode === "host-return" && <HostReturn onHome={() => setMode(null)} />}
 
-        {mode === "guest" && guestSession && (
-          <>
+          {mode === "guest" && guestSession && (
+            <>
+              <div className="receipt">
+                <div className="header-receipt">
+                  <button className="home-btn" onClick={() => setMode(null)}>
+                    <span className="home-btn-icon">⌂</span>
+                    <span className="home-btn-label">Home</span>
+                  </button>
+                  <img src={LOGO_SRC} alt="KakiSplit" className="logo-img" />
+                  <div className="logo-tagline">Split bills lah, no drama</div>
+                  <div><span className="badge-strip guest-badge">👥 Guest</span></div>
+                </div>
+              </div>
+              <GuestView session={guestSession} onBack={() => setMode(null)} />
+            </>
+          )}
+
+          {mode === "guest-code" && (
+            <>
+              <div className="receipt">
+                <div className="header-receipt">
+                  <button className="home-btn" onClick={() => setMode(null)}>
+                    <span className="home-btn-icon">⌂</span>
+                    <span className="home-btn-label">Home</span>
+                  </button>
+                  <img src={LOGO_SRC} alt="KakiSplit" className="logo-img" />
+                  <div className="logo-tagline">Split bills lah, no drama</div>
+                  <div><span className="badge-strip guest-badge">👥 Guest</span></div>
+                </div>
+              </div>
+              <GuestCode onJoin={s => { setGuestSession(s); setMode("guest"); }} onBack={() => setMode(null)} />
+            </>
+          )}
+
+          {mode === "notfound" && (
             <div className="receipt">
-              <div className="header-receipt">
-                <button className="home-btn" onClick={() => setMode(null)}>
-                  <span className="home-btn-icon">⌂</span>
-                  <span className="home-btn-label">Home</span>
-                </button>
-                <img src={LOGO_SRC} alt="KakiSplit" className="logo-img" />
-                <div className="logo-tagline">Split bills lah, no drama</div>
-                <div><span className="badge-strip guest-badge">👥 Guest</span></div>
+              <div className="receipt-inner" style={{ textAlign: "center", padding: "40px 24px" }}>
+                <div style={{ fontSize: "3rem", marginBottom: 14 }}>😕</div>
+                <div className="section-head" style={{ textAlign: "center" }}>Table not found</div>
+                <div className="section-sub" style={{ textAlign: "center", marginBottom: 24 }}>Link may have expired or host hasn't started yet</div>
+                <button className="btn btn-ink" onClick={() => setMode(null)}>Back to Home</button>
               </div>
             </div>
-            <GuestView session={guestSession} onBack={() => setMode(null)} />
-          </>
-        )}
+          )}
 
-        {mode === "guest-code" && (
-          <>
-            <div className="receipt">
-              <div className="header-receipt">
-                <button className="home-btn" onClick={() => setMode(null)}>
-                  <span className="home-btn-icon">⌂</span>
-                  <span className="home-btn-label">Home</span>
-                </button>
-                <img src={LOGO_SRC} alt="KakiSplit" className="logo-img" />
-                <div className="logo-tagline">Split bills lah, no drama</div>
-                <div><span className="badge-strip guest-badge">👥 Guest</span></div>
-              </div>
-            </div>
-            <GuestCode onJoin={s => { setGuestSession(s); setMode("guest"); }} onBack={() => setMode(null)} />
-          </>
-        )}
-
-        {mode === "notfound" && (
-          <div className="receipt">
-            <div className="receipt-inner" style={{ textAlign: "center", padding: "40px 24px" }}>
-              <div style={{ fontSize: "3rem", marginBottom: 14 }}>😕</div>
-              <div className="section-head" style={{ textAlign: "center" }}>Table not found</div>
-              <div className="section-sub" style={{ textAlign: "center", marginBottom: 24 }}>Link may have expired or host hasn't started yet</div>
-              <button className="btn btn-ink" onClick={() => setMode(null)}>Back to Home</button>
-            </div>
-          </div>
-        )}
+        </>}
 
       </div>
     </>
