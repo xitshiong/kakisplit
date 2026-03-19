@@ -1099,16 +1099,14 @@ function HostView({ onHome }) {
     r.readAsDataURL(f);
   };
 
-  const finalise = () => {
+  const finalise = async () => {
     const c = genCode();
-    // Clear any previous paid records when starting fresh
-    try { localStorage.removeItem(PAID_KEY); } catch (e) { }
-    save({ code: c, items, qrImage: qrImg, createdAt: Date.now() });
+    localStorage.setItem("ks_current_code", c);
+    await save({ code: c, items, qrImage: qrImg, createdAt: Date.now() });
     setCode(c);
     setPaidMap({});
     setStep(3);
   };
-
   // Poll paid status every 2s once live
   useEffect(() => {
     if (step !== 3) return;
@@ -1301,29 +1299,36 @@ function HostView({ onHome }) {
 function GuestCode({ onJoin, onBack }) {
   const [code, setCode] = useState("");
   const [err, setErr] = useState("");
-  const tryJoin = () => {
-    const s = load();
-    if (s?.code === code.toUpperCase().trim()) { onJoin(s); }
-    else setErr("Table not found. Ask the host for the link directly.");
+  const [loading, setLoading] = useState(false);
+
+  const tryJoin = async () => {
+    setLoading(true);
+    setErr("");
+    const s = await load(code.trim());
+    if (s) { onJoin(s); }
+    else setErr("Table not found. Ask the host for the correct code.");
+    setLoading(false);
   };
+
   return (
     <div className="receipt">
       <div className="receipt-inner">
         <div className="section-head">Join a table</div>
-        <div className="section-sub" style={{ marginBottom: 16 }}>Enter the 6-letter code from the host</div>
+        <div className="section-sub" style={{ marginBottom: 16 }}>Enter the 4-digit code from the host</div>
         <input className="name-in" placeholder="e.g. 1234" value={code}
           onChange={e => setCode(e.target.value.replace(/\D/g, ""))}
           onKeyDown={e => e.key === "Enter" && tryJoin()} autoFocus
           inputMode="numeric" pattern="[0-9]*"
           style={{ textAlign: "center", letterSpacing: 6, fontSize: "1.2rem" }} />
         {err && <div className="error-strip">⚠ {err}</div>}
-        <button className="btn btn-ink" disabled={!code.trim()} onClick={tryJoin}>Join Table →</button>
+        <button className="btn btn-ink" disabled={!code.trim() || loading} onClick={tryJoin}>
+          {loading ? "Looking up..." : "Join Table →"}
+        </button>
         <button className="btn btn-outline" onClick={onBack}>← Back</button>
       </div>
     </div>
   );
 }
-
 // ── ROOT ──────────────────────────────────────────────────────
 export default function KakiSplit() {
   const [mode, setMode] = useState(null);
