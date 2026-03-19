@@ -1074,7 +1074,7 @@ function HostView({ onHome }) {
             contents: [{
               parts: [
                 { inline_data: { mime_type: "image/jpeg", data: b64 } },
-                { text: `Extract all line items from this receipt. Return ONLY valid JSON, no markdown, no explanation:\n{"items":[{"name":"Item Name","price":12.50}],"tax":1.50,"serviceCharge":2.00}\nRules: price = total for that line. tax/serviceCharge = amounts not %, use 0 if absent.` }
+                { text: `Extract all line items from this receipt. Return ONLY valid JSON, no markdown, no explanation:\n{"items":[{"name":"Item Name","price":12.50}],"tax":1.50,"serviceCharge":2.00,"discount":3.00}\nRules: price = total for that line. tax/serviceCharge = amounts not %, use 0 if absent. discount = total discount amount, use 0 if absent. Discounts are negative values on receipt, return as positive number.` }
               ]
             }],
             generationConfig: { temperature: 0.1, maxOutputTokens: 8192 }
@@ -1088,7 +1088,7 @@ function HostView({ onHome }) {
       const rawItems = parsed.items || [];
       const tax = parseFloat(parsed.tax || 0);
       const sc = parseFloat(parsed.serviceCharge || 0);
-      const extras = tax + sc;
+      const extras = tax + sc - parseFloat(parsed.discount || 0);
       const rawSubtotal = rawItems.reduce((s, i) => s + parseFloat(i.price || 0), 0);
       const baked = rawItems.map((it, i) => {
         const itemPrice = parseFloat(it.price || 0);
@@ -1340,6 +1340,99 @@ function GuestCode({ onJoin, onBack }) {
 }
 
 // ── ROOT ──────────────────────────────────────────────────────
+if (initializing) return (
+  <><style>{css}</style><div className="bg" />
+    <div className="app" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
+      <div style={{ textAlign: "center", color: "var(--paper)" }}>
+        <div className="spinner" style={{ margin: "0 auto 16px" }} />
+        <div style={{ fontSize: "0.8rem", letterSpacing: 2, textTransform: "uppercase", opacity: 0.5 }}>Loading...</div>
+      </div>
+    </div>
+  </>
+);
+function HostReturn({ onHome }) {
+  const [session, setSession] = useState(null);
+  const [paidMap, setPaidMap] = useState({});
+  const code = localStorage.getItem("ks_current_code");
+
+  useEffect(() => {
+    if (!code) return;
+    load(code).then(s => {
+      if (s) setSession(s);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!code) return;
+    const t = setInterval(() => {
+      loadPaid(code).then(setPaidMap);
+    }, 2000);
+    return () => clearInterval(t);
+  }, [code]);
+
+  if (!session) return (
+    <div className="receipt">
+      <div className="receipt-inner" style={{ textAlign: "center", padding: "40px 24px" }}>
+        <div className="spinner" style={{ margin: "0 auto 16px" }} />
+        <div className="section-sub">Loading your table...</div>
+      </div>
+    </div>
+  );
+
+  const url = `${window.location.origin}${window.location.pathname}?table=${code}`;
+  const subtotal = session.items.reduce((s, i) => s + parseFloat(i.price || 0), 0);
+
+  return (
+    <div className="receipt">
+      <div className="header-receipt">
+        <button className="home-btn" onClick={onHome}>
+          <span className="home-btn-icon">⌂</span>
+          <span className="home-btn-label">Home</span>
+        </button>
+        <img src={LOGO_SRC} alt="KakiSplit" className="logo-img" />
+        <div className="logo-tagline">Split bills lah, no drama</div>
+        <div><span className="badge-strip">🧾 Your Table</span></div>
+      </div>
+
+      <div className="section">
+        <div style={{ background: "var(--ink)", borderRadius: 4, padding: "16px 20px", marginBottom: 16, textAlign: "center" }}>
+          <div style={{ fontSize: "0.55rem", color: "rgba(245,240,232,0.4)", letterSpacing: 3, textTransform: "uppercase", marginBottom: 6 }}>Table Code</div>
+          <div style={{ fontFamily: "Unbounded,sans-serif", fontSize: "2.4rem", fontWeight: 900, color: "var(--neon-lime)", letterSpacing: 8 }}>{code}</div>
+        </div>
+
+        <div style={{ fontSize: "0.7rem", color: "var(--ink-faint)", letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span>Bill Summary</span>
+          <span style={{ color: "var(--neon-lime)", fontSize: "0.6rem" }}>{Object.keys(paidMap).length}/{session.items.length} paid</span>
+        </div>
+
+        {session.items.map(i => {
+          const paidBy = paidMap[i.id];
+          return (
+            <div key={i.id} className={`line-item ${paidBy ? "paid" : ""}`} style={{ borderBottom: "1px dotted var(--ink-faint)" }}>
+              <span style={{ flex: 1, fontSize: "0.85rem", color: "var(--ink)", fontFamily: "'DM Mono',monospace", textDecoration: paidBy ? "line-through" : "none" }}>
+                {i.name}
+              </span>
+              {paidBy
+                ? <span className="paid-tag">✓ {paidBy}</span>
+                : <span style={{ fontFamily: "'DM Mono',monospace", fontSize: "0.85rem", color: "var(--ink-light)", fontWeight: 500 }}>RM {parseFloat(i.price).toFixed(2)}</span>
+              }
+            </div>
+          );
+        })}
+
+        <div className="bill-summary-row highlight" style={{ marginTop: 8, paddingTop: 8, borderTop: "2px solid var(--ink)" }}>
+          <span style={{ fontWeight: 500, color: "var(--ink)" }}>Total</span>
+          <span className="bill-summary-val">RM {subtotal.toFixed(2)}</span>
+        </div>
+
+        <button className="btn btn-ink" style={{ marginTop: 16 }} onClick={() => navigator.clipboard.writeText(url)}>
+          📋 Copy Table Link
+        </button>
+        <button className="btn btn-outline" onClick={onHome}>← Home</button>
+      </div>
+    </div>
+  );
+}
 export default function KakiSplit() {
   const [mode, setMode] = useState(null);
   const [guestSession, setGuestSession] = useState(null);
@@ -1385,9 +1478,26 @@ export default function KakiSplit() {
                   <div className="mode-card" onClick={() => setMode("guest-code")}>
                     <span className="mode-emoji">👥</span>
                     <div className="mode-title">Guest</div>
-                    <div className="mode-desc">I got a link from the host</div>
+                    <div className="mode-desc">I got a code from the host</div>
                   </div>
                 </div>
+
+                {localStorage.getItem("ks_current_code") && (
+                  <div style={{ marginTop: 16, borderTop: "1px dashed var(--ink-faint)", paddingTop: 16 }}>
+                    <div style={{ fontSize: "0.65rem", color: "var(--ink-faint)", letterSpacing: 2, textTransform: "uppercase", marginBottom: 10 }}>
+                      Active Table
+                    </div>
+                    <div className="mode-card" style={{ flexDirection: "row", justifyContent: "space-between", padding: "16px 20px", minHeight: "auto" }}
+                      onClick={() => setMode("host-return")}>
+                      <div style={{ textAlign: "left" }}>
+                        <div className="mode-title" style={{ marginBottom: 4 }}>↩ Return to my table</div>
+                        <div className="mode-desc">Code: {localStorage.getItem("ks_current_code")}</div>
+                      </div>
+                      <span style={{ fontSize: "1.8rem" }}>🧾</span>
+                    </div>
+                  </div>
+                )}
+
                 <div style={{ textAlign: "center", marginTop: 14, fontSize: "0.58rem", color: "var(--ink-faint)", letterSpacing: 1, textTransform: "uppercase" }}>
                   Guests — open the host's link directly for best experience
                 </div>
@@ -1397,6 +1507,7 @@ export default function KakiSplit() {
         )}
 
         {mode === "host" && <HostView onHome={() => setMode(null)} />}
+        {mode === "host-return" && <HostReturn onHome={() => setMode(null)} />}
 
         {mode === "guest" && guestSession && (
           <>
