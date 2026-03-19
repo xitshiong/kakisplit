@@ -1144,7 +1144,7 @@ function HostView({ onHome }) {
               onDragOver={e => { e.preventDefault(); setDrag(true); }}
               onDragLeave={() => setDrag(false)}
               onDrop={e => { e.preventDefault(); setDrag(false); handleFile(e.dataTransfer.files[0]); }}>
-              <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={e => handleFile(e.target.files[0])} />
+              <input ref={fileRef} type="file" accept="image/*" onChange={e => handleFile(e.target.files[0])} />
               <span className="upload-emoji">📸</span>
               <div className="upload-label">Tap to snap or upload</div>
               <div className="upload-hint">Any receipt • JPG, PNG, HEIC</div>
