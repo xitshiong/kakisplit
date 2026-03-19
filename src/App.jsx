@@ -869,12 +869,12 @@ async function load(code) {
   if (!data || error || data.length === 0) return null;
   const row = data[0];
   return {
-    code: data.code,
-    items: data.items,
-    qrImage: data.qr_image,
-    paid: data.paid,
-    tableName: data.table_name,
-    tableDate: data.table_date
+    code: row.code,
+    items: row.items,
+    qrImage: row.qr_image,
+    paid: row.paid,
+    tableName: row.table_name,
+    tableDate: row.table_date
   };
 }
 
@@ -888,8 +888,13 @@ async function savePaid(itemId, name) {
 }
 
 async function loadPaid(code) {
-  const { data } = await supabase.from("sessions").select("paid").eq("code", code).single();
-  return data?.paid || {};
+  const { data, error } = await supabase
+    .from("sessions")
+    .select("paid")
+    .eq("code", code)
+    .limit(1);
+  if (!data || error || data.length === 0) return {};
+  return data[0]?.paid || {};
 }
 // ── STEP BAR ──────────────────────────────────────────────────
 function StepBar({ current, steps }) {
