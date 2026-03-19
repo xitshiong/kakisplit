@@ -841,8 +841,7 @@ body {
 // ── UTILS ─────────────────────────────────────────────────────
 const SESSION_KEY = "ks_session_v2";
 const PAID_KEY = "ks_paid_v2";
-function genCode() { return Math.random().toString(36).substring(2, 8).toUpperCase(); }
-function save(d) { try { localStorage.setItem(SESSION_KEY, JSON.stringify(d)); } catch (e) { } }
+function genCode() { return Math.floor(1000 + Math.random() * 9000).toString(); }
 function load() { try { return JSON.parse(localStorage.getItem(SESSION_KEY)); } catch (e) { return null; } }
 function savePaid(itemId, name) {
   try {
@@ -1291,9 +1290,10 @@ function GuestCode({ onJoin, onBack }) {
       <div className="receipt-inner">
         <div className="section-head">Join a table</div>
         <div className="section-sub" style={{ marginBottom: 16 }}>Enter the 6-letter code from the host</div>
-        <input className="name-in" placeholder="e.g. AB12CD" value={code}
-          onChange={e => setCode(e.target.value.toUpperCase())}
+        <input className="name-in" placeholder="e.g. 1234" value={code}
+          onChange={e => setCode(e.target.value.replace(/\D/g, ""))}
           onKeyDown={e => e.key === "Enter" && tryJoin()} autoFocus
+          inputMode="numeric" pattern="[0-9]*"
           style={{ textAlign: "center", letterSpacing: 6, fontSize: "1.2rem" }} />
         {err && <div className="error-strip">⚠ {err}</div>}
         <button className="btn btn-ink" disabled={!code.trim()} onClick={tryJoin}>Join Table →</button>
