@@ -847,8 +847,7 @@ body {
 `;
 
 // ── UTILS ─────────────────────────────────────────────────────
-const SESSION_KEY = "ks_session_v2";
-const PAID_KEY = "ks_paid_v2";
+
 function genCode() { return Math.floor(1000 + Math.random() * 9000).toString(); }
 async function save(d) {
   await supabase.from("sessions").upsert({
@@ -915,7 +914,7 @@ function GuestView({ session, onBack }) {
   const [sel, setSel] = useState({});
   const [done, setDone] = useState(false);
   const [showQR, setShowQR] = useState(false);
-  const [paidMap, setPaidMap] = useState(loadPaid);
+  const [paidMap, setPaidMap] = useState({});
   const { items = [], qrImage } = session;
 
   // Reload paid map periodically
@@ -925,6 +924,7 @@ function GuestView({ session, onBack }) {
     }, 2000);
     return () => clearInterval(t);
   }, []);
+
 
   const myItems = items.filter(i => sel[i.id]);
   const myTotal = myItems.reduce((s, i) => s + parseFloat(i.price || 0), 0);
@@ -1185,7 +1185,7 @@ function HostView({ onHome }) {
         {/* STEP 0 */}
         {step === 0 && <div className="section">
           <div className="section-head">Snap the receipt</div>
-          <div className="section-sub">AI reads all items instantly</div>
+          <div className="section-sub">Reading items instantly...</div>
           {!img ? (
             <div className={`upload-zone ${drag ? "drag" : ""}`}
               onClick={() => fileRef.current.click()}
@@ -1273,7 +1273,7 @@ function HostView({ onHome }) {
             </div>
           </div>
           <div style={{ marginTop: 20 }}>
-            <button className="btn btn-ink" disabled={items.length === 0} onClick={() => setStep(2)}>Next: Payment QR →</button>
+            <button className="btn btn-ink" disabled={items.length === 0} onClick={() => setStep(3)}>Next: Payment QR →</button>
             <button className="btn btn-outline" onClick={() => setStep(0)}>← Back</button>
           </div>
         </div>}
