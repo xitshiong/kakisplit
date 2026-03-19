@@ -1133,6 +1133,10 @@ function HostView({ onHome }) {
 
   const finalise = async () => {
     const c = genCode();
+    // Save to list of all host tables
+    const existing = JSON.parse(localStorage.getItem("ks_tables") || "[]");
+    existing.unshift({ code: c, name: tableName || "My Table", date: tableDate });
+    localStorage.setItem("ks_tables", JSON.stringify(existing));
     localStorage.setItem("ks_current_code", c);
     localStorage.setItem("ks_current_name", tableName || "My Table");
     localStorage.setItem("ks_current_date", tableDate);
@@ -1479,6 +1483,19 @@ function HostReturn({ onHome }) {
         <button className="btn btn-ink" style={{ marginTop: 16 }} onClick={() => navigator.clipboard.writeText(url)}>
           📋 Copy Table Link
         </button>
+        <button className="btn btn-outline" style={{ marginTop: 10, borderColor: "var(--neon-pink)", color: "var(--neon-pink)" }}
+          onClick={async () => {
+            await supabase.from("sessions").update({ concluded: true }).eq("code", code);
+            const tables = JSON.parse(localStorage.getItem("ks_tables") || "[]");
+            const updated = tables.filter(t => t.code !== code);
+            localStorage.setItem("ks_tables", JSON.stringify(updated));
+            localStorage.removeItem("ks_current_code");
+            localStorage.removeItem("ks_current_name");
+            localStorage.removeItem("ks_current_date");
+            onHome();
+          }}>
+          🏁 Conclude Table
+        </button>
         <button className="btn btn-outline" onClick={onHome}>← Home</button>
       </div>
     </div>
@@ -1543,26 +1560,29 @@ export default function KakiSplit() {
                     <div className="mode-desc">I got a code from the host</div>
                   </div>
                 </div>
+              </div>
 
-                {localStorage.getItem("ks_current_code") && (
-                  <div style={{ marginTop: 16, borderTop: "1px dashed var(--ink-faint)", paddingTop: 16 }}>
-                    <div style={{ fontSize: "0.65rem", color: "var(--ink-faint)", letterSpacing: 2, textTransform: "uppercase", marginBottom: 10 }}>
-                      Active Table
-                    </div>
-                    <div className="mode-card" style={{ flexDirection: "row", justifyContent: "space-between", padding: "16px 20px", minHeight: "auto" }}
-                      onClick={() => setMode("host-return")}>
+              {JSON.parse(localStorage.getItem("ks_tables") || "[]").length > 0 && (
+                <div className="section">
+                  <div style={{ fontSize: "0.65rem", color: "var(--ink-faint)", letterSpacing: 2, textTransform: "uppercase", marginBottom: 12 }}>
+                    Your Tables
+                  </div>
+                  {JSON.parse(localStorage.getItem("ks_tables") || "[]").map(t => (
+                    <div key={t.code} className="mode-card"
+                      style={{ flexDirection: "row", justifyContent: "space-between", padding: "16px 20px", minHeight: "auto", marginBottom: 10 }}
+                      onClick={() => { localStorage.setItem("ks_current_code", t.code); setMode("host-return"); }}>
                       <div style={{ textAlign: "left" }}>
-                        <div className="mode-title" style={{ marginBottom: 4 }}>↩ Return to my table</div>
-                        <div className="mode-desc">{localStorage.getItem("ks_current_name") || "My Table"} · {localStorage.getItem("ks_current_date")}</div>
+                        <div className="mode-title" style={{ marginBottom: 4 }}>{t.name}</div>
+                        <div className="mode-desc">{t.date} · Code: {t.code}</div>
                       </div>
                       <span style={{ fontSize: "1.8rem" }}>🧾</span>
                     </div>
-                  </div>
-                )}
-
-                <div style={{ textAlign: "center", marginTop: 14, fontSize: "0.58rem", color: "var(--ink-faint)", letterSpacing: 1, textTransform: "uppercase" }}>
-                  Guests — open the host's link directly for best experience
+                  ))}
                 </div>
+              )}
+
+              <div style={{ textAlign: "center", padding: "0 24px 16px", fontSize: "0.58rem", color: "var(--ink-faint)", letterSpacing: 1, textTransform: "uppercase" }}>
+                Guests — open the host's link directly for best experience
               </div>
             </div>
           )}
@@ -1617,7 +1637,7 @@ export default function KakiSplit() {
 
         </>}
 
-      </div>
+      </div >
     </>
   );
 }
