@@ -843,6 +843,7 @@ body {
 const SESSION_KEY = "ks_session_v2";
 const PAID_KEY = "ks_paid_v2";
 function genCode() { return Math.floor(1000 + Math.random() * 9000).toString(); }
+function save(d) { try { localStorage.setItem(SESSION_KEY, JSON.stringify(d)); } catch (e) { } }
 function load() { try { return JSON.parse(localStorage.getItem(SESSION_KEY)); } catch (e) { return null; } }
 function savePaid(itemId, name) {
   try {
