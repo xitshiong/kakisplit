@@ -851,7 +851,14 @@ const SESSION_KEY = "ks_session_v2";
 const PAID_KEY = "ks_paid_v2";
 function genCode() { return Math.floor(1000 + Math.random() * 9000).toString(); }
 async function save(d) {
-  await supabase.from("sessions").upsert({ code: d.code, items: d.items, qr_image: d.qrImage || null, paid: {} });
+  await supabase.from("sessions").upsert({
+    code: d.code,
+    items: d.items,
+    qr_image: d.qrImage || null,
+    paid: {},
+    table_name: d.tableName || "My Table",
+    table_date: d.tableDate || new Date().toISOString().split("T")[0]
+  });
 }
 
 async function load(code) {
@@ -862,7 +869,14 @@ async function load(code) {
     .limit(1);
   if (!data || error || data.length === 0) return null;
   const row = data[0];
-  return { code: row.code, items: row.items, qrImage: row.qr_image, paid: row.paid };
+  return {
+    code: data.code,
+    items: data.items,
+    qrImage: data.qr_image,
+    paid: data.paid,
+    tableName: data.table_name,
+    tableDate: data.table_date
+  };
 }
 
 async function savePaid(itemId, name) {
@@ -1049,7 +1063,9 @@ function HostView({ onHome }) {
   const [paidMap, setPaidMap] = useState({});
   const fileRef = useRef();
   const qrRef = useRef();
-  const STEPS = ["Receipt", "Items", "QR", "Share"];
+  const STEPS = ["Receipt", "Details", "Items", "QR", "Share"];
+  const [tableName, setTableName] = useState("");
+  const [tableDate, setTableDate] = useState(new Date().toISOString().split("T")[0]);
 
   const handleFile = f => {
     if (!f?.type.startsWith("image/")) return;
@@ -1111,10 +1127,13 @@ function HostView({ onHome }) {
 
   const finalise = async () => {
     const c = genCode();
-    await save({ code: c, items, qrImage: qrImg });
+    localStorage.setItem("ks_current_code", c);
+    localStorage.setItem("ks_current_name", tableName || "My Table");
+    localStorage.setItem("ks_current_date", tableDate);
+    await save({ code: c, items, qrImage: qrImg, tableName: tableName || "My Table", tableDate });
     setCode(c);
     setPaidMap({});
-    setStep(3);
+    setStep(4);
   };
   // Poll paid status every 2s once live
   useEffect(() => {
@@ -1198,9 +1217,23 @@ function HostView({ onHome }) {
           )}
 
         </div>}
-
-        {/* STEP 1 */}
+        {/* STEP 1 - TABLE DETAILS */}
         {step === 1 && <div className="section">
+          <div className="section-head">Name your table</div>
+          <div className="section-sub">So you can find it later</div>
+          <input className="name-in" placeholder="e.g. Jalan Alor dinner, KLCC lunch..."
+            value={tableName} onChange={e => setTableName(e.target.value)}
+            style={{ marginBottom: 12 }} />
+          <div style={{ fontSize: "0.7rem", color: "var(--ink-faint)", letterSpacing: 1, textTransform: "uppercase", marginBottom: 8 }}>Date</div>
+          <input className="name-in" type="date" value={tableDate}
+            onChange={e => setTableDate(e.target.value)}
+            style={{ marginBottom: 20 }} />
+          <button className="btn btn-ink" onClick={() => setStep(2)}>Next: Check Items →</button>
+          <button className="btn btn-outline" onClick={() => setStep(0)}>← Back</button>
+        </div>}
+
+        {/* STEP 2 - CHECK ITEMS */}
+        {step === 2 && <div className="section">
           <div className="section-head">Check items</div>
           <div className="section-sub">Prices already include tax & service charge</div>
           {items.map(it => (
@@ -1226,8 +1259,8 @@ function HostView({ onHome }) {
           </div>
         </div>}
 
-        {/* STEP 2 */}
-        {step === 2 && <div className="section">
+        {/* STEP 3 */}
+        {step === 3 && <div className="section">
           <div className="section-head">Your payment QR</div>
           <div className="section-sub">Guests scan this to pay you directly</div>
           {!qrImg ? (
@@ -1250,8 +1283,8 @@ function HostView({ onHome }) {
           </div>
         </div>}
 
-        {/* STEP 3 */}
-        {step === 3 && <div className="section">
+        {/* STEP 4 */}
+        {step === 4 && <div className="section">
           <div className="section-head">Table is live!</div>
           <div className="section-sub">Share with everyone at the table</div>
           <div className="share-receipt">
@@ -1388,6 +1421,9 @@ function HostReturn({ onHome }) {
         <div style={{ background: "var(--ink)", borderRadius: 4, padding: "16px 20px", marginBottom: 16, textAlign: "center" }}>
           <div style={{ fontSize: "0.55rem", color: "rgba(245,240,232,0.4)", letterSpacing: 3, textTransform: "uppercase", marginBottom: 6 }}>Table Code</div>
           <div style={{ fontFamily: "Unbounded,sans-serif", fontSize: "2.4rem", fontWeight: 900, color: "var(--neon-lime)", letterSpacing: 8 }}>{code}</div>
+          <div style={{ fontSize: "0.75rem", color: "rgba(245,240,232,0.5)", marginTop: 8, letterSpacing: 1 }}>
+            {session.tableName} · {session.tableDate}
+          </div>
         </div>
 
         <div style={{ fontSize: "0.7rem", color: "var(--ink-faint)", letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -1492,7 +1528,7 @@ export default function KakiSplit() {
                       onClick={() => setMode("host-return")}>
                       <div style={{ textAlign: "left" }}>
                         <div className="mode-title" style={{ marginBottom: 4 }}>↩ Return to my table</div>
-                        <div className="mode-desc">Code: {localStorage.getItem("ks_current_code")}</div>
+                        <div className="mode-desc">{localStorage.getItem("ks_current_name") || "My Table"} · {localStorage.getItem("ks_current_date")}</div>
                       </div>
                       <span style={{ fontSize: "1.8rem" }}>🧾</span>
                     </div>
