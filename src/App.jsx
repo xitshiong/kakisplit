@@ -942,6 +942,7 @@ function GuestView({ session, onBack }) {
     const updated = await loadPaid(session.code);
     setPaidMap(updated);
     setDone(true);
+    setShowQR(false);
   };
 
   if (!named) return (
@@ -1000,7 +1001,14 @@ function GuestView({ session, onBack }) {
             <div className="qr-img-wrap">
               <img src={qrImage} className="qr-img" alt="QR" />
             </div>
-            <button className="qr-modal-close" onClick={() => setShowQR(false)}>Done ✓</button>
+            <button className="qr-modal-close" style={{ background: "var(--neon-pink)", color: "var(--paper)" }}
+              onClick={confirmPayment}>
+              ✅ I Have Paid
+            </button>
+            <button className="qr-modal-close" style={{ background: "transparent", color: "var(--ink-faint)", borderTop: "1px dashed var(--ink-faint)" }}
+              onClick={() => setShowQR(false)}>
+              ← Back
+            </button>
           </div>
         </div>
       )}
@@ -1046,7 +1054,7 @@ function GuestView({ session, onBack }) {
           <div className="sticky-label">Your total</div>
           <div className="sticky-amt">{myTotal > 0 ? `RM ${myTotal.toFixed(2)}` : "— —"}</div>
         </div>
-        <button className="sticky-pay-btn" disabled={myTotal === 0} onClick={confirmPayment}>
+        <button className="sticky-pay-btn" disabled={myTotal === 0} onClick={() => qrImage ? setShowQR(true) : confirmPayment()}>
           {qrImage ? "Pay Now →" : "Confirm →"}
         </button>
       </div>
