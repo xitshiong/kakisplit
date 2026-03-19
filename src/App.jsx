@@ -1343,14 +1343,19 @@ function GuestCode({ onJoin, onBack }) {
 export default function KakiSplit() {
   const [mode, setMode] = useState(null);
   const [guestSession, setGuestSession] = useState(null);
+  const [initializing, setInitializing] = useState(true);
 
   useEffect(() => {
     const p = new URLSearchParams(window.location.search);
     const t = p.get("table");
     if (t) {
-      const s = load();
-      if (s?.code === t) { setGuestSession(s); setMode("guest"); }
-      else setMode("notfound");
+      load(t).then(s => {
+        if (s) { setGuestSession(s); setMode("guest"); }
+        else setMode("notfound");
+        setInitializing(false);
+      });
+    } else {
+      setInitializing(false);
     }
   }, []);
 
