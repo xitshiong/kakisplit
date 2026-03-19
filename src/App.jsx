@@ -1112,7 +1112,7 @@ function HostView({ onHome }) {
             contents: [{
               parts: [
                 { inline_data: { mime_type: "image/jpeg", data: b64 } },
-                { text: `Extract all line items from this receipt. Return ONLY valid JSON, no markdown, no explanation:\n{"items":[{"name":"Item Name","qty":2,"price":6.50}],"tax":1.50,"serviceCharge":2.00}\nRules: price = price PER SINGLE ITEM (divide total by quantity). qty = quantity ordered (default 1 if not shown). tax/serviceCharge = amounts not %, use 0 if absent.` }
+                { text: `Extract all line items from this receipt. Return ONLY valid JSON, no markdown, no explanation:\n{"items":[{"name":"Item Name","price":12.50}],"tax":1.50,"serviceCharge":2.00,"discount":5.00}\nRules: price = total for that line. tax/serviceCharge/discount = amounts not %, use 0 if absent. discount is a negative adjustment to the total.` }
               ]
             }],
             generationConfig: { temperature: 0.1, maxOutputTokens: 8192 }
@@ -1126,7 +1126,8 @@ function HostView({ onHome }) {
       const rawItems = parsed.items || [];
       const tax = parseFloat(parsed.tax || 0);
       const sc = parseFloat(parsed.serviceCharge || 0);
-      const extras = tax + sc - parseFloat(parsed.discount || 0);
+      const discount = parseFloat(parsed.discount || 0);
+      const extras = tax + sc - discount;
       const rawSubtotal = rawItems.reduce((s, i) => s + parseFloat(i.price || 0), 0);
       const expanded = [];
       rawItems.forEach(it => {
