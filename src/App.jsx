@@ -751,7 +751,7 @@ body {
 }
 .paid-tag {
   font-size: 0.62rem;
-  color: var(--neon-lime);
+  color: var(--ink-light);
   background: rgba(184,255,0,0.12);
   border: 1px solid rgba(184,255,0,0.25);
   border-radius: 3px;
@@ -1331,7 +1331,7 @@ function HostView({ onHome }) {
           <div style={{ marginTop: 16, borderTop: "1px dashed var(--ink-faint)", paddingTop: 16 }}>
             <div style={{ fontSize: "0.7rem", color: "var(--ink-faint)", letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <span>Bill Summary</span>
-              <span style={{ color: "var(--neon-lime)", fontSize: "0.6rem" }}>{Object.keys(paidMap).length}/{items.length} paid</span>
+              <span style={{ color: "var(--ink-light)", fontSize: "0.6rem" }}>{Object.keys(paidMap).length}/{items.length} paid</span>
             </div>
             {items.map(i => {
               const paidBy = paidMap[i.id];
@@ -1457,23 +1457,49 @@ function HostReturn({ onHome }) {
 
         <div style={{ fontSize: "0.7rem", color: "var(--ink-faint)", letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <span>Bill Summary</span>
-          <span style={{ color: "var(--neon-lime)", fontSize: "0.6rem" }}>{Object.keys(paidMap).length}/{session.items.length} paid</span>
+          <span style={{ color: "var(--ink-light)", fontSize: "0.6rem" }}>{Object.keys(paidMap).length}/{session.items.length} paid</span>
         </div>
 
-        {session.items.map(i => {
-          const paidBy = paidMap[i.id];
-          return (
-            <div key={i.id} className={`line-item ${paidBy ? "paid" : ""}`} style={{ borderBottom: "1px dotted var(--ink-faint)" }}>
-              <span style={{ flex: 1, fontSize: "0.85rem", color: "var(--ink)", fontFamily: "'DM Mono',monospace", textDecoration: paidBy ? "line-through" : "none" }}>
-                {i.name}
-              </span>
-              {paidBy
-                ? <span className="paid-tag">✓ {paidBy}</span>
-                : <span style={{ fontFamily: "'DM Mono',monospace", fontSize: "0.85rem", color: "var(--ink-light)", fontWeight: 500 }}>RM {parseFloat(i.price).toFixed(2)}</span>
-              }
+        {/* UNPAID ITEMS */}
+        {session.items.filter(i => !paidMap[i.id]).length > 0 && (
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: "0.6rem", color: "var(--neon-pink)", letterSpacing: 2, textTransform: "uppercase", marginBottom: 8, fontWeight: 500 }}>
+              ⏳ Unpaid ({session.items.filter(i => !paidMap[i.id]).length})
             </div>
-          );
-        })}
+            {session.items.filter(i => !paidMap[i.id]).map(i => (
+              <div key={i.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 0", borderBottom: "1px dotted var(--ink-faint)" }}>
+                <span style={{ flex: 1, fontSize: "0.85rem", color: "var(--ink)", fontFamily: "'DM Mono',monospace" }}>
+                  {i.name}
+                </span>
+                <span style={{ fontFamily: "'DM Mono',monospace", fontSize: "0.85rem", color: "var(--neon-pink)", fontWeight: 500 }}>
+                  RM {parseFloat(i.price).toFixed(2)}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* PAID ITEMS */}
+        {session.items.filter(i => paidMap[i.id]).length > 0 && (
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: "0.6rem", color: "var(--ink-light)", letterSpacing: 2, textTransform: "uppercase", marginBottom: 8, fontWeight: 500 }}>
+              ✓ Paid ({session.items.filter(i => paidMap[i.id]).length})
+            </div>
+            {session.items.filter(i => paidMap[i.id]).map(i => (
+              <div key={i.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 0", borderBottom: "1px dotted var(--ink-faint)", opacity: 0.5 }}>
+                <div style={{ flex: 1 }}>
+                  <span style={{ fontSize: "0.85rem", color: "var(--ink)", fontFamily: "'DM Mono',monospace", textDecoration: "line-through" }}>
+                    {i.name}
+                  </span>
+                  <div style={{ fontSize: "0.65rem", color: "var(--ink-faint)", marginTop: 2 }}>
+                    paid by {paidMap[i.id]}
+                  </div>
+                </div>
+                <span className="paid-tag">✓ {paidMap[i.id]}</span>
+              </div>
+            ))}
+          </div>
+        )}
 
         <div className="bill-summary-row highlight" style={{ marginTop: 8, paddingTop: 8, borderTop: "2px solid var(--ink)" }}>
           <span style={{ fontWeight: 500, color: "var(--ink)" }}>Total</span>
