@@ -358,6 +358,13 @@ body {
   width: 88px;
   text-align: right;
   min-height: 44px;
+  -moz-appearance: textfield;
+}
+
+.item-price-in::-webkit-outer-spin-button,
+.item-price-in::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 .rm-tag { font-size: 0.78rem; color: var(--ink-faint); flex-shrink: 0; }
@@ -834,26 +841,26 @@ body {
 // ── UTILS ─────────────────────────────────────────────────────
 const SESSION_KEY = "ks_session_v2";
 const PAID_KEY = "ks_paid_v2";
-function genCode() { return Math.random().toString(36).substring(2,8).toUpperCase(); }
-function save(d) { try { localStorage.setItem(SESSION_KEY, JSON.stringify(d)); } catch(e){} }
-function load() { try { return JSON.parse(localStorage.getItem(SESSION_KEY)); } catch(e){ return null; } }
+function genCode() { return Math.random().toString(36).substring(2, 8).toUpperCase(); }
+function save(d) { try { localStorage.setItem(SESSION_KEY, JSON.stringify(d)); } catch (e) { } }
+function load() { try { return JSON.parse(localStorage.getItem(SESSION_KEY)); } catch (e) { return null; } }
 function savePaid(itemId, name) {
   try {
     const existing = JSON.parse(localStorage.getItem(PAID_KEY) || "{}");
     existing[itemId] = name;
     localStorage.setItem(PAID_KEY, JSON.stringify(existing));
-  } catch(e){}
+  } catch (e) { }
 }
-function loadPaid() { try { return JSON.parse(localStorage.getItem(PAID_KEY) || "{}"); } catch(e){ return {}; } }
+function loadPaid() { try { return JSON.parse(localStorage.getItem(PAID_KEY) || "{}"); } catch (e) { return {}; } }
 
 // ── STEP BAR ──────────────────────────────────────────────────
 function StepBar({ current, steps }) {
   return (
     <div className="step-bar">
-      {steps.map((s,i) => (
+      {steps.map((s, i) => (
         <div key={s} className="step-item">
           <div className={`step-num ${i < current ? "done" : i === current ? "active" : ""}`}>
-            {i < current ? "✓" : i+1}
+            {i < current ? "✓" : i + 1}
           </div>
           <div className="step-label">{s}</div>
         </div>
@@ -870,7 +877,7 @@ function GuestView({ session, onBack }) {
   const [done, setDone] = useState(false);
   const [showQR, setShowQR] = useState(false);
   const [paidMap, setPaidMap] = useState(loadPaid);
-  const { items=[], qrImage } = session;
+  const { items = [], qrImage } = session;
 
   // Reload paid map periodically
   useEffect(() => {
@@ -879,7 +886,7 @@ function GuestView({ session, onBack }) {
   }, []);
 
   const myItems = items.filter(i => sel[i.id]);
-  const myTotal = myItems.reduce((s,i) => s + parseFloat(i.price||0), 0);
+  const myTotal = myItems.reduce((s, i) => s + parseFloat(i.price || 0), 0);
 
   const confirmPayment = () => {
     myItems.forEach(i => savePaid(i.id, name));
@@ -888,14 +895,14 @@ function GuestView({ session, onBack }) {
   };
 
   if (!named) return (
-    <div className="receipt" style={{marginTop:0}}>
+    <div className="receipt" style={{ marginTop: 0 }}>
       <div className="receipt-inner">
         <div className="section-head">What's your name?</div>
-        <div className="section-sub" style={{marginBottom:16}}>So the host knows who's paid</div>
+        <div className="section-sub" style={{ marginBottom: 16 }}>So the host knows who's paid</div>
         <input className="name-in" placeholder="e.g. Yagiz, Dylan, Sabry..."
-          value={name} onChange={e=>setName(e.target.value)}
-          onKeyDown={e=>e.key==="Enter"&&name.trim()&&setNamed(true)} autoFocus/>
-        <button className="btn btn-ink" disabled={!name.trim()} onClick={()=>setNamed(true)}>
+          value={name} onChange={e => setName(e.target.value)}
+          onKeyDown={e => e.key === "Enter" && name.trim() && setNamed(true)} autoFocus />
+        <button className="btn btn-ink" disabled={!name.trim()} onClick={() => setNamed(true)}>
           Continue →
         </button>
         <button className="btn btn-outline" onClick={onBack}>← Back</button>
@@ -907,17 +914,17 @@ function GuestView({ session, onBack }) {
     <div className="receipt">
       <div className="receipt-inner">
         <span className="success-mark">✅</span>
-        <div className="section-head" style={{textAlign:"center"}}>Confirmed, {name}!</div>
-        <div className="section-sub" style={{textAlign:"center",marginBottom:20}}>Here's your share of the bill</div>
+        <div className="section-head" style={{ textAlign: "center" }}>Confirmed, {name}!</div>
+        <div className="section-sub" style={{ textAlign: "center", marginBottom: 20 }}>Here's your share of the bill</div>
 
-        <div style={{background:"var(--ink)",borderRadius:4,padding:"16px 20px",marginBottom:16,textAlign:"center"}}>
-          <div style={{fontSize:"0.55rem",color:"rgba(245,240,232,0.4)",letterSpacing:3,textTransform:"uppercase",marginBottom:6}}>You owe</div>
-          <div style={{fontFamily:"Unbounded,sans-serif",fontSize:"2.4rem",fontWeight:900,color:"var(--neon-lime)",letterSpacing:-1}}>
+        <div style={{ background: "var(--ink)", borderRadius: 4, padding: "16px 20px", marginBottom: 16, textAlign: "center" }}>
+          <div style={{ fontSize: "0.55rem", color: "rgba(245,240,232,0.4)", letterSpacing: 3, textTransform: "uppercase", marginBottom: 6 }}>You owe</div>
+          <div style={{ fontFamily: "Unbounded,sans-serif", fontSize: "2.4rem", fontWeight: 900, color: "var(--neon-lime)", letterSpacing: -1 }}>
             RM {myTotal.toFixed(2)}
           </div>
         </div>
 
-        {myItems.map(i=>(
+        {myItems.map(i => (
           <div key={i.id} className="bill-summary-row">
             <span>{i.name}</span>
             <span className="bill-summary-val">RM {parseFloat(i.price).toFixed(2)}</span>
@@ -925,25 +932,25 @@ function GuestView({ session, onBack }) {
         ))}
 
         {qrImage && (
-          <button className="btn btn-neon" style={{marginTop:20}} onClick={()=>setShowQR(true)}>
+          <button className="btn btn-neon" style={{ marginTop: 20 }} onClick={() => setShowQR(true)}>
             📲 Scan to Pay
           </button>
         )}
-        {!qrImage && <div className="section-sub" style={{textAlign:"center",marginTop:14}}>Ask host for payment QR</div>}
+        {!qrImage && <div className="section-sub" style={{ textAlign: "center", marginTop: 14 }}>Ask host for payment QR</div>}
       </div>
 
       {showQR && qrImage && (
-        <div className="qr-modal" onClick={()=>setShowQR(false)}>
-          <div className="qr-modal-inner" onClick={e=>e.stopPropagation()}>
+        <div className="qr-modal" onClick={() => setShowQR(false)}>
+          <div className="qr-modal-inner" onClick={e => e.stopPropagation()}>
             <div className="qr-modal-top">
               <div className="qr-modal-title">Scan & Pay</div>
               <div className="qr-modal-sub">Pay exactly this amount</div>
             </div>
             <div className="qr-modal-amt">RM {myTotal.toFixed(2)}</div>
             <div className="qr-img-wrap">
-              <img src={qrImage} className="qr-img" alt="QR"/>
+              <img src={qrImage} className="qr-img" alt="QR" />
             </div>
-            <button className="qr-modal-close" onClick={()=>setShowQR(false)}>Done ✓</button>
+            <button className="qr-modal-close" onClick={() => setShowQR(false)}>Done ✓</button>
           </div>
         </div>
       )}
@@ -953,31 +960,31 @@ function GuestView({ session, onBack }) {
   return (
     <>
       <div className="receipt">
-        <div className="header-receipt" style={{paddingBottom:14}}>
-          <div style={{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",fontWeight:700,color:"var(--ink)"}}>
+        <div className="header-receipt" style={{ paddingBottom: 14 }}>
+          <div style={{ fontFamily: "'Playfair Display',serif", fontSize: "1.1rem", fontWeight: 700, color: "var(--ink)" }}>
             Hey {name} 👋
           </div>
-          <div style={{fontSize:"0.62rem",color:"var(--ink-faint)",letterSpacing:1.5,textTransform:"uppercase",marginTop:4}}>
+          <div style={{ fontSize: "0.62rem", color: "var(--ink-faint)", letterSpacing: 1.5, textTransform: "uppercase", marginTop: 4 }}>
             Tap everything you ordered
           </div>
         </div>
-        <div style={{padding:"4px 24px 90px"}}>
-          {items.map(item=>{
+        <div style={{ padding: "4px 24px 90px" }}>
+          {items.map(item => {
             const paidBy = paidMap[item.id];
             if (paidBy) return (
               <div key={item.id} className="guest-item paid-item">
-                <div className="g-check" style={{borderColor:"var(--ink-faint)"}}>–</div>
-                <span className="g-name" style={{textDecoration:"line-through"}}>{item.name}</span>
+                <div className="g-check" style={{ borderColor: "var(--ink-faint)" }}>–</div>
+                <span className="g-name" style={{ textDecoration: "line-through" }}>{item.name}</span>
                 <span className="guest-paid-tag">paid by {paidBy}</span>
               </div>
             );
             return (
               <div key={item.id}
-                className={`guest-item ${sel[item.id]?"sel":""}`}
-                onClick={()=>setSel(s=>({...s,[item.id]:!s[item.id]}))}>
-                <div className="g-check">{sel[item.id]?"✓":""}</div>
+                className={`guest-item ${sel[item.id] ? "sel" : ""}`}
+                onClick={() => setSel(s => ({ ...s, [item.id]: !s[item.id] }))}>
+                <div className="g-check">{sel[item.id] ? "✓" : ""}</div>
                 <span className="g-name">{item.name}</span>
-                <span className="g-price">RM {parseFloat(item.price||0).toFixed(2)}</span>
+                <span className="g-price">RM {parseFloat(item.price || 0).toFixed(2)}</span>
               </div>
             );
           })}
@@ -987,9 +994,9 @@ function GuestView({ session, onBack }) {
       <div className="sticky-total">
         <div>
           <div className="sticky-label">Your total</div>
-          <div className="sticky-amt">{myTotal>0?`RM ${myTotal.toFixed(2)}`:"— —"}</div>
+          <div className="sticky-amt">{myTotal > 0 ? `RM ${myTotal.toFixed(2)}` : "— —"}</div>
         </div>
-        <button className="sticky-pay-btn" disabled={myTotal===0} onClick={confirmPayment}>
+        <button className="sticky-pay-btn" disabled={myTotal === 0} onClick={confirmPayment}>
           {qrImage ? "Pay Now →" : "Confirm →"}
         </button>
       </div>
@@ -1012,7 +1019,7 @@ function HostView({ onHome }) {
   const [paidMap, setPaidMap] = useState({});
   const fileRef = useRef();
   const qrRef = useRef();
-  const STEPS = ["Receipt","Items","QR","Share"];
+  const STEPS = ["Receipt", "Items", "QR", "Share"];
 
   const handleFile = f => {
     if (!f?.type.startsWith("image/")) return;
@@ -1027,8 +1034,9 @@ function HostView({ onHome }) {
     setLoading(true); setErr("");
     try {
       const GEMINI_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+      console.log("KEY:", GEMINI_KEY);
       const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_KEY}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${GEMINI_KEY}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -1039,18 +1047,19 @@ function HostView({ onHome }) {
                 { text: `Extract all line items from this receipt. Return ONLY valid JSON, no markdown, no explanation:\n{"items":[{"name":"Item Name","price":12.50}],"tax":1.50,"serviceCharge":2.00}\nRules: price = total for that line. tax/serviceCharge = amounts not %, use 0 if absent.` }
               ]
             }],
-            generationConfig: { temperature: 0.1, maxOutputTokens: 1000 }
+            generationConfig: { temperature: 0.1, maxOutputTokens: 8192 }
           })
         }
       );
       const data = await res.json();
+      console.log("RESPONSE:", JSON.stringify(data));
       const txt = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-      const parsed = JSON.parse(txt.replace(/```json|```/g,"").trim());
+      const parsed = JSON.parse(txt.replace(/```json|```/g, "").trim());
       const rawItems = parsed.items || [];
       const tax = parseFloat(parsed.tax || 0);
       const sc = parseFloat(parsed.serviceCharge || 0);
       const extras = tax + sc;
-      const rawSubtotal = rawItems.reduce((s,i) => s + parseFloat(i.price||0), 0);
+      const rawSubtotal = rawItems.reduce((s, i) => s + parseFloat(i.price || 0), 0);
       const baked = rawItems.map((it, i) => {
         const itemPrice = parseFloat(it.price || 0);
         const proportion = rawSubtotal > 0 ? itemPrice / rawSubtotal : 0;
@@ -1059,7 +1068,7 @@ function HostView({ onHome }) {
       });
       setItems(baked);
       setStep(1);
-    } catch(e) { setErr("Couldn't read receipt. Try a clearer photo or snap again."); }
+    } catch (e) { setErr("Couldn't read receipt. Try a clearer photo or snap again."); }
     setLoading(false);
   };
 
@@ -1073,8 +1082,8 @@ function HostView({ onHome }) {
   const finalise = () => {
     const c = genCode();
     // Clear any previous paid records when starting fresh
-    try { localStorage.removeItem(PAID_KEY); } catch(e){}
-    save({ code:c, items, qrImage:qrImg, createdAt:Date.now() });
+    try { localStorage.removeItem(PAID_KEY); } catch (e) { }
+    save({ code: c, items, qrImage: qrImg, createdAt: Date.now() });
     setCode(c);
     setPaidMap({});
     setStep(3);
@@ -1107,9 +1116,9 @@ function HostView({ onHome }) {
   };
 
   const url = code ? `${window.location.origin}${window.location.pathname}?table=${code}` : "";
-  const subtotal = items.reduce((s,i)=>s+parseFloat(i.price||0),0);
+  const subtotal = items.reduce((s, i) => s + parseFloat(i.price || 0), 0);
   const total = subtotal;
-  const upd = (id,f,v) => setItems(its=>its.map(it=>it.id===id?{...it,[f]:v}:it));
+  const upd = (id, f, v) => setItems(its => its.map(it => it.id === id ? { ...it, [f]: v } : it));
 
   return (
     <>
@@ -1123,37 +1132,37 @@ function HostView({ onHome }) {
           <div className="logo-tagline">Split bills lah, no drama</div>
           <div><span className="badge-strip">🧾 Host Mode</span></div>
         </div>
-        <StepBar current={step} steps={STEPS}/>
+        <StepBar current={step} steps={STEPS} />
 
         {/* STEP 0 */}
-        {step===0 && <div className="section">
+        {step === 0 && <div className="section">
           <div className="section-head">Snap the receipt</div>
           <div className="section-sub">AI reads all items instantly</div>
           {!img ? (
-            <div className={`upload-zone ${drag?"drag":""}`}
-              onClick={()=>fileRef.current.click()}
-              onDragOver={e=>{e.preventDefault();setDrag(true);}}
-              onDragLeave={()=>setDrag(false)}
-              onDrop={e=>{e.preventDefault();setDrag(false);handleFile(e.dataTransfer.files[0]);}}>
-              <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={e=>handleFile(e.target.files[0])}/>
+            <div className={`upload-zone ${drag ? "drag" : ""}`}
+              onClick={() => fileRef.current.click()}
+              onDragOver={e => { e.preventDefault(); setDrag(true); }}
+              onDragLeave={() => setDrag(false)}
+              onDrop={e => { e.preventDefault(); setDrag(false); handleFile(e.dataTransfer.files[0]); }}>
+              <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={e => handleFile(e.target.files[0])} />
               <span className="upload-emoji">📸</span>
               <div className="upload-label">Tap to snap or upload</div>
               <div className="upload-hint">Any receipt • JPG, PNG, HEIC</div>
             </div>
           ) : (
             <>
-              <img src={img} className="preview-img" alt="Receipt"/>
+              <img src={img} className="preview-img" alt="Receipt" />
               {err && <div className="error-strip">⚠ {err}</div>}
               {loading ? (
                 <div className="loading-receipt">
-                  <div className="spinner"/>
+                  <div className="spinner" />
                   <div className="loading-label">Extracting menu items...</div>
                   <div className="loading-sub">Reading your receipt</div>
                 </div>
               ) : (
                 <>
                   <button className="btn btn-ink" onClick={parseReceipt}>Extract Menu Items →</button>
-                  <button className="btn btn-outline" onClick={()=>{setImg(null);setB64(null);setErr("");}}>Try another photo</button>
+                  <button className="btn btn-outline" onClick={() => { setImg(null); setB64(null); setErr(""); }}>Try another photo</button>
                 </>
               )}
             </>
@@ -1162,97 +1171,97 @@ function HostView({ onHome }) {
         </div>}
 
         {/* STEP 1 */}
-        {step===1 && <div className="section">
+        {step === 1 && <div className="section">
           <div className="section-head">Check items</div>
           <div className="section-sub">Prices already include tax & service charge</div>
-          {items.map(it=>(
+          {items.map(it => (
             <div key={it.id} className="line-item">
-              <input className="item-name-in" value={it.name} onChange={e=>upd(it.id,"name",e.target.value)}/>
+              <input className="item-name-in" value={it.name} onChange={e => upd(it.id, "name", e.target.value)} />
               <span className="rm-tag">RM</span>
-              <input className="item-price-in" type="number" step="0.01" value={it.price} onChange={e=>upd(it.id,"price",e.target.value)}/>
-              <button className="del-btn" onClick={()=>deleteItem(it.id)}>×</button>
+              <input className="item-price-in" type="number" step="0.01" value={it.price} onChange={e => upd(it.id, "price", e.target.value)} />
+              <button className="del-btn" onClick={() => deleteItem(it.id)}>×</button>
             </div>
           ))}
-          <button className="add-line-btn" onClick={()=>setItems(its=>[...its,{id:Date.now(),name:"New Item",price:0}])}>
+          <button className="add-line-btn" onClick={() => setItems(its => [...its, { id: Date.now(), name: "New Item", price: 0 }])}>
             + Add item
           </button>
-          <div style={{marginTop:16}}>
+          <div style={{ marginTop: 16 }}>
             <div className="total-row grand">
               <span className="total-label">TOTAL (incl. tax)</span>
               <span className="total-val">RM {subtotal.toFixed(2)}</span>
             </div>
           </div>
-          <div style={{marginTop:20}}>
-            <button className="btn btn-ink" disabled={items.length===0} onClick={()=>setStep(2)}>Next: Payment QR →</button>
-            <button className="btn btn-outline" onClick={()=>setStep(0)}>← Back</button>
+          <div style={{ marginTop: 20 }}>
+            <button className="btn btn-ink" disabled={items.length === 0} onClick={() => setStep(2)}>Next: Payment QR →</button>
+            <button className="btn btn-outline" onClick={() => setStep(0)}>← Back</button>
           </div>
         </div>}
 
         {/* STEP 2 */}
-        {step===2 && <div className="section">
+        {step === 2 && <div className="section">
           <div className="section-head">Your payment QR</div>
           <div className="section-sub">Guests scan this to pay you directly</div>
           {!qrImg ? (
-            <div className="qr-zone" onClick={()=>qrRef.current.click()}>
-              <input ref={qrRef} type="file" accept="image/*" onChange={e=>handleQR(e.target.files[0])}/>
+            <div className="qr-zone" onClick={() => qrRef.current.click()}>
+              <input ref={qrRef} type="file" accept="image/*" onChange={e => handleQR(e.target.files[0])} />
               <span className="upload-emoji">💳</span>
               <div className="upload-label">Upload your QR code</div>
               <div className="upload-hint">DuitNow • TNG • Maybank2u • Any QR</div>
             </div>
           ) : (
             <>
-              <img src={qrImg} className="qr-preview" alt="QR"/>
-              <button className="btn btn-outline" onClick={()=>setQrImg(null)} style={{marginBottom:14}}>Change QR</button>
+              <img src={qrImg} className="qr-preview" alt="QR" />
+              <button className="btn btn-outline" onClick={() => setQrImg(null)} style={{ marginBottom: 14 }}>Change QR</button>
             </>
           )}
-          <div style={{marginTop:16}}>
+          <div style={{ marginTop: 16 }}>
             <button className="btn btn-ink" onClick={finalise}>🔗 Generate Table Link →</button>
-            <button className="btn btn-outline" onClick={()=>setStep(1)}>← Back</button>
-            {!qrImg && <div className="section-sub" style={{textAlign:"center",marginTop:10}}>Skip if collecting payment another way</div>}
+            <button className="btn btn-outline" onClick={() => setStep(1)}>← Back</button>
+            {!qrImg && <div className="section-sub" style={{ textAlign: "center", marginTop: 10 }}>Skip if collecting payment another way</div>}
           </div>
         </div>}
 
         {/* STEP 3 */}
-        {step===3 && <div className="section">
+        {step === 3 && <div className="section">
           <div className="section-head">Table is live!</div>
           <div className="section-sub">Share with everyone at the table</div>
           <div className="share-receipt">
             <div className="share-code-label">Table Code</div>
             <div className="share-code">{code}</div>
-            <div className="neon-divider"/>
-            <div className="share-url-box" onClick={()=>{navigator.clipboard.writeText(url);setCopied(true);setTimeout(()=>setCopied(false),2000);}}>
+            <div className="neon-divider" />
+            <div className="share-url-box" onClick={() => { navigator.clipboard.writeText(url); setCopied(true); setTimeout(() => setCopied(false), 2000); }}>
               {url}
             </div>
             <div className="share-hint">Tap to copy • Share to WhatsApp / Telegram</div>
           </div>
-          <button className="btn btn-ink" onClick={()=>{navigator.clipboard.writeText(url);setCopied(true);setTimeout(()=>setCopied(false),2000);}}>
+          <button className="btn btn-ink" onClick={() => { navigator.clipboard.writeText(url); setCopied(true); setTimeout(() => setCopied(false), 2000); }}>
             {copied ? "✓ Copied!" : "📋 Copy Link"}
           </button>
-          <div style={{marginTop:16,borderTop:"1px dashed var(--ink-faint)",paddingTop:16}}>
-            <div style={{fontSize:"0.7rem",color:"var(--ink-faint)",letterSpacing:1.5,textTransform:"uppercase",marginBottom:12,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <div style={{ marginTop: 16, borderTop: "1px dashed var(--ink-faint)", paddingTop: 16 }}>
+            <div style={{ fontSize: "0.7rem", color: "var(--ink-faint)", letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <span>Bill Summary</span>
-              <span style={{color:"var(--neon-lime)",fontSize:"0.6rem"}}>{Object.keys(paidMap).length}/{items.length} paid</span>
+              <span style={{ color: "var(--neon-lime)", fontSize: "0.6rem" }}>{Object.keys(paidMap).length}/{items.length} paid</span>
             </div>
-            {items.map(i=>{
+            {items.map(i => {
               const paidBy = paidMap[i.id];
               return (
-                <div key={i.id} className={`line-item ${paidBy?"paid":""}`} style={{borderBottom:"1px dotted var(--ink-faint)"}}>
-                  <span style={{flex:1,fontSize:"0.85rem",color:"var(--ink)",fontFamily:"'DM Mono',monospace",textDecoration:paidBy?"line-through":"none"}}>
+                <div key={i.id} className={`line-item ${paidBy ? "paid" : ""}`} style={{ borderBottom: "1px dotted var(--ink-faint)" }}>
+                  <span style={{ flex: 1, fontSize: "0.85rem", color: "var(--ink)", fontFamily: "'DM Mono',monospace", textDecoration: paidBy ? "line-through" : "none" }}>
                     {i.name}
                   </span>
                   {paidBy
                     ? <span className="paid-tag">✓ {paidBy}</span>
-                    : <span style={{fontFamily:"'DM Mono',monospace",fontSize:"0.85rem",color:"var(--ink-light)",fontWeight:500}}>RM {parseFloat(i.price).toFixed(2)}</span>
+                    : <span style={{ fontFamily: "'DM Mono',monospace", fontSize: "0.85rem", color: "var(--ink-light)", fontWeight: 500 }}>RM {parseFloat(i.price).toFixed(2)}</span>
                   }
                 </div>
               );
             })}
-            <div className="bill-summary-row highlight" style={{marginTop:8,paddingTop:8,borderTop:"2px solid var(--ink)"}}>
-              <span style={{fontWeight:500,color:"var(--ink)"}}>Total</span>
+            <div className="bill-summary-row highlight" style={{ marginTop: 8, paddingTop: 8, borderTop: "2px solid var(--ink)" }}>
+              <span style={{ fontWeight: 500, color: "var(--ink)" }}>Total</span>
               <span className="bill-summary-val">RM {subtotal.toFixed(2)}</span>
             </div>
           </div>
-          <button className="btn btn-outline" style={{marginTop:16}} onClick={()=>{setStep(0);setImg(null);setB64(null);setItems([]);setQrImg(null);setCode("");setCopied(false);}}>
+          <button className="btn btn-outline" style={{ marginTop: 16 }} onClick={() => { setStep(0); setImg(null); setB64(null); setItems([]); setQrImg(null); setCode(""); setCopied(false); }}>
             🔄 Start new table
           </button>
         </div>}
@@ -1263,7 +1272,7 @@ function HostView({ onHome }) {
         <div className="undo-toast">
           <span className="toast-msg">"{toast.item.name}" removed</span>
           <button className="toast-undo" onClick={undoDelete}>Undo</button>
-          <div className="toast-bar"/>
+          <div className="toast-bar" />
         </div>
       )}
     </>
@@ -1281,11 +1290,11 @@ function GuestCode({ onJoin, onBack }) {
     <div className="receipt">
       <div className="receipt-inner">
         <div className="section-head">Join a table</div>
-        <div className="section-sub" style={{marginBottom:16}}>Enter the 6-letter code from the host</div>
+        <div className="section-sub" style={{ marginBottom: 16 }}>Enter the 6-letter code from the host</div>
         <input className="name-in" placeholder="e.g. AB12CD" value={code}
-          onChange={e=>setCode(e.target.value.toUpperCase())}
-          onKeyDown={e=>e.key==="Enter"&&tryJoin()} autoFocus
-          style={{textAlign:"center",letterSpacing:6,fontSize:"1.2rem"}}/>
+          onChange={e => setCode(e.target.value.toUpperCase())}
+          onKeyDown={e => e.key === "Enter" && tryJoin()} autoFocus
+          style={{ textAlign: "center", letterSpacing: 6, fontSize: "1.2rem" }} />
         {err && <div className="error-strip">⚠ {err}</div>}
         <button className="btn btn-ink" disabled={!code.trim()} onClick={tryJoin}>Join Table →</button>
         <button className="btn btn-outline" onClick={onBack}>← Back</button>
@@ -1312,7 +1321,7 @@ export default function KakiSplit() {
   return (
     <>
       <style>{css}</style>
-      <div className="bg"/>
+      <div className="bg" />
       <div className="app">
 
         {/* HOME */}
@@ -1327,18 +1336,18 @@ export default function KakiSplit() {
                 <div className="section-head">Who are you?</div>
                 <div className="section-sub">Pick your role for this session</div>
                 <div className="mode-grid">
-                  <div className="mode-card" onClick={()=>setMode("host")}>
+                  <div className="mode-card" onClick={() => setMode("host")}>
                     <span className="mode-emoji">🧾</span>
                     <div className="mode-title">Host</div>
                     <div className="mode-desc">I have the receipt & collecting money</div>
                   </div>
-                  <div className="mode-card" onClick={()=>setMode("guest-code")}>
+                  <div className="mode-card" onClick={() => setMode("guest-code")}>
                     <span className="mode-emoji">👥</span>
                     <div className="mode-title">Guest</div>
                     <div className="mode-desc">I got a link from the host</div>
                   </div>
                 </div>
-                <div style={{textAlign:"center",marginTop:14,fontSize:"0.58rem",color:"var(--ink-faint)",letterSpacing:1,textTransform:"uppercase"}}>
+                <div style={{ textAlign: "center", marginTop: 14, fontSize: "0.58rem", color: "var(--ink-faint)", letterSpacing: 1, textTransform: "uppercase" }}>
                   Guests — open the host's link directly for best experience
                 </div>
               </div>
@@ -1346,13 +1355,13 @@ export default function KakiSplit() {
           </>
         )}
 
-        {mode==="host" && <HostView onHome={()=>setMode(null)}/>}
+        {mode === "host" && <HostView onHome={() => setMode(null)} />}
 
-        {mode==="guest" && guestSession && (
+        {mode === "guest" && guestSession && (
           <>
             <div className="receipt">
               <div className="header-receipt">
-                <button className="home-btn" onClick={()=>setMode(null)}>
+                <button className="home-btn" onClick={() => setMode(null)}>
                   <span className="home-btn-icon">⌂</span>
                   <span className="home-btn-label">Home</span>
                 </button>
@@ -1361,15 +1370,15 @@ export default function KakiSplit() {
                 <div><span className="badge-strip guest-badge">👥 Guest</span></div>
               </div>
             </div>
-            <GuestView session={guestSession} onBack={()=>setMode(null)}/>
+            <GuestView session={guestSession} onBack={() => setMode(null)} />
           </>
         )}
 
-        {mode==="guest-code" && (
+        {mode === "guest-code" && (
           <>
             <div className="receipt">
               <div className="header-receipt">
-                <button className="home-btn" onClick={()=>setMode(null)}>
+                <button className="home-btn" onClick={() => setMode(null)}>
                   <span className="home-btn-icon">⌂</span>
                   <span className="home-btn-label">Home</span>
                 </button>
@@ -1378,17 +1387,17 @@ export default function KakiSplit() {
                 <div><span className="badge-strip guest-badge">👥 Guest</span></div>
               </div>
             </div>
-            <GuestCode onJoin={s=>{setGuestSession(s);setMode("guest");}} onBack={()=>setMode(null)}/>
+            <GuestCode onJoin={s => { setGuestSession(s); setMode("guest"); }} onBack={() => setMode(null)} />
           </>
         )}
 
-        {mode==="notfound" && (
+        {mode === "notfound" && (
           <div className="receipt">
-            <div className="receipt-inner" style={{textAlign:"center",padding:"40px 24px"}}>
-              <div style={{fontSize:"3rem",marginBottom:14}}>😕</div>
-              <div className="section-head" style={{textAlign:"center"}}>Table not found</div>
-              <div className="section-sub" style={{textAlign:"center",marginBottom:24}}>Link may have expired or host hasn't started yet</div>
-              <button className="btn btn-ink" onClick={()=>setMode(null)}>Back to Home</button>
+            <div className="receipt-inner" style={{ textAlign: "center", padding: "40px 24px" }}>
+              <div style={{ fontSize: "3rem", marginBottom: 14 }}>😕</div>
+              <div className="section-head" style={{ textAlign: "center" }}>Table not found</div>
+              <div className="section-sub" style={{ textAlign: "center", marginBottom: 24 }}>Link may have expired or host hasn't started yet</div>
+              <button className="btn btn-ink" onClick={() => setMode(null)}>Back to Home</button>
             </div>
           </div>
         )}
