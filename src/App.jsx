@@ -1225,9 +1225,28 @@ function HostView({ onHome }) {
             value={tableName} onChange={e => setTableName(e.target.value)}
             style={{ marginBottom: 12 }} />
           <div style={{ fontSize: "0.7rem", color: "var(--ink-faint)", letterSpacing: 1, textTransform: "uppercase", marginBottom: 8 }}>Date</div>
-          <input className="name-in" type="date" value={tableDate}
-            onChange={e => setTableDate(e.target.value)}
-            style={{ marginBottom: 20 }} />
+          <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+            {[0, 1, 2, 3, 4, 5, 6].map(d => {
+              const date = new Date();
+              date.setDate(date.getDate() - d);
+              const val = date.toISOString().split("T")[0];
+              const label = d === 0 ? "Today" : d === 1 ? "Yesterday" : date.toLocaleDateString("en-MY", { weekday: "short" });
+              const day = date.toLocaleDateString("en-MY", { day: "numeric" });
+              return (
+                <div key={val} onClick={() => setTableDate(val)}
+                  style={{
+                    flex: 1, textAlign: "center", padding: "10px 4px",
+                    borderRadius: 4, cursor: "pointer",
+                    background: tableDate === val ? "var(--ink)" : "var(--paper-dark)",
+                    border: tableDate === val ? "1.5px solid var(--ink)" : "1.5px solid var(--ink-faint)",
+                    transition: "all 0.15s"
+                  }}>
+                  <div style={{ fontSize: "0.55rem", color: tableDate === val ? "var(--neon-lime)" : "var(--ink-faint)", letterSpacing: 1, textTransform: "uppercase", marginBottom: 3 }}>{label}</div>
+                  <div style={{ fontSize: "0.85rem", fontWeight: 500, color: tableDate === val ? "var(--neon-lime)" : "var(--ink)" }}>{day}</div>
+                </div>
+              );
+            })}
+          </div>
           <button className="btn btn-ink" onClick={() => setStep(2)}>Next: Check Items →</button>
           <button className="btn btn-outline" onClick={() => setStep(0)}>← Back</button>
         </div>}
