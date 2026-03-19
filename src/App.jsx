@@ -850,7 +850,7 @@ body {
 
 function genCode() { return Math.floor(1000 + Math.random() * 9000).toString(); }
 async function save(d) {
-  await supabase.from("sessions").upsert({
+  const { data, error } = await supabase.from("sessions").upsert({
     code: d.code,
     items: d.items,
     qr_image: d.qrImage || null,
@@ -858,6 +858,7 @@ async function save(d) {
     table_name: d.tableName || "My Table",
     table_date: d.tableDate || new Date().toISOString().split("T")[0]
   });
+  console.log("SAVE RESULT:", data, error);
 }
 
 async function load(code) {
