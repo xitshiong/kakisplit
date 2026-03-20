@@ -998,7 +998,7 @@ function GuestView({ session, onBack }) {
         {!qrImage && <div className="section-sub" style={{ textAlign: "center", marginTop: 14 }}>Ask host for payment QR</div>}
       </div>
 
-      {showQR && qrImage && (
+      {showQR && (
         <div className="qr-modal" onClick={() => setShowQR(false)}>
           <div className="qr-modal-inner" onClick={e => e.stopPropagation()}>
             <div className="qr-modal-top">
