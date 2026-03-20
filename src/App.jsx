@@ -1062,7 +1062,7 @@ function GuestView({ session, onBack }) {
           <div className="sticky-label">Your total</div>
           <div className="sticky-amt">{myTotal > 0 ? `RM ${myTotal.toFixed(2)}` : "— —"}</div>
         </div>
-        <button className="sticky-pay-btn" disabled={myTotal === 0} onClick={() => qrImage ? setShowQR(true) : confirmPayment()}>
+        <button className="sticky-pay-btn" disabled={myTotal === 0} onClick={() => setShowQR(true)}>
           {qrImage ? "Pay Now →" : "Confirm →"}
         </button>
       </div>
