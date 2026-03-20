@@ -1112,7 +1112,7 @@ function HostView({ onHome }) {
             contents: [{
               parts: [
                 { inline_data: { mime_type: "image/jpeg", data: b64 } },
-                { text: `Extract all line items from this receipt. Return ONLY valid JSON, no markdown, no explanation:\n{"items":[{"name":"Item Name","price":12.50}],"tax":1.50,"serviceCharge":2.00,"discount":5.00}\nRules: price = total for that line. tax/serviceCharge/discount = amounts not %, use 0 if absent. discount is a negative adjustment to the total.` }
+                { text: `Extract individual line items from this receipt. Return ONLY valid JSON, no markdown, no explanation:\n{"items":[{"name":"Item Name","price":12.50,"qty":2}],"tax":1.50,"serviceCharge":2.00,"discount":0}\nRules:\n- price = unit price for ONE item (divide total by qty)\n- qty = quantity shown on receipt, default 1\n- If same item appears multiple times, combine them into one entry with combined qty\n- IGNORE subtotal, total, grand total, rounding rows\n- tax = Govt SST amount, serviceCharge = Service Charge amount, discount = discount amount, all in ringgit not %\n- use 0 if any field absent` }
               ]
             }],
             generationConfig: { temperature: 0.1, maxOutputTokens: 8192 }
@@ -1128,21 +1128,22 @@ function HostView({ onHome }) {
       const sc = parseFloat(parsed.serviceCharge || 0);
       const discount = parseFloat(parsed.discount || 0);
       const extras = tax + sc - discount;
-      const rawSubtotal = rawItems.reduce((s, i) => s + parseFloat(i.price || 0), 0);
-      const expanded = [];
+      const rawSubtotal = rawItems.reduce((s, i) => s + parseFloat(i.price || 0) * parseInt(i.qty || 1), 0);
+      const baked = [];
+      let idCounter = 1;
       rawItems.forEach(it => {
-        const qty = parseInt(it.qty || 1);
         const itemPrice = parseFloat(it.price || 0);
+        const qty = parseInt(it.qty || 1);
+        const lineTotal = itemPrice * qty;
+        const proportion = rawSubtotal > 0 ? lineTotal / rawSubtotal : 0;
+        const finalUnitPrice = parseFloat((itemPrice + extras * proportion / qty).toFixed(2));
         for (let q = 0; q < qty; q++) {
-          expanded.push({ name: qty > 1 ? `${it.name} (${q + 1}/${qty})` : it.name, price: itemPrice });
+          baked.push({
+            name: qty > 1 ? `${it.name} (${q + 1}/${qty})` : it.name,
+            price: finalUnitPrice,
+            id: idCounter++
+          });
         }
-      });
-
-      const expandedSubtotal = expanded.reduce((s, i) => s + i.price, 0);
-      const baked = expanded.map((it, i) => {
-        const proportion = expandedSubtotal > 0 ? it.price / expandedSubtotal : 0;
-        const finalPrice = parseFloat((it.price + extras * proportion).toFixed(2));
-        return { ...it, price: finalPrice, id: i + 1 };
       });
       setItems(baked);
       setStep(1);
