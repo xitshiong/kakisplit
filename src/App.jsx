@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { createClient } from "@supabase/supabase-js";
-import { Analytics } from "@vercel/analytics/next"
+import { Analytics } from "@vercel/analytics/react"
 
 const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL,
