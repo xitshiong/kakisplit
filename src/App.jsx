@@ -997,29 +997,6 @@ function GuestView({ session, onBack }) {
         </button>
         {!qrImage && <div className="section-sub" style={{ textAlign: "center", marginTop: 14 }}>Ask host for payment QR</div>}
       </div>
-
-      {showQR && (
-        <div className="qr-modal" onClick={() => setShowQR(false)}>
-          <div className="qr-modal-inner" onClick={e => e.stopPropagation()}>
-            <div className="qr-modal-top">
-              <div className="qr-modal-title">Scan & Pay</div>
-              <div className="qr-modal-sub">Pay exactly this amount</div>
-            </div>
-            <div className="qr-modal-amt">RM {myTotal.toFixed(2)}</div>
-            <div className="qr-img-wrap">
-              <img src={qrImage} className="qr-img" alt="QR" />
-            </div>
-            <button className="qr-modal-close" style={{ background: "var(--neon-pink)", color: "var(--paper)" }}
-              onClick={confirmPayment}>
-              ✅ I Have Paid
-            </button>
-            <button className="qr-modal-close" style={{ background: "transparent", color: "var(--ink-faint)", borderTop: "1px dashed var(--ink-faint)" }}
-              onClick={() => setShowQR(false)}>
-              ← Back
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 
@@ -1062,11 +1039,185 @@ function GuestView({ session, onBack }) {
           <div className="sticky-label">Your total</div>
           <div className="sticky-amt">{myTotal > 0 ? `RM ${myTotal.toFixed(2)}` : "— —"}</div>
         </div>
-        <button className="sticky-pay-btn" disabled={myTotal === 0} onClick={() => setShowQR(true)}>
+        <button className="sticky-pay-btn" disabled={myTotal === 0} onClick={() => qrImage ? setShowQR(true) : confirmPayment()}>
           {qrImage ? "Pay Now →" : "Confirm →"}
         </button>
       </div>
+
+      {showQR && (
+        <div className="qr-modal" onClick={() => setShowQR(false)}>
+          <div className="qr-modal-inner" onClick={e => e.stopPropagation()}>
+            <div className="qr-modal-top">
+              <div className="qr-modal-title">Scan & Pay</div>
+              <div className="qr-modal-sub">Pay exactly this amount</div>
+            </div>
+            <div className="qr-modal-amt">RM {myTotal.toFixed(2)}</div>
+            <div className="qr-img-wrap">
+              <img src={qrImage} className="qr-img" alt="QR" />
+            </div>
+            <button className="qr-modal-close" style={{ background: "var(--neon-pink)", color: "var(--paper)" }}
+              onClick={confirmPayment}>
+              ✅ I Have Paid
+            </button>
+            <button className="qr-modal-close" style={{ background: "transparent", color: "var(--ink-faint)", borderTop: "1px dashed var(--ink-faint)" }}
+              onClick={() => setShowQR(false)}>
+              ← Back
+            </button>
+          </div>
+        </div>
+      )}
     </>
+  );
+}
+
+// ── SCAN TO EXCEL ─────────────────────────────────────────────
+function ScanToExcel({ onHome }) {
+  const [img, setImg] = useState(null);
+  const [b64, setB64] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState("");
+  const [drag, setDrag] = useState(false);
+  const [items, setItems] = useState([]);
+  const [tax, setTax] = useState(0);
+  const [sc, setSc] = useState(0);
+  const [discount, setDiscount] = useState(0);
+  const [copied, setCopied] = useState(false);
+  const fileRef = useRef();
+
+  const handleFile = f => {
+    if (!f?.type.startsWith("image/")) return;
+    setImg(URL.createObjectURL(f));
+    const r = new FileReader();
+    r.onload = e => setB64(e.target.result.split(",")[1]);
+    r.readAsDataURL(f);
+    setErr(""); setItems([]); setCopied(false);
+  };
+
+  const scanReceipt = async () => {
+    setLoading(true); setErr("");
+    try {
+      const GEMINI_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${GEMINI_KEY}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{
+              parts: [
+                { inline_data: { mime_type: "image/jpeg", data: b64 } },
+                { text: `Extract individual line items from this receipt. Return ONLY valid JSON, no markdown, no explanation:\n{"items":[{"name":"Item Name","price":12.50,"qty":2}],"tax":1.50,"serviceCharge":2.00,"discount":0}\nRules:\n- price = unit price for ONE item (divide total by qty)\n- qty = quantity shown on receipt, default 1\n- If same item appears multiple times, combine them into one entry with combined qty\n- IGNORE subtotal, total, grand total, rounding rows\n- tax = Govt SST amount, serviceCharge = Service Charge amount, discount = discount amount, all in ringgit not %\n- use 0 if any field absent` }
+              ]
+            }],
+            generationConfig: { temperature: 0.1, maxOutputTokens: 8192 }
+          })
+        }
+      );
+      const data = await res.json();
+      const txt = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+      const parsed = JSON.parse(txt.replace(/```json|```/g, "").trim());
+      setItems((parsed.items || []).map((it, i) => ({ id: i, name: it.name, price: parseFloat(it.price || 0), qty: parseInt(it.qty || 1) })));
+      setTax(parseFloat(parsed.tax || 0));
+      setSc(parseFloat(parsed.serviceCharge || 0));
+      setDiscount(parseFloat(parsed.discount || 0));
+    } catch (e) { setErr("Couldn't read receipt. Try a clearer photo."); }
+    setLoading(false);
+  };
+
+  const copyForExcel = () => {
+    const rows = ["Item\tQty\tUnit Price\tTotal"];
+    items.forEach(it => {
+      const lineTotal = (it.price * it.qty).toFixed(2);
+      rows.push(`${it.name}\t${it.qty}\t${it.price.toFixed(2)}\t${lineTotal}`);
+    });
+    const subtotal = items.reduce((s, it) => s + it.price * it.qty, 0);
+    rows.push(`\t\tSubtotal\t${subtotal.toFixed(2)}`);
+    if (tax > 0) rows.push(`\t\tTax (SST)\t${tax.toFixed(2)}`);
+    if (sc > 0) rows.push(`\t\tService Charge\t${sc.toFixed(2)}`);
+    if (discount > 0) rows.push(`\t\tDiscount\t-${discount.toFixed(2)}`);
+    rows.push(`\t\tGrand Total\t${(subtotal + tax + sc - discount).toFixed(2)}`);
+    navigator.clipboard.writeText(rows.join("\n"));
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2500);
+  };
+
+  const upd = (id, f, v) => setItems(its => its.map(it => it.id === id ? { ...it, [f]: v } : it));
+
+  return (
+    <div className="receipt">
+      <div className="header-receipt">
+        <button className="home-btn" onClick={onHome}>
+          <span className="home-btn-icon">⌂</span>
+          <span className="home-btn-label">Home</span>
+        </button>
+        <img src={LOGO_SRC} alt="KakiSplit" className="logo-img" />
+        <div className="logo-tagline">Split bills lah, no drama</div>
+        <div><span className="badge-strip">📊 Scan to Excel</span></div>
+      </div>
+
+      <div className="section">
+        <div className="section-head">Scan your receipt</div>
+        <div className="section-sub">Extract items & copy straight into Excel</div>
+
+        {!img ? (
+          <div className={`upload-zone ${drag ? "drag" : ""}`}
+            onClick={() => fileRef.current.click()}
+            onDragOver={e => { e.preventDefault(); setDrag(true); }}
+            onDragLeave={() => setDrag(false)}
+            onDrop={e => { e.preventDefault(); setDrag(false); handleFile(e.dataTransfer.files[0]); }}>
+            <input ref={fileRef} type="file" accept="image/*" onChange={e => handleFile(e.target.files[0])} />
+            <span className="upload-emoji">📸</span>
+            <div className="upload-label">Tap to snap or upload</div>
+            <div className="upload-hint">Any receipt · JPG, PNG, HEIC</div>
+          </div>
+        ) : (
+          <>
+            <img src={img} className="preview-img" alt="Receipt" />
+            {err && <div className="error-strip">⚠ {err}</div>}
+            {loading ? (
+              <div className="loading-receipt">
+                <div className="spinner" />
+                <div className="loading-label">Extracting items...</div>
+                <div className="loading-sub">Reading your receipt</div>
+              </div>
+            ) : items.length === 0 ? (
+              <>
+                <button className="btn btn-ink" onClick={scanReceipt}>Extract Items →</button>
+                <button className="btn btn-outline" onClick={() => { setImg(null); setB64(null); setErr(""); }}>Try another photo</button>
+              </>
+            ) : null}
+          </>
+        )}
+
+        {items.length > 0 && (
+          <>
+            <div style={{ marginTop: 16, marginBottom: 8 }}>
+              {items.map(it => (
+                <div key={it.id} className="line-item">
+                  <input className="item-name-in" value={it.name} onChange={e => upd(it.id, "name", e.target.value)} />
+                  <input className="item-price-in" type="number" step="1" min="1" value={it.qty}
+                    onChange={e => upd(it.id, "qty", parseInt(e.target.value) || 1)}
+                    style={{ width: 36, textAlign: "center" }} title="Qty" />
+                  <span className="rm-tag">RM</span>
+                  <input className="item-price-in" type="number" step="0.01" value={it.price} onChange={e => upd(it.id, "price", parseFloat(e.target.value) || 0)} />
+                </div>
+              ))}
+              <div className="total-row grand" style={{ marginTop: 12 }}>
+                <span className="total-label">GRAND TOTAL</span>
+                <span className="total-val">RM {(items.reduce((s, it) => s + it.price * it.qty, 0) + tax + sc - discount).toFixed(2)}</span>
+              </div>
+            </div>
+
+            <button className="btn btn-ink" onClick={copyForExcel} style={{ background: copied ? "var(--neon-lime)" : undefined, color: copied ? "var(--ink)" : undefined }}>
+              {copied ? "✅ Copied! Paste into Excel" : "📋 Copy for Excel"}
+            </button>
+            <button className="btn btn-outline" onClick={() => { setImg(null); setB64(null); setItems([]); setErr(""); setCopied(false); }}>
+              Scan another receipt
+            </button>
+          </>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -1612,6 +1763,11 @@ export default function KakiSplit() {
                     <div className="mode-title">Guest</div>
                     <div className="mode-desc">I got a code from the host</div>
                   </div>
+                  <div className="mode-card" onClick={() => setMode("scan-excel")}>
+                    <span className="mode-emoji">📊</span>
+                    <div className="mode-title">Scan to Excel</div>
+                    <div className="mode-desc">Extract receipt items for spreadsheet</div>
+                  </div>
                 </div>
               </div>
 
@@ -1642,6 +1798,7 @@ export default function KakiSplit() {
 
           {mode === "host" && <HostView onHome={() => setMode(null)} />}
           {mode === "host-return" && <HostReturn onHome={() => setMode(null)} />}
+          {mode === "scan-excel" && <ScanToExcel onHome={() => setMode(null)} />}
 
           {mode === "guest" && guestSession && (
             <>
