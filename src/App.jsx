@@ -1687,6 +1687,17 @@ function HostReturn({ onHome }) {
         <button className="btn btn-ink" style={{ marginTop: 16 }} onClick={() => navigator.clipboard.writeText(url)}>
           📋 Copy Table Link
         </button>
+        <button className="btn btn-outline" style={{ marginTop: 10 }} onClick={() => {
+          const rows = ["Item\tPaid By\tPrice"];
+          session.items.forEach(i => {
+            rows.push(`${i.name}\t${paidMap[i.id] || ""}\t${parseFloat(i.price).toFixed(2)}`);
+          });
+          rows.push(`\t\t`);
+          rows.push(`Total\t\t${subtotal.toFixed(2)}`);
+          navigator.clipboard.writeText(rows.join("\n"));
+        }}>
+          📊 Copy to Excel
+        </button>
         <button className="btn btn-outline" style={{ marginTop: 10, borderColor: "var(--neon-pink)", color: "var(--neon-pink)" }}
           onClick={async () => {
             await supabase.from("sessions").update({ concluded: true }).eq("code", code);
@@ -1762,11 +1773,6 @@ export default function KakiSplit() {
                     <span className="mode-emoji">👥</span>
                     <div className="mode-title">Guest</div>
                     <div className="mode-desc">I got a code from the host</div>
-                  </div>
-                  <div className="mode-card" onClick={() => setMode("scan-excel")}>
-                    <span className="mode-emoji">📊</span>
-                    <div className="mode-title">Scan to Excel</div>
-                    <div className="mode-desc">Extract receipt items for spreadsheet</div>
                   </div>
                 </div>
               </div>
