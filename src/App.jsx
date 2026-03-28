@@ -970,7 +970,7 @@ function GuestView({ session, onBack }) {
         <div className="section-sub" style={{ textAlign: "center", marginBottom: 20 }}>Here's your share of the bill</div>
 
         <div style={{ background: "var(--ink)", borderRadius: 4, padding: "16px 20px", marginBottom: 16, textAlign: "center" }}>
-          <div style={{ fontSize: "0.55rem", color: "rgba(245,240,232,0.4)", letterSpacing: 3, textTransform: "uppercase", marginBottom: 6 }}>You owe</div>
+          <div style={{ fontSize: "0.55rem", color: "rgba(245,240,232,0.4)", letterSpacing: 3, textTransform: "uppercase", marginBottom: 6 }}>You paid</div>
           <div style={{ fontFamily: "Unbounded,sans-serif", fontSize: "2.4rem", fontWeight: 900, color: "var(--neon-lime)", letterSpacing: -1 }}>
             RM {myTotal.toFixed(2)}
           </div>
