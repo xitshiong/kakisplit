@@ -879,8 +879,8 @@ async function load(code) {
   };
 }
 
-async function savePaid(itemId, name) {
-  const code = new URLSearchParams(window.location.search).get("table") || localStorage.getItem("ks_current_code");
+async function savePaid(itemId, name, code) {
+  if (!code) code = new URLSearchParams(window.location.search).get("table") || localStorage.getItem("ks_current_code");
   if (!code) return;
   const { data } = await supabase.from("sessions").select("paid").eq("code", code).single();
   const paid = data?.paid || {};
