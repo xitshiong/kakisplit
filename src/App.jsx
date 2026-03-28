@@ -982,21 +982,6 @@ function GuestView({ session, onBack }) {
             <span className="bill-summary-val">RM {parseFloat(i.price).toFixed(2)}</span>
           </div>
         ))}
-
-        {qrImage && (
-          <div style={{ marginTop: 20, textAlign: "center" }}>
-            <div style={{ fontSize: "0.65rem", color: "var(--ink-faint)", letterSpacing: 2, textTransform: "uppercase", marginBottom: 12 }}>
-              Scan to Pay
-            </div>
-            <div style={{ background: "white", padding: 16, borderRadius: 4, display: "inline-block", marginBottom: 16 }}>
-              <img src={qrImage} style={{ width: 200, height: 200, objectFit: "contain", display: "block" }} alt="Payment QR" />
-            </div>
-          </div>
-        )}
-        <button className="btn btn-ink" style={{ marginTop: 8 }} onClick={confirmPayment}>
-          ✅ I Have Paid
-        </button>
-        {!qrImage && <div className="section-sub" style={{ textAlign: "center", marginTop: 14 }}>Ask host for payment QR</div>}
       </div>
     </div>
   );
