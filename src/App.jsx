@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { createClient } from "@supabase/supabase-js";
+import { Analytics } from "@vercel/analytics/next"
 
 const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL,
@@ -1695,6 +1696,12 @@ function HostReturn({ onHome }) {
           rows.push(`\t\t`);
           rows.push(`Total\t\t${subtotal.toFixed(2)}`);
           navigator.clipboard.writeText(rows.join("\n"));
+          if (session.qrImage) {
+            const a = document.createElement("a");
+            a.href = session.qrImage;
+            a.download = `${session.tableName || "table"}-qr.png`;
+            a.click();
+          }
         }}>
           📊 Copy to Excel
         </button>
