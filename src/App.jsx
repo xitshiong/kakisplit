@@ -1024,11 +1024,20 @@ function GuestView({ session, onBack }) {
                 <span className="guest-paid-tag">paid by {paidBy.join(", ")}</span>
               </div>
             );
+
+            if (alreadyPaid) return (
+              <div key={item.id} className="guest-item paid-item">
+                <div className="g-check">✓</div>
+                <span className="g-name">{item.name}</span>
+                <span className="guest-paid-tag">you paid</span>
+              </div>
+            );
+
             return (
               <div key={item.id}>
-                <div className={`guest-item ${sel[item.id] ? "sel" : ""} ${alreadyPaid ? "paid-item" : ""}`}
-                  onClick={() => !alreadyPaid && setSel(s => ({ ...s, [item.id]: !s[item.id] }))}>
-                  <div className="g-check">{alreadyPaid ? "✓" : sel[item.id] ? "✓" : ""}</div>
+                <div className={`guest-item ${sel[item.id] ? "sel" : ""}`}
+                  onClick={() => setSel(s => ({ ...s, [item.id]: !s[item.id] }))}>
+                  <div className="g-check">{sel[item.id] ? "✓" : ""}</div>
                   <span className="g-name">{item.name}</span>
                   <span className="g-price">RM {splitPrice.toFixed(2)}</span>
                 </div>
@@ -1037,7 +1046,7 @@ function GuestView({ session, onBack }) {
                     {paidBy.length}/{totalSplit} paid by {paidBy.join(", ")}
                   </div>
                 )}
-                {sel[item.id] && !alreadyPaid && (
+                {sel[item.id] && (
                   <div style={{ padding: "4px 24px 8px 56px", display: "flex", alignItems: "center", gap: 8, fontSize: "0.7rem", color: "var(--ink-light)" }}>
                     <span>Split with:</span>
                     <button onClick={() => setSplits(s => ({ ...s, [item.id]: Math.max(1, (s[item.id] || 1) - 1) }))}
