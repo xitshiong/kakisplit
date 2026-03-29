@@ -1047,13 +1047,13 @@ function GuestView({ session, onBack }) {
                   </div>
                 )}
                 {sel[item.id] && splitCount === 1 && (
-                  <div style={{ padding: "4px 24px 8px 56px", display: "flex", alignItems: "center", gap: 8, fontSize: "0.7rem", color: "var(--ink-light)" }}>
-                    <span>Split with:</span>
+                  <div style={{ padding: "8px 24px 12px 56px", display: "flex", alignItems: "center", gap: 12, fontSize: "0.75rem", color: "var(--ink)" }}>
+                    <span style={{ fontWeight: 500 }}>Split with:</span>
                     <button onClick={() => setSplits(s => ({ ...s, [item.id]: Math.max(1, (s[item.id] || 1) - 1) }))}
-                      style={{ padding: "2px 8px", background: "var(--ink-faint)", border: "none", borderRadius: 4, cursor: "pointer" }}>−</button>
-                    <span style={{ minWidth: 60, textAlign: "center" }}>{(splits[item.id] || 1) === 1 ? "no one" : `${(splits[item.id] || 1) - 1} other${(splits[item.id] || 1) > 2 ? "s" : ""}`}</span>
+                      style={{ padding: "8px 16px", background: "var(--ink)", color: "var(--paper)", border: "none", borderRadius: 8, cursor: "pointer", fontSize: "1rem", fontWeight: 600, minWidth: 40 }}>−</button>
+                    <span style={{ minWidth: 80, textAlign: "center", fontWeight: 600, fontSize: "0.8rem" }}>{(splits[item.id] || 1) === 1 ? "no one" : `${(splits[item.id] || 1) - 1} other${(splits[item.id] || 1) > 2 ? "s" : ""}`}</span>
                     <button onClick={() => setSplits(s => ({ ...s, [item.id]: (s[item.id] || 1) + 1 }))}
-                      style={{ padding: "2px 8px", background: "var(--ink-faint)", border: "none", borderRadius: 4, cursor: "pointer" }}>+</button>
+                      style={{ padding: "8px 16px", background: "var(--ink)", color: "var(--paper)", border: "none", borderRadius: 8, cursor: "pointer", fontSize: "1rem", fontWeight: 600, minWidth: 40 }}>+</button>
                   </div>
                 )}
               </div>
