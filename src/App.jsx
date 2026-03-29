@@ -1531,14 +1531,16 @@ function HostView({ onHome }) {
               <span style={{ color: "var(--ink-light)", fontSize: "0.6rem" }}>{Object.keys(paidMap).length}/{items.length} paid</span>
             </div>
             {items.map(i => {
-              const paidBy = paidMap[i.id];
+              const paidInfo = paidMap[i.id];
+              const payers = paidInfo?.payers || (paidInfo ? [paidInfo] : []);
+              const isPaid = payers.length > 0;
               return (
-                <div key={i.id} className={`line-item ${paidBy ? "paid" : ""}`} style={{ borderBottom: "1px dotted var(--ink-faint)" }}>
-                  <span style={{ flex: 1, fontSize: "0.85rem", color: "var(--ink)", fontFamily: "'DM Mono',monospace", textDecoration: paidBy ? "line-through" : "none" }}>
+                <div key={i.id} className={`line-item ${isPaid ? "paid" : ""}`} style={{ borderBottom: "1px dotted var(--ink-faint)" }}>
+                  <span style={{ flex: 1, fontSize: "0.85rem", color: "var(--ink)", fontFamily: "'DM Mono',monospace", textDecoration: isPaid ? "line-through" : "none" }}>
                     {i.name}
                   </span>
-                  {paidBy
-                    ? <span className="paid-tag">✓ {paidBy}</span>
+                  {isPaid
+                    ? <span className="paid-tag">✓ {payers.join(", ")}</span>
                     : <span style={{ fontFamily: "'DM Mono',monospace", fontSize: "0.85rem", color: "var(--ink-light)", fontWeight: 500 }}>RM {parseFloat(i.price).toFixed(2)}</span>
                   }
                 </div>
@@ -1682,19 +1684,22 @@ function HostReturn({ onHome }) {
             <div style={{ fontSize: "0.6rem", color: "var(--ink-light)", letterSpacing: 2, textTransform: "uppercase", marginBottom: 8, fontWeight: 500 }}>
               ✓ Paid ({session.items.filter(i => paidMap[i.id]).length})
             </div>
-            {session.items.filter(i => paidMap[i.id]).map(i => (
+            {session.items.filter(i => paidMap[i.id]).map(i => {
+              const paidInfo = paidMap[i.id];
+              const payers = paidInfo?.payers || [paidInfo];
+              return (
               <div key={i.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 0", borderBottom: "1px dotted var(--ink-faint)", opacity: 0.5 }}>
                 <div style={{ flex: 1 }}>
                   <span style={{ fontSize: "0.85rem", color: "var(--ink)", fontFamily: "'DM Mono',monospace", textDecoration: "line-through" }}>
                     {i.name}
                   </span>
                   <div style={{ fontSize: "0.65rem", color: "var(--ink-faint)", marginTop: 2 }}>
-                    paid by {paidMap[i.id]}
+                    paid by {payers.join(", ")}
                   </div>
                 </div>
-                <span className="paid-tag">✓ {paidMap[i.id]}</span>
+                <span className="paid-tag">✓ {payers.join(", ")}</span>
               </div>
-            ))}
+            )})}
           </div>
         )}
 
@@ -1709,7 +1714,9 @@ function HostReturn({ onHome }) {
         <button className="btn btn-outline" style={{ marginTop: 10 }} onClick={() => {
           const rows = ["Item\tPaid By\tPrice"];
           session.items.forEach(i => {
-            rows.push(`${i.name}\t${paidMap[i.id] || ""}\t${parseFloat(i.price).toFixed(2)}`);
+            const paidInfo = paidMap[i.id];
+            const payers = paidInfo?.payers ? paidInfo.payers.join(", ") : (paidInfo || "");
+            rows.push(`${i.name}\t${payers}\t${parseFloat(i.price).toFixed(2)}`);
           });
           rows.push(`\t\t`);
           rows.push(`Total\t\t${subtotal.toFixed(2)}`);
