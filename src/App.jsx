@@ -880,12 +880,14 @@ async function load(code) {
   };
 }
 
-async function savePaid(itemId, name, code) {
+async function savePaid(itemId, name, code, splitCount = 1) {
   if (!code) code = new URLSearchParams(window.location.search).get("table") || localStorage.getItem("ks_current_code");
   if (!code) return;
   const { data } = await supabase.from("sessions").select("paid").eq("code", code).single();
   const paid = data?.paid || {};
-  paid[itemId] = name;
+  if (!paid[itemId]) paid[itemId] = { payers: [], total: splitCount };
+  if (!paid[itemId].payers) paid[itemId] = { payers: [paid[itemId]], total: 1 };
+  if (!paid[itemId].payers.includes(name)) paid[itemId].payers.push(name);
   await supabase.from("sessions").update({ paid }).eq("code", code);
 }
 
@@ -942,7 +944,7 @@ function GuestView({ session, onBack }) {
 
   const confirmPayment = async () => {
     for (const i of myItems) {
-      await savePaid(i.id, name, session.code);
+      await savePaid(i.id, name, session.code, splits[i.id] || 1);
     }
     const updated = await loadPaid(session.code);
     setPaidMap(updated);
@@ -1007,26 +1009,35 @@ function GuestView({ session, onBack }) {
         </div>
         <div style={{ padding: "4px 24px 90px" }}>
           {items.map(item => {
-            const paidBy = paidMap[item.id];
+            const paidInfo = paidMap[item.id];
+            const paidBy = paidInfo?.payers || (paidInfo ? [paidInfo] : []);
+            const totalSplit = paidInfo?.total || 1;
+            const fullyPaid = paidBy.length >= totalSplit;
+            const alreadyPaid = paidBy.includes(name);
             const splitCount = splits[item.id] || 1;
             const splitPrice = parseFloat(item.price || 0) / splitCount;
 
-            if (paidBy) return (
+            if (fullyPaid) return (
               <div key={item.id} className="guest-item paid-item">
                 <div className="g-check" style={{ borderColor: "var(--ink-faint)" }}>–</div>
                 <span className="g-name" style={{ textDecoration: "line-through" }}>{item.name}</span>
-                <span className="guest-paid-tag">paid by {paidBy}</span>
+                <span className="guest-paid-tag">paid by {paidBy.join(", ")}</span>
               </div>
             );
             return (
               <div key={item.id}>
-                <div className={`guest-item ${sel[item.id] ? "sel" : ""}`}
-                  onClick={() => setSel(s => ({ ...s, [item.id]: !s[item.id] }))}>
-                  <div className="g-check">{sel[item.id] ? "✓" : ""}</div>
+                <div className={`guest-item ${sel[item.id] ? "sel" : ""} ${alreadyPaid ? "paid-item" : ""}`}
+                  onClick={() => !alreadyPaid && setSel(s => ({ ...s, [item.id]: !s[item.id] }))}>
+                  <div className="g-check">{alreadyPaid ? "✓" : sel[item.id] ? "✓" : ""}</div>
                   <span className="g-name">{item.name}</span>
                   <span className="g-price">RM {splitPrice.toFixed(2)}</span>
                 </div>
-                {sel[item.id] && (
+                {paidBy.length > 0 && (
+                  <div style={{ padding: "4px 24px 4px 56px", fontSize: "0.65rem", color: "var(--ink-light)" }}>
+                    {paidBy.length}/{totalSplit} paid by {paidBy.join(", ")}
+                  </div>
+                )}
+                {sel[item.id] && !alreadyPaid && (
                   <div style={{ padding: "4px 24px 8px 56px", display: "flex", alignItems: "center", gap: 8, fontSize: "0.7rem", color: "var(--ink-light)" }}>
                     <span>Split with:</span>
                     <button onClick={() => setSplits(s => ({ ...s, [item.id]: Math.max(1, (s[item.id] || 1) - 1) }))}
