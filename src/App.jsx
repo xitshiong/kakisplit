@@ -1014,7 +1014,7 @@ function GuestView({ session, onBack }) {
             const totalSplit = paidInfo?.total || 1;
             const fullyPaid = paidBy.length >= totalSplit;
             const alreadyPaid = paidBy.includes(name);
-            const splitCount = splits[item.id] || 1;
+            const splitCount = totalSplit;
             const splitPrice = parseFloat(item.price || 0) / splitCount;
 
             if (fullyPaid) return (
@@ -1046,12 +1046,12 @@ function GuestView({ session, onBack }) {
                     {paidBy.length}/{totalSplit} paid by {paidBy.join(", ")}
                   </div>
                 )}
-                {sel[item.id] && (
+                {sel[item.id] && splitCount === 1 && (
                   <div style={{ padding: "4px 24px 8px 56px", display: "flex", alignItems: "center", gap: 8, fontSize: "0.7rem", color: "var(--ink-light)" }}>
                     <span>Split with:</span>
                     <button onClick={() => setSplits(s => ({ ...s, [item.id]: Math.max(1, (s[item.id] || 1) - 1) }))}
                       style={{ padding: "2px 8px", background: "var(--ink-faint)", border: "none", borderRadius: 4, cursor: "pointer" }}>−</button>
-                    <span style={{ minWidth: 60, textAlign: "center" }}>{splitCount === 1 ? "no one" : `${splitCount - 1} other${splitCount > 2 ? "s" : ""}`}</span>
+                    <span style={{ minWidth: 60, textAlign: "center" }}>{(splits[item.id] || 1) === 1 ? "no one" : `${(splits[item.id] || 1) - 1} other${(splits[item.id] || 1) > 2 ? "s" : ""}`}</span>
                     <button onClick={() => setSplits(s => ({ ...s, [item.id]: (s[item.id] || 1) + 1 }))}
                       style={{ padding: "2px 8px", background: "var(--ink-faint)", border: "none", borderRadius: 4, cursor: "pointer" }}>+</button>
                   </div>
