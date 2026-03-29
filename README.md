@@ -1,4 +1,4 @@
-# KakiSplit 🧾
+# PayWho? 🧾
 
 Split bills lah, no drama.
 

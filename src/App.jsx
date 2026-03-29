@@ -1158,7 +1158,7 @@ function ScanToExcel({ onHome }) {
           <span className="home-btn-icon">⌂</span>
           <span className="home-btn-label">Home</span>
         </button>
-        <img src={LOGO_SRC} alt="KakiSplit" className="logo-img" />
+        <img src={LOGO_SRC} alt="PayWho" className="logo-img" />
         <div className="logo-tagline">Split bills lah, no drama</div>
         <div><span className="badge-strip">📊 Scan to Excel</span></div>
       </div>
@@ -1372,7 +1372,7 @@ function HostView({ onHome }) {
             <span className="home-btn-icon">⌂</span>
             <span className="home-btn-label">Home</span>
           </button>
-          <img src={LOGO_SRC} alt="KakiSplit" className="logo-img" />
+          <img src={LOGO_SRC} alt="PayWho" className="logo-img" />
           <div className="logo-tagline">Split bills lah, no drama</div>
           <div><span className="badge-strip">🧾 Host Mode</span></div>
         </div>
@@ -1627,7 +1627,7 @@ function HostReturn({ onHome }) {
           <span className="home-btn-icon">⌂</span>
           <span className="home-btn-label">Home</span>
         </button>
-        <img src={LOGO_SRC} alt="KakiSplit" className="logo-img" />
+        <img src={LOGO_SRC} alt="PayWho" className="logo-img" />
         <div className="logo-tagline">Split bills lah, no drama</div>
         <div><span className="badge-strip">🧾 Your Table</span></div>
       </div>
@@ -1731,7 +1731,7 @@ function HostReturn({ onHome }) {
   );
 }
 
-export default function KakiSplit() {
+export default function PayWho() {
   const [mode, setMode] = useState(null);
   const [guestSession, setGuestSession] = useState(null);
   const [initializing, setInitializing] = useState(true);
@@ -1771,7 +1771,7 @@ export default function KakiSplit() {
           {!mode && (
             <div className="receipt">
               <div className="header-receipt">
-                <img src={LOGO_SRC} alt="KakiSplit" className="logo-img" />
+                <img src={LOGO_SRC} alt="PayWho" className="logo-img" />
                 <div className="logo-tagline">Split bills lah, no drama</div>
               </div>
               <div className="section">
@@ -1828,7 +1828,7 @@ export default function KakiSplit() {
                     <span className="home-btn-icon">⌂</span>
                     <span className="home-btn-label">Home</span>
                   </button>
-                  <img src={LOGO_SRC} alt="KakiSplit" className="logo-img" />
+                  <img src={LOGO_SRC} alt="PayWho" className="logo-img" />
                   <div className="logo-tagline">Split bills lah, no drama</div>
                   <div><span className="badge-strip guest-badge">👥 Guest</span></div>
                 </div>
@@ -1845,7 +1845,7 @@ export default function KakiSplit() {
                     <span className="home-btn-icon">⌂</span>
                     <span className="home-btn-label">Home</span>
                   </button>
-                  <img src={LOGO_SRC} alt="KakiSplit" className="logo-img" />
+                  <img src={LOGO_SRC} alt="PayWho" className="logo-img" />
                   <div className="logo-tagline">Split bills lah, no drama</div>
                   <div><span className="badge-strip guest-badge">👥 Guest</span></div>
                 </div>
