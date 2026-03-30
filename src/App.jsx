@@ -38,6 +38,8 @@ body {
   background: var(--ink);
   min-height: 100vh;
   overflow-x: hidden;
+  -webkit-text-size-adjust: 100%;
+  touch-action: manipulation;
 }
 
 /* Night market background */
@@ -63,7 +65,7 @@ body {
   max-width: 420px;
   margin: 0 auto;
   min-height: 100vh;
-  padding: 16px 16px 100px;
+  padding: 16px 16px calc(100px + env(safe-area-inset-bottom, 0px));
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -608,7 +610,7 @@ body {
   bottom: 0; left: 50%; transform: translateX(-50%);
   width: 100%; max-width: 420px;
   background: var(--ink);
-  padding: 16px 20px;
+  padding: 16px 20px calc(16px + env(safe-area-inset-bottom, 0px));
   display: flex; align-items: center; justify-content: space-between;
   gap: 14px;
   z-index: 50;
@@ -775,7 +777,7 @@ body {
 /* ── UNDO TOAST ── */
 .undo-toast {
   position: fixed;
-  bottom: 88px; left: 50%; transform: translateX(-50%);
+  bottom: calc(88px + env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%);
   background: var(--ink);
   border: 1px solid rgba(184,255,0,0.2);
   border-radius: 3px;
@@ -783,7 +785,8 @@ body {
   display: flex; align-items: center; gap: 16px;
   z-index: 200;
   animation: toast-in 0.2s ease;
-  white-space: nowrap;
+  max-width: calc(100vw - 32px);
+  flex-wrap: wrap;
   box-shadow: 0 8px 32px rgba(0,0,0,0.4);
 }
 
@@ -844,6 +847,52 @@ body {
   letter-spacing: 1px;
   text-transform: uppercase;
   color: var(--ink-faint);
+}
+
+/* ── DATE STRIP SCROLL ── */
+.date-strip {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 4px;
+  margin-bottom: 20px;
+  scrollbar-width: none;
+}
+.date-strip::-webkit-scrollbar { display: none; }
+.date-chip {
+  flex-shrink: 0;
+  min-width: 48px;
+  text-align: center;
+  padding: 10px 4px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+/* ── RESPONSIVE TWEAKS ── */
+@media (max-width: 380px) {
+  .share-code {
+    font-size: 2rem;
+    letter-spacing: 4px;
+  }
+}
+
+@media (max-width: 360px) {
+  .step-label {
+    font-size: 0.5rem;
+  }
+  .step-num {
+    width: 28px; height: 28px;
+    font-size: 0.7rem;
+  }
+  .item-price-in {
+    width: 72px;
+  }
+  .mode-card {
+    padding: 20px 10px;
+    min-height: 120px;
+  }
 }
 `;
 
@@ -1441,7 +1490,7 @@ function HostView({ onHome }) {
             value={tableName} onChange={e => setTableName(e.target.value)}
             style={{ marginBottom: 12 }} />
           <div style={{ fontSize: "0.7rem", color: "var(--ink-faint)", letterSpacing: 1, textTransform: "uppercase", marginBottom: 8 }}>Date</div>
-          <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+          <div className="date-strip">
             {[0, 1, 2, 3, 4, 5, 6].map(d => {
               const date = new Date();
               date.setDate(date.getDate() - d);
@@ -1449,13 +1498,10 @@ function HostView({ onHome }) {
               const label = d === 0 ? "Today" : d === 1 ? "Yesterday" : date.toLocaleDateString("en-MY", { weekday: "short" });
               const day = date.toLocaleDateString("en-MY", { day: "numeric" });
               return (
-                <div key={val} onClick={() => setTableDate(val)}
+                <div key={val} className="date-chip" onClick={() => setTableDate(val)}
                   style={{
-                    flex: 1, textAlign: "center", padding: "10px 4px",
-                    borderRadius: 4, cursor: "pointer",
                     background: tableDate === val ? "var(--ink)" : "var(--paper-dark)",
                     border: tableDate === val ? "1.5px solid var(--ink)" : "1.5px solid var(--ink-faint)",
-                    transition: "all 0.15s"
                   }}>
                   <div style={{ fontSize: "0.55rem", color: tableDate === val ? "var(--neon-lime)" : "var(--ink-faint)", letterSpacing: 1, textTransform: "uppercase", marginBottom: 3 }}>{label}</div>
                   <div style={{ fontSize: "0.85rem", fontWeight: 500, color: tableDate === val ? "var(--neon-lime)" : "var(--ink)" }}>{day}</div>
@@ -1697,18 +1743,19 @@ function HostReturn({ onHome }) {
               const paidInfo = paidMap[i.id];
               const payers = paidInfo?.payers || [paidInfo];
               return (
-              <div key={i.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 0", borderBottom: "1px dotted var(--ink-faint)", opacity: 0.5 }}>
-                <div style={{ flex: 1 }}>
-                  <span style={{ fontSize: "0.85rem", color: "var(--ink)", fontFamily: "'DM Mono',monospace", textDecoration: "line-through" }}>
-                    {i.name}
-                  </span>
-                  <div style={{ fontSize: "0.65rem", color: "var(--ink-faint)", marginTop: 2 }}>
-                    paid by {payers.join(", ")}
+                <div key={i.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 0", borderBottom: "1px dotted var(--ink-faint)", opacity: 0.5 }}>
+                  <div style={{ flex: 1 }}>
+                    <span style={{ fontSize: "0.85rem", color: "var(--ink)", fontFamily: "'DM Mono',monospace", textDecoration: "line-through" }}>
+                      {i.name}
+                    </span>
+                    <div style={{ fontSize: "0.65rem", color: "var(--ink-faint)", marginTop: 2 }}>
+                      paid by {payers.join(", ")}
+                    </div>
                   </div>
+                  <span className="paid-tag">✓ {payers.join(", ")}</span>
                 </div>
-                <span className="paid-tag">✓ {payers.join(", ")}</span>
-              </div>
-            )})}
+              )
+            })}
           </div>
         )}
 
