@@ -1063,7 +1063,7 @@ function GuestView({ session, onBack }) {
             const totalSplit = paidInfo?.total || 1;
             const fullyPaid = paidBy.length >= totalSplit;
             const alreadyPaid = paidBy.includes(name);
-            const splitCount = totalSplit;
+            const splitCount = splits[item.id] || totalSplit || 1;
             const splitPrice = parseFloat(item.price || 0) / splitCount;
 
             if (fullyPaid) return (
