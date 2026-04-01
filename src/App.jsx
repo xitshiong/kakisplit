@@ -987,13 +987,16 @@ function GuestView({ session, onBack }) {
 
   const myItems = items.filter(i => sel[i.id]);
   const myTotal = myItems.reduce((s, i) => {
-    const splitCount = splits[i.id] || 1;
-    return s + parseFloat(i.price || 0) / splitCount;
+    const paidInfo = paidMap[i.id];
+    const totalSplit = paidInfo?.total || splits[i.id] || 1;
+    return s + parseFloat(i.price || 0) / totalSplit;
   }, 0);
 
   const confirmPayment = async () => {
     for (const i of myItems) {
-      await savePaid(i.id, name, session.code, splits[i.id] || 1);
+      const paidInfo = paidMap[i.id];
+      const totalSplit = paidInfo?.total || splits[i.id] || 1;
+      await savePaid(i.id, name, session.code, totalSplit);
     }
     const updated = await loadPaid(session.code);
     setPaidMap(updated);
@@ -1032,11 +1035,12 @@ function GuestView({ session, onBack }) {
         </div>
 
         {myItems.map(i => {
-          const splitCount = splits[i.id] || 1;
-          const splitPrice = parseFloat(i.price) / splitCount;
+          const paidInfo = paidMap[i.id];
+          const totalSplit = paidInfo?.total || splits[i.id] || 1;
+          const splitPrice = parseFloat(i.price) / totalSplit;
           return (
             <div key={i.id} className="bill-summary-row">
-              <span>{i.name}{splitCount > 1 ? ` (split ${splitCount} ways)` : ""}</span>
+              <span>{i.name}{totalSplit > 1 ? ` (split ${totalSplit} ways)` : ""}</span>
               <span className="bill-summary-val">RM {splitPrice.toFixed(2)}</span>
             </div>
           );
@@ -1060,11 +1064,10 @@ function GuestView({ session, onBack }) {
           {items.map(item => {
             const paidInfo = paidMap[item.id];
             const paidBy = paidInfo?.payers || (paidInfo ? [paidInfo] : []);
-            const totalSplit = paidInfo?.total || 1;
-            const fullyPaid = paidBy.length >= totalSplit;
             const alreadyPaid = paidBy.includes(name);
-            const splitCount = splits[item.id] || totalSplit || 1;
-            const splitPrice = parseFloat(item.price || 0) / splitCount;
+            const totalSplit = paidInfo?.total || splits[item.id] || 1;
+            const splitPrice = parseFloat(item.price || 0) / totalSplit;
+            const fullyPaid = paidBy.length >= totalSplit;
 
             if (fullyPaid) return (
               <div key={item.id} className="guest-item paid-item">
@@ -1095,7 +1098,7 @@ function GuestView({ session, onBack }) {
                     {paidBy.length}/{totalSplit} paid by {paidBy.join(", ")}
                   </div>
                 )}
-                {sel[item.id] && splitCount === 1 && (
+                {sel[item.id] && totalSplit === 1 && (
                   <div style={{ padding: "8px 24px 12px 56px", display: "flex", alignItems: "center", gap: 12, fontSize: "0.75rem", color: "var(--ink)" }}>
                     <span style={{ fontWeight: 500 }}>Split with:</span>
                     <button onClick={() => setSplits(s => ({ ...s, [item.id]: Math.max(1, (s[item.id] || 1) - 1) }))}
@@ -1409,7 +1412,6 @@ function HostView({ onHome }) {
     return () => clearInterval(t);
   }, [step, code]);
 
-  const [deleted, setDeleted] = useState([]); // undo stack
   const [toast, setToast] = useState(null);   // {item, timer}
 
   const deleteItem = (id) => {
@@ -1430,7 +1432,6 @@ function HostView({ onHome }) {
 
   const url = code ? `${window.location.origin}${window.location.pathname}?table=${code}` : "";
   const subtotal = items.reduce((s, i) => s + parseFloat(i.price || 0), 0);
-  const total = subtotal;
   const upd = (id, f, v) => setItems(its => its.map(it => it.id === id ? { ...it, [f]: v } : it));
 
   return (
@@ -1659,6 +1660,8 @@ function GuestCode({ onJoin, onBack }) {
 function HostReturn({ onHome }) {
   const [session, setSession] = useState(null);
   const [paidMap, setPaidMap] = useState({});
+  const [copiedLink, setCopiedLink] = useState(false);
+  const [copiedExcel, setCopiedExcel] = useState(false);
   const code = localStorage.getItem("ks_current_code");
 
   useEffect(() => {
@@ -1764,8 +1767,12 @@ function HostReturn({ onHome }) {
           <span className="bill-summary-val">RM {subtotal.toFixed(2)}</span>
         </div>
 
-        <button className="btn btn-ink" style={{ marginTop: 16 }} onClick={() => navigator.clipboard.writeText(url)}>
-          📋 Copy Table Link
+        <button className="btn btn-ink" style={{ marginTop: 16 }} onClick={() => {
+          navigator.clipboard.writeText(url);
+          setCopiedLink(true);
+          setTimeout(() => setCopiedLink(false), 2000);
+        }}>
+          {copiedLink ? "✓ Copied!" : "📋 Copy Table Link"}
         </button>
         <button className="btn btn-outline" style={{ marginTop: 10 }} onClick={() => {
           const rows = ["Item\tPaid By\tPrice"];
@@ -1777,14 +1784,10 @@ function HostReturn({ onHome }) {
           rows.push(`\t\t`);
           rows.push(`Total\t\t${subtotal.toFixed(2)}`);
           navigator.clipboard.writeText(rows.join("\n"));
-          if (session.qrImage) {
-            const a = document.createElement("a");
-            a.href = session.qrImage;
-            a.download = `${session.tableName || "table"}-qr.png`;
-            a.click();
-          }
+          setCopiedExcel(true);
+          setTimeout(() => setCopiedExcel(false), 2000);
         }}>
-          📊 Copy to Excel
+          {copiedExcel ? "✓ Copied!" : "📊 Copy to Excel"}
         </button>
         <button className="btn btn-outline" style={{ marginTop: 10, borderColor: "var(--neon-pink)", color: "var(--neon-pink)" }}
           onClick={async () => {
