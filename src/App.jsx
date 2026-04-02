@@ -1098,7 +1098,7 @@ function GuestView({ session, onBack }) {
                     {paidBy.length}/{totalSplit} paid by {paidBy.join(", ")}
                   </div>
                 )}
-                {sel[item.id] && (
+                {sel[item.id] && paidBy.length === 0 && (
                   <div style={{ padding: "8px 24px 12px 56px", display: "flex", alignItems: "center", gap: 12, fontSize: "0.75rem", color: "var(--ink)" }}>
                     <span style={{ fontWeight: 500 }}>Split with:</span>
                     <button onClick={() => setSplits(s => ({ ...s, [item.id]: Math.max(1, (s[item.id] || totalSplit) - 1) }))}
