@@ -1067,7 +1067,7 @@ function GuestView({ session, onBack }) {
             const alreadyPaid = paidBy.includes(name);
             const totalSplit = paidInfo?.total || splits[item.id] || 1;
             const splitPrice = parseFloat(item.price || 0) / totalSplit;
-            const fullyPaid = paidInfo?.total > 1 && paidBy.length >= totalSplit;
+            const fullyPaid = paidBy.length >= totalSplit;
 
             if (fullyPaid) return (
               <div key={item.id} className="guest-item paid-item">
