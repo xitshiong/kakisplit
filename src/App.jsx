@@ -1098,13 +1098,17 @@ function GuestView({ session, onBack }) {
                     {paidBy.length}/{totalSplit} paid by {paidBy.join(", ")}
                   </div>
                 )}
-                {sel[item.id] && totalSplit === 1 && (
+                {sel[item.id] && (
                   <div style={{ padding: "8px 24px 12px 56px", display: "flex", alignItems: "center", gap: 12, fontSize: "0.75rem", color: "var(--ink)" }}>
                     <span style={{ fontWeight: 500 }}>Split with:</span>
-                    <button onClick={() => setSplits(s => ({ ...s, [item.id]: Math.max(1, (s[item.id] || 1) - 1) }))}
+                    <button onClick={() => setSplits(s => ({ ...s, [item.id]: Math.max(1, (s[item.id] || totalSplit) - 1) }))}
                       style={{ padding: "8px 16px", background: "var(--ink)", color: "var(--paper)", border: "none", borderRadius: 8, cursor: "pointer", fontSize: "1rem", fontWeight: 600, minWidth: 40 }}>−</button>
-                    <span style={{ minWidth: 80, textAlign: "center", fontWeight: 600, fontSize: "0.8rem" }}>{(splits[item.id] || 1) === 1 ? "no one" : `${(splits[item.id] || 1) - 1} other${(splits[item.id] || 1) > 2 ? "s" : ""}`}</span>
-                    <button onClick={() => setSplits(s => ({ ...s, [item.id]: (s[item.id] || 1) + 1 }))}
+
+                    <span style={{ minWidth: 80, textAlign: "center", fontWeight: 600, fontSize: "0.8rem" }}>
+                      {(splits[item.id] || totalSplit) === 1 ? "no one" : `${(splits[item.id] || totalSplit) - 1} other${(splits[item.id] || totalSplit) > 2 ? "s" : ""}`}
+                    </span>
+
+                    <button onClick={() => setSplits(s => ({ ...s, [item.id]: (s[item.id] || totalSplit) + 1 }))}
                       style={{ padding: "8px 16px", background: "var(--ink)", color: "var(--paper)", border: "none", borderRadius: 8, cursor: "pointer", fontSize: "1rem", fontWeight: 600, minWidth: 40 }}>+</button>
                   </div>
                 )}
