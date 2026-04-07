@@ -1700,8 +1700,8 @@ function HostView({ onHome }) {
   const prevPaidMap = usePrevious(paidMap);
   useEffect(() => {
     if (!prevPaidMap || !paidMap || step !== 4) return;
-    
-    const newPaymentsByPayer = {}; 
+
+    const newPaymentsByPayer = {};
     Object.keys(paidMap).forEach(itemId => {
       const current = paidMap[itemId]?.payers || [];
       const prev = prevPaidMap[itemId]?.payers || [];
@@ -1989,7 +1989,7 @@ function HostReturn({ onHome }) {
   const prevPaidMap = usePrevious(paidMap);
   useEffect(() => {
     if (!prevPaidMap || !paidMap || !session) return;
-    
+
     const newPaymentsByPayer = {};
     Object.keys(paidMap).forEach(itemId => {
       const current = paidMap[itemId]?.payers || [];
