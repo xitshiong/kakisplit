@@ -894,6 +894,199 @@ body {
     min-height: 120px;
   }
 }
+
+/* ── LANDING PAGE ── */
+.landing {
+  display: flex; flex-direction: column;
+}
+
+.hero {
+  padding: 36px 24px 28px;
+  text-align: center;
+  border-bottom: 1px dashed var(--ink-faint);
+}
+
+.hero-logo {
+  height: 72px; width: auto;
+  display: block; margin: 0 auto 24px;
+  animation: hero-drop 0.6s cubic-bezier(0.34,1.56,0.64,1) both;
+}
+
+@keyframes hero-drop {
+  from { opacity: 0; transform: translateY(-20px) scale(0.9); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.hero-headline {
+  font-family: 'Playfair Display', serif;
+  font-size: 2.8rem;
+  font-weight: 900;
+  color: var(--ink);
+  line-height: 1.05;
+  letter-spacing: -1px;
+  margin-bottom: 16px;
+  animation: hero-up 0.5s 0.1s ease both;
+}
+
+.hero-headline em {
+  font-style: italic;
+  color: var(--neon-pink);
+}
+
+@keyframes hero-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.hero-sub {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.78rem;
+  color: var(--ink-faint);
+  letter-spacing: 0.5px;
+  line-height: 1.8;
+  margin-bottom: 28px;
+  animation: hero-up 0.5s 0.2s ease both;
+}
+
+.hero-cta-row {
+  display: flex; flex-direction: column; gap: 10px;
+  animation: hero-up 0.5s 0.3s ease both;
+}
+
+.btn-hero-host {
+  width: 100%; padding: 20px;
+  background: var(--neon-pink); color: var(--paper);
+  border: none; border-radius: 3px;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.88rem; font-weight: 500;
+  letter-spacing: 2px; text-transform: uppercase;
+  cursor: pointer; transition: all 0.15s;
+  min-height: 60px; position: relative; overflow: hidden;
+}
+.btn-hero-host::after {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, transparent 50%);
+}
+.btn-hero-host:hover { background: #e02068; transform: translateY(-1px); }
+.btn-hero-host:active { transform: translateY(0); }
+
+.btn-hero-guest {
+  width: 100%; padding: 20px;
+  background: var(--ink); color: var(--neon-cyan);
+  border: none; border-radius: 3px;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.88rem; font-weight: 500;
+  letter-spacing: 2px; text-transform: uppercase;
+  cursor: pointer; transition: all 0.15s;
+  min-height: 60px;
+}
+.btn-hero-guest:hover { background: #2a1f0f; transform: translateY(-1px); }
+.btn-hero-guest:active { transform: translateY(0); }
+
+.how-section {
+  padding: 24px 24px;
+  border-bottom: 1px dashed var(--ink-faint);
+  animation: hero-up 0.5s 0.4s ease both;
+}
+
+.how-label {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.58rem; color: var(--ink-faint);
+  letter-spacing: 3px; text-transform: uppercase;
+  text-align: center; margin-bottom: 18px;
+}
+
+.how-steps { display: flex; flex-direction: column; gap: 2px; }
+
+.how-step {
+  display: flex; align-items: flex-start; gap: 16px;
+  padding: 14px 16px;
+  background: var(--paper-dark);
+  border: 1px solid rgba(26,18,8,0.08);
+  border-radius: 3px; transition: all 0.2s;
+}
+.how-step:hover { background: rgba(26,18,8,0.04); border-color: rgba(26,18,8,0.18); }
+
+.how-step-num {
+  font-family: 'Unbounded', sans-serif;
+  font-size: 1.3rem; font-weight: 900; line-height: 1;
+  flex-shrink: 0; width: 36px; padding-top: 2px;
+}
+.how-step:nth-child(1) .how-step-num { color: var(--neon-pink); }
+.how-step:nth-child(2) .how-step-num { color: var(--ink); }
+.how-step:nth-child(3) .how-step-num { color: var(--neon-cyan); }
+
+.how-step-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 1rem; font-weight: 700;
+  color: var(--ink); margin-bottom: 3px;
+}
+
+.how-step-desc {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.72rem; color: var(--ink-faint);
+  line-height: 1.6; letter-spacing: 0.3px;
+}
+
+.recent-tables {
+  padding: 0 24px 8px;
+  animation: hero-up 0.5s 0.45s ease both;
+}
+
+.recent-label {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.58rem; color: var(--ink-faint);
+  letter-spacing: 3px; text-transform: uppercase; margin-bottom: 10px;
+}
+
+.recent-card {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px;
+  background: var(--paper-dark);
+  border: 1px solid rgba(26,18,8,0.1);
+  border-radius: 3px; cursor: pointer; transition: all 0.2s; margin-bottom: 8px;
+}
+.recent-card:hover { background: rgba(26,18,8,0.04); border-color: var(--ink); }
+
+.recent-name {
+  font-family: 'Playfair Display', serif;
+  font-size: 0.95rem; font-weight: 700; color: var(--ink); margin-bottom: 2px;
+}
+
+.recent-meta {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.62rem; color: var(--ink-faint); letter-spacing: 0.5px;
+}
+
+.recent-code {
+  font-family: 'Unbounded', sans-serif;
+  font-size: 0.85rem; font-weight: 700;
+  color: var(--ink); letter-spacing: 2px;
+  background: var(--neon-lime); padding: 4px 8px; border-radius: 2px;
+}
+
+.landing-footer {
+  padding: 16px 24px 32px;
+  animation: hero-up 0.5s 0.5s ease both;
+}
+
+.tool-chip {
+  display: inline-flex; align-items: center; gap: 10px;
+  padding: 14px 18px;
+  background: var(--paper-dark);
+  border: 1.5px solid var(--ink-faint);
+  border-radius: 3px; cursor: pointer; transition: all 0.2s;
+}
+.tool-chip:hover { border-color: var(--ink); background: rgba(26,18,8,0.04); }
+
+.tool-chip-icon { font-size: 1.1rem; }
+
+.tool-chip-label {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.68rem; color: var(--ink-faint);
+  letter-spacing: 1px; text-transform: uppercase;
+}
 `;
 
 // ── UTILS ─────────────────────────────────────────────────────
@@ -1812,6 +2005,83 @@ function HostReturn({ onHome }) {
   );
 }
 
+// ── LANDING PAGE ──────────────────────────────────────────────
+function LandingPage({ onHost, onGuest, onScanExcel, onReturnTable }) {
+  const tables = JSON.parse(localStorage.getItem("ks_tables") || "[]");
+
+  return (
+    <div className="receipt landing">
+      <div className="hero">
+        <img src={LOGO_SRC} alt="KakiSplit" className="hero-logo" />
+        <div className="hero-headline">
+          Split bills lah,<br /><em>no drama.</em>
+        </div>
+        <div className="hero-sub">
+          Snap a receipt. Share a code.<br />
+          Everyone pays their exact share — instantly.
+        </div>
+        <div className="hero-cta-row">
+          <button className="btn-hero-host" onClick={onHost}>
+            🧾 Host a Table
+          </button>
+          <button className="btn-hero-guest" onClick={onGuest}>
+            👥 Join as Guest
+          </button>
+        </div>
+      </div>
+
+      <div className="how-section">
+        <div className="how-label">How it works</div>
+        <div className="how-steps">
+          <div className="how-step">
+            <div className="how-step-num">01</div>
+            <div>
+              <div className="how-step-title">Snap the receipt</div>
+              <div className="how-step-desc">AI reads every line item in seconds. Edit anything it misses.</div>
+            </div>
+          </div>
+          <div className="how-step">
+            <div className="how-step-num">02</div>
+            <div>
+              <div className="how-step-title">Share the code</div>
+              <div className="how-step-desc">Guests tap what they ordered. Splitting is automatic.</div>
+            </div>
+          </div>
+          <div className="how-step">
+            <div className="how-step-num">03</div>
+            <div>
+              <div className="how-step-title">Settle up</div>
+              <div className="how-step-desc">Everyone scans your DuitNow QR and pays their exact share.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {tables.length > 0 && (
+        <div className="recent-tables" style={{ paddingTop: 20, borderTop: "1px dashed var(--ink-faint)" }}>
+          <div className="recent-label">Your Tables</div>
+          {tables.map(t => (
+            <div key={t.code} className="recent-card" onClick={() => onReturnTable(t.code)}>
+              <div>
+                <div className="recent-name">{t.name}</div>
+                <div className="recent-meta">{t.date}</div>
+              </div>
+              <div className="recent-code">{t.code}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="landing-footer">
+        <div className="tool-chip" onClick={onScanExcel}>
+          <span className="tool-chip-icon">📊</span>
+          <span className="tool-chip-label">Scan to Excel</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function KakiSplit() {
   const [mode, setMode] = useState(null);
   const [guestSession, setGuestSession] = useState(null);
@@ -1850,51 +2120,12 @@ export default function KakiSplit() {
 
           {/* HOME */}
           {!mode && (
-            <div className="receipt">
-              <div className="header-receipt">
-                <img src={LOGO_SRC} alt="KakiSplit" className="logo-img" />
-                <div className="logo-tagline">Split bills lah, no drama</div>
-              </div>
-              <div className="section">
-                <div className="section-head">Who are you?</div>
-                <div className="section-sub">Pick your role for this session</div>
-                <div className="mode-grid">
-                  <div className="mode-card" onClick={() => setMode("host")}>
-                    <span className="mode-emoji">🧾</span>
-                    <div className="mode-title">Host</div>
-                    <div className="mode-desc">I have the receipt & collecting money</div>
-                  </div>
-                  <div className="mode-card" onClick={() => setMode("guest-code")}>
-                    <span className="mode-emoji">👥</span>
-                    <div className="mode-title">Guest</div>
-                    <div className="mode-desc">I got a code from the host</div>
-                  </div>
-                </div>
-              </div>
-
-              {JSON.parse(localStorage.getItem("ks_tables") || "[]").length > 0 && (
-                <div className="section">
-                  <div style={{ fontSize: "0.65rem", color: "var(--ink-faint)", letterSpacing: 2, textTransform: "uppercase", marginBottom: 12 }}>
-                    Your Tables
-                  </div>
-                  {JSON.parse(localStorage.getItem("ks_tables") || "[]").map(t => (
-                    <div key={t.code} className="mode-card"
-                      style={{ flexDirection: "row", justifyContent: "space-between", padding: "16px 20px", minHeight: "auto", marginBottom: 10 }}
-                      onClick={() => { localStorage.setItem("ks_current_code", t.code); setMode("host-return"); }}>
-                      <div style={{ textAlign: "left" }}>
-                        <div className="mode-title" style={{ marginBottom: 4 }}>{t.name}</div>
-                        <div className="mode-desc">{t.date} · Code: {t.code}</div>
-                      </div>
-                      <span style={{ fontSize: "1.8rem" }}>🧾</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <div style={{ textAlign: "center", padding: "0 24px 16px", fontSize: "0.58rem", color: "var(--ink-faint)", letterSpacing: 1, textTransform: "uppercase" }}>
-                Guests — open the host's link directly for best experience
-              </div>
-            </div>
+            <LandingPage
+              onHost={() => setMode("host")}
+              onGuest={() => setMode("guest-code")}
+              onScanExcel={() => setMode("scan-excel")}
+              onReturnTable={code => { localStorage.setItem("ks_current_code", code); setMode("host-return"); }}
+            />
           )}
 
           {mode === "host" && <HostView onHome={() => setMode(null)} />}
