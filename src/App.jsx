@@ -243,6 +243,14 @@ body {
   margin-bottom: 6px;
 }
 
+.currency-selector-row { display: flex; gap: 8px; justify-content: center; margin-bottom: 24px; flex-wrap: wrap; }
+.currency-chip { 
+  background: var(--paper-dark); border: 1.5px solid var(--ink-faint); padding: 8px 16px; border-radius: 6px;
+  font-family: 'DM Mono', monospace; font-size: 0.8rem; color: var(--ink-light); cursor: pointer; transition: 0.2s;
+}
+.currency-chip:hover { border-color: var(--ink); color: var(--ink); }
+.currency-chip.active { background: var(--ink); color: var(--neon-lime); border-color: var(--ink); transform: scale(1.05); font-weight: 600; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+
 .upload-hint { font-size: 0.75rem; color: var(--ink-faint); letter-spacing: 0.5px; text-transform: uppercase; }
 
 .preview-img {
@@ -2219,17 +2227,6 @@ function LandingPage({ onHost, onGuest, onScanExcel, onReturnTable, currency, on
       )}
 
       <div className="hero">
-        <div style={{ display: "flex", justifyContent: "flex-end", padding: "0 4px 12px" }}>
-          <select value={currency} onChange={e => onCurrencyChange(e.target.value)}
-            style={{
-              background: "var(--ink)", color: "var(--neon-lime)", padding: "4px 8px",
-              border: "1px solid var(--ink-faint)", borderRadius: 3, fontFamily: "DM Mono", fontSize: "0.65rem"
-            }}>
-            {["RM", "SGD", "USD", "EUR", "GBP", "IDR", "THB", "PHP", "VND"].map(c => (
-              <option key={c} value={c}>{c}</option>
-            ))}
-          </select>
-        </div>
         <img src={LOGO_SRC} alt="KakiSplit" className="hero-logo" />
 
         {oldTables.length > 0 && (
@@ -2249,6 +2246,15 @@ function LandingPage({ onHost, onGuest, onScanExcel, onReturnTable, currency, on
           Snap a receipt. Share a code.<br />
           Everyone pays their exact share — instantly.
         </div>
+
+        <div className="currency-selector-row">
+          {["RM", "SGD", "USD", "EUR", "IDR", "THB"].map(c => (
+            <button key={c} className={`currency-chip ${currency === c ? 'active' : ''}`} onClick={() => onCurrencyChange(c)}>
+              {c}
+            </button>
+          ))}
+        </div>
+
         <div className="hero-cta-row">
           <button className="btn-hero-host" onClick={onHost}>
             🧾 Host a Table
