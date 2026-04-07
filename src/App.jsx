@@ -251,6 +251,29 @@ body {
 .currency-chip:hover { border-color: var(--ink); color: var(--ink); }
 .currency-chip.active { background: var(--ink); color: var(--neon-lime); border-color: var(--ink); transform: scale(1.05); font-weight: 600; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
 
+.install-cta { 
+    background: var(--ink); color: var(--neon-lime); padding: 12px 20px; border-radius: 8px; border: none;
+    font-family: 'Unbounded', sans-serif; font-size: 0.8rem; font-weight: 700; cursor: pointer;
+    display: flex; align-items: center; gap: 8px; margin: 16px auto; width: fit-content;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+  }
+  .ios-guide-overlay { 
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(18,17,16,0.9); 
+    display: flex; align-items: center; justifyContent: center; z-index: 2000; padding: 24px;
+    backdrop-filter: blur(8px);
+  }
+  .ios-guide-card { 
+    background: var(--paper); border: 2px solid var(--ink); padding: 24px; border-radius: 12px;
+    text-align: center; max-width: 320px; box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  }
+  .ios-guide-title { font-family: 'Unbounded', sans-serif; font-size: 1.1rem; color: var(--ink); margin-bottom: 12px; }
+  .ios-guide-step { font-size: 0.85rem; color: var(--ink-light); margin: 12px 0; line-height: 1.5; }
+  .ios-guide-icon { font-size: 1.5rem; display: block; margin: 8px 0; }
+  .ios-guide-btn { 
+    background: var(--ink); color: var(--neon-lime); border: none; padding: 10px 20px;
+    border-radius: 6px; font-weight: 600; margin-top: 16px; cursor: pointer;
+  }
+
 .upload-hint { font-size: 0.75rem; color: var(--ink-faint); letter-spacing: 0.5px; text-transform: uppercase; }
 
 .preview-img {
@@ -2197,8 +2220,17 @@ function HostReturn({ onHome }) {
 
 // ── LANDING PAGE ──────────────────────────────────────────────
 function LandingPage({ onHost, onGuest, onScanExcel, onReturnTable, currency, onCurrencyChange }) {
+  const [showIOS, setShowIOS] = useState(false);
   const tables = JSON.parse(localStorage.getItem("ks_tables") || "[]");
   const [notifState, setNotifState] = useState(() => (typeof window !== "undefined" && "Notification" in window ? Notification.permission : "unsupported"));
+
+  const isStandalone = typeof window !== "undefined" && window.matchMedia("(display-mode: standalone)").matches;
+  const isIOS = typeof navigator !== "undefined" && /iPad|iPhone|iPod/.test(navigator.userAgent);
+
+  const handleInstall = () => {
+    if (isIOS) setShowIOS(true);
+    else if (window.deferredPrompt) window.deferredPrompt.prompt();
+  };
 
   const handleNotifReq = async () => {
     const res = await requestNotificationPermission();
@@ -2218,6 +2250,24 @@ function LandingPage({ onHost, onGuest, onScanExcel, onReturnTable, currency, on
         <div className="notify-banner">
           <span>🔔 Want real-time payment alerts?</span>
           <button className="btn-notify-perm" onClick={handleNotifReq}>Enable</button>
+        </div>
+      )}
+
+      {showIOS && (
+        <div className="ios-guide-overlay" onClick={() => setShowIOS(false)}>
+          <div className="ios-guide-card" onClick={e => e.stopPropagation()}>
+            <div className="ios-guide-title">Get Notifications</div>
+            <div className="ios-guide-step">iPhone users must "Add to Home Screen" first.</div>
+            <div className="ios-guide-step">
+              1. Tap the Share button below
+              <span className="ios-guide-icon">⎋</span>
+            </div>
+            <div className="ios-guide-step">
+              2. Select <strong>Add to Home Screen</strong>
+              <span className="ios-guide-icon">⊞</span>
+            </div>
+            <button className="ios-guide-btn" onClick={() => setShowIOS(false)}>Understood →</button>
+          </div>
         </div>
       )}
 
@@ -2258,6 +2308,12 @@ function LandingPage({ onHost, onGuest, onScanExcel, onReturnTable, currency, on
             👥 Join as Guest
           </button>
         </div>
+
+        {!isStandalone && (
+          <button className="install-cta" onClick={handleInstall}>
+            📲 Install KakiSplit for Notifications
+          </button>
+        )}
       </div>
 
       <div className="how-section">
@@ -2321,6 +2377,15 @@ export default function KakiSplit() {
     if (saved === "RM") return "MYR"; // Migration
     return saved || "MYR";
   });
+
+  useEffect(() => {
+    const handlePrompt = (e) => {
+      e.preventDefault();
+      window.deferredPrompt = e;
+    };
+    window.addEventListener("beforeinstallprompt", handlePrompt);
+    return () => window.removeEventListener("beforeinstallprompt", handlePrompt);
+  }, []);
 
   useEffect(() => {
     const p = new URLSearchParams(window.location.search);
