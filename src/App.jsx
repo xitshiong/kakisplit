@@ -1072,7 +1072,8 @@ body {
 }
 
 .tool-chip {
-  display: inline-flex; align-items: center; gap: 10px;
+  display: flex; align-items: center; gap: 10px;
+  width: 100%;
   padding: 14px 18px;
   background: var(--paper-dark);
   border: 1.5px solid var(--ink-faint);
@@ -1756,9 +1757,9 @@ function HostView({ onHome }) {
             </>
           )}
           <div style={{ marginTop: 16 }}>
-            <button className="btn btn-ink" onClick={finalise}>🔗 Generate Table Link →</button>
+            <button className="btn btn-ink" disabled={!qrImg} onClick={finalise}>🔗 Generate Table Link →</button>
+            {!qrImg && <div className="error-strip" style={{ marginTop: 12 }}>Upload your payment QR to continue — guests need it to pay you.</div>}
             <button className="btn btn-outline" onClick={() => setStep(1)}>← Back</button>
-            {!qrImg && <div className="section-sub" style={{ textAlign: "center", marginTop: 10 }}>Skip if collecting payment another way</div>}
           </div>
         </div>}
 
