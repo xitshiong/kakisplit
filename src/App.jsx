@@ -1439,7 +1439,7 @@ function GuestView({ session, onBack }) {
 }
 
 // ── SCAN TO EXCEL ─────────────────────────────────────────────
-function ScanToExcel({ onHome }) {
+function ScanToExcel({ onHome, currency }) {
   const [img, setImg] = useState(null);
   const [b64, setB64] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -1596,7 +1596,7 @@ function ScanToExcel({ onHome }) {
 }
 
 // ── HOST VIEW ─────────────────────────────────────────────────
-function HostView({ onHome }) {
+function HostView({ onHome, currency }) {
   const [step, setStep] = useState(0);
   const [img, setImg] = useState(null);
   const [b64, setB64] = useState(null);
@@ -1991,7 +1991,7 @@ function GuestCode({ onJoin, onBack }) {
 }
 
 // ── ROOT ──────────────────────────────────────────────────────
-function HostReturn({ onHome }) {
+function HostReturn({ onHome, currency }) {
   const [session, setSession] = useState(null);
   const [paidMap, setPaidMap] = useState({});
   const [copiedLink, setCopiedLink] = useState(false);
