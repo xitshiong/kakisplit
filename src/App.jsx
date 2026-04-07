@@ -774,6 +774,67 @@ body {
   flex-shrink: 0;
 }
 
+/* ── NOTIFICATIONS & ALERTS ── */
+.notify-banner {
+  background: var(--ink);
+  color: var(--neon-cyan);
+  padding: 12px 16px;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.72rem;
+  display: flex;
+  align-items: center; justify-content: space-between;
+  border-bottom: 2px solid var(--neon-cyan);
+  position: sticky; top: 0; z-index: 100;
+  animation: slide-down 0.3s ease;
+}
+
+@keyframes slide-down {
+  from { transform: translateY(-100%); }
+  to { transform: translateY(0); }
+}
+
+.pending-alert {
+  background: rgba(255, 107, 26, 0.1);
+  border: 1px dashed var(--neon-orange);
+  border-radius: 4px;
+  padding: 14px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center; gap: 12px;
+}
+
+.pending-title {
+  color: var(--neon-orange);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.pending-desc {
+  font-size: 0.7rem;
+  color: var(--ink-light);
+  line-height: 1.4;
+}
+
+.btn-notify-perm {
+  background: transparent;
+  border: 1px solid var(--neon-cyan);
+  color: var(--neon-cyan);
+  padding: 6px 12px;
+  border-radius: 3px;
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-notify-perm:hover {
+  background: var(--neon-cyan);
+  color: var(--ink);
+}
+
 /* ── UNDO TOAST ── */
 .undo-toast {
   position: fixed;
@@ -1091,6 +1152,33 @@ body {
 `;
 
 // ── UTILS ─────────────────────────────────────────────────────
+function usePrevious(value) {
+  const ref = useRef();
+  useEffect(() => {
+    ref.current = value;
+  }, [value]);
+  return ref.current;
+}
+
+async function requestNotificationPermission() {
+  if (!("Notification" in window)) return "unsupported";
+  if (Notification.permission === "granted") return "granted";
+  const permission = await Notification.permission;
+  if (permission === "denied") return "denied";
+  return await Notification.requestPermission();
+}
+
+function sendLocalNotification(title, body) {
+  if (!("Notification" in window) || Notification.permission !== "granted") return;
+  try {
+    new Notification(title, {
+      body,
+      icon: "/icon.png", // fallback to common icon path
+    });
+  } catch (e) {
+    console.warn("Notification failed:", e);
+  }
+}
 
 function genCode() { return Math.floor(1000 + Math.random() * 9000).toString(); }
 async function save(d) {
@@ -1177,6 +1265,23 @@ function GuestView({ session, onBack }) {
     }, 2000);
     return () => clearInterval(t);
   }, []);
+
+  const prevPaidMap = usePrevious(paidMap);
+  useEffect(() => {
+    if (!prevPaidMap || !paidMap) return;
+    Object.keys(paidMap).forEach(itemId => {
+      const currentPayers = paidMap[itemId]?.payers || [];
+      const prevPayers = prevPaidMap[itemId]?.payers || [];
+      const newPayers = currentPayers.filter(p => !prevPayers.includes(p));
+
+      newPayers.forEach(payer => {
+        if (payer !== name) {
+          const item = items.find(i => i.id.toString() === itemId.toString());
+          sendLocalNotification("New Payment!", `${payer} paid for ${item?.name || "an item"}`);
+        }
+      });
+    });
+  }, [paidMap, name, items]);
 
 
   const myItems = items.filter(i => sel[i.id]);
@@ -1603,12 +1708,27 @@ function HostView({ onHome }) {
   };
   // Poll paid status every 2s once live
   useEffect(() => {
-    if (step !== 3) return;
+    if (step !== 4) return;
     const t = setInterval(() => {
       loadPaid(code).then(setPaidMap);
     }, 2000);
     return () => clearInterval(t);
   }, [step, code]);
+
+  const prevPaidMap = usePrevious(paidMap);
+  useEffect(() => {
+    if (!prevPaidMap || !paidMap || step !== 4) return;
+    Object.keys(paidMap).forEach(itemId => {
+      const currentPayers = paidMap[itemId]?.payers || [];
+      const prevPayers = prevPaidMap[itemId]?.payers || [];
+      const newPayers = currentPayers.filter(p => !prevPayers.includes(p));
+
+      newPayers.forEach(payer => {
+        const item = items.find(i => i.id.toString() === itemId.toString());
+        sendLocalNotification("Incoming Payment!", `${payer} paid for ${item?.name || "an item"}`);
+      });
+    });
+  }, [paidMap, items, step]);
 
   const [toast, setToast] = useState(null);   // {item, timer}
 
@@ -1877,6 +1997,21 @@ function HostReturn({ onHome }) {
     return () => clearInterval(t);
   }, [code]);
 
+  const prevPaidMap = usePrevious(paidMap);
+  useEffect(() => {
+    if (!prevPaidMap || !paidMap || !session) return;
+    Object.keys(paidMap).forEach(itemId => {
+      const currentPayers = paidMap[itemId]?.payers || [];
+      const prevPayers = prevPaidMap[itemId]?.payers || [];
+      const newPayers = currentPayers.filter(p => !prevPayers.includes(p));
+
+      newPayers.forEach(payer => {
+        const item = session.items.find(i => i.id.toString() === itemId.toString());
+        sendLocalNotification("Incoming Payment!", `${payer} paid for ${item?.name || "an item"}`);
+      });
+    });
+  }, [paidMap, session]);
+
   if (!session) return (
     <div className="receipt">
       <div className="receipt-inner" style={{ textAlign: "center", padding: "40px 24px" }}>
@@ -2009,11 +2144,43 @@ function HostReturn({ onHome }) {
 // ── LANDING PAGE ──────────────────────────────────────────────
 function LandingPage({ onHost, onGuest, onScanExcel, onReturnTable }) {
   const tables = JSON.parse(localStorage.getItem("ks_tables") || "[]");
+  const [notifState, setNotifState] = useState(Notification.permission);
+
+  const handleNotifReq = async () => {
+    const res = await requestNotificationPermission();
+    setNotifState(res);
+  };
+
+  // Check for any tables that are more than 12 hours old
+  const oldTables = tables.filter(t => {
+    const tableDate = new Date(t.date);
+    const now = new Date();
+    const diff = now - tableDate;
+    return diff > 12 * 60 * 60 * 1000; // 12 hours
+  });
 
   return (
     <div className="receipt landing">
+      {notifState === "default" && (
+        <div className="notify-banner">
+          <span>🔔 Want real-time payment alerts?</span>
+          <button className="btn-notify-perm" onClick={handleNotifReq}>Enable</button>
+        </div>
+      )}
+
       <div className="hero">
         <img src={LOGO_SRC} alt="KakiSplit" className="hero-logo" />
+
+        {oldTables.length > 0 && (
+          <div className="pending-alert">
+            <span style={{ fontSize: "1.5rem" }}>🕒</span>
+            <div>
+              <div className="pending-title">Unconcluded Tables</div>
+              <div className="pending-desc">You have {oldTables.length} table{oldTables.length > 1 ? "s" : ""} from {oldTables[0].date} still active.</div>
+            </div>
+          </div>
+        )}
+
         <div className="hero-headline">
           Split bills lah,<br /><em>no drama.</em>
         </div>
