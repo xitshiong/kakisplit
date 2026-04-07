@@ -1169,23 +1169,18 @@ function usePrevious(value) {
 }
 
 async function requestNotificationPermission() {
-  if (!("Notification" in window)) return "unsupported";
+  if (typeof window === "undefined" || !("Notification" in window)) return "unsupported";
   if (Notification.permission === "granted") return "granted";
-  const permission = await Notification.permission;
-  if (permission === "denied") return "denied";
-  return await Notification.requestPermission();
+  try {
+    return await Notification.requestPermission();
+  } catch (e) { return "denied"; }
 }
 
 function sendLocalNotification(title, body) {
-  if (!("Notification" in window) || Notification.permission !== "granted") return;
+  if (typeof window === "undefined" || !("Notification" in window) || Notification.permission !== "granted") return;
   try {
-    new Notification(title, {
-      body,
-      icon: "/icon.png", // fallback to common icon path
-    });
-  } catch (e) {
-    console.warn("Notification failed:", e);
-  }
+    new Notification(title, { body, icon: LOGO_SRC });
+  } catch (e) { console.warn("Notification failed:", e); }
 }
 
 function genCode() { return Math.floor(1000 + Math.random() * 9000).toString(); }
@@ -2203,7 +2198,7 @@ function HostReturn({ onHome }) {
 // ── LANDING PAGE ──────────────────────────────────────────────
 function LandingPage({ onHost, onGuest, onScanExcel, onReturnTable, currency, onCurrencyChange }) {
   const tables = JSON.parse(localStorage.getItem("ks_tables") || "[]");
-  const [notifState, setNotifState] = useState(Notification.permission);
+  const [notifState, setNotifState] = useState(() => (typeof window !== "undefined" && "Notification" in window ? Notification.permission : "unsupported"));
 
   const handleNotifReq = async () => {
     const res = await requestNotificationPermission();
