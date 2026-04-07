@@ -2248,7 +2248,7 @@ function LandingPage({ onHost, onGuest, onScanExcel, onReturnTable, currency, on
         </div>
 
         <div className="currency-selector-row">
-          {["RM", "SGD", "USD", "EUR", "IDR", "THB"].map(c => (
+          {["MYR", "SGD", "AUD"].map(c => (
             <button key={c} className={`currency-chip ${currency === c ? 'active' : ''}`} onClick={() => onCurrencyChange(c)}>
               {c}
             </button>
@@ -2286,7 +2286,7 @@ function LandingPage({ onHost, onGuest, onScanExcel, onReturnTable, currency, on
             <div className="how-step-num">03</div>
             <div>
               <div className="how-step-title">Settle up</div>
-              <div className="how-step-desc">Everyone scans your {currency === "RM" ? "DuitNow" : ""} QR and pays their exact share.</div>
+              <div className="how-step-desc">Everyone scans your {currency === "MYR" ? "DuitNow" : ""} QR and pays their exact share.</div>
             </div>
           </div>
         </div>
@@ -2321,7 +2321,11 @@ export default function KakiSplit() {
   const [mode, setMode] = useState(null);
   const [guestSession, setGuestSession] = useState(null);
   const [initializing, setInitializing] = useState(true);
-  const [currency, setCurrency] = useState(localStorage.getItem("ks_currency") || "RM");
+  const [currency, setCurrency] = useState(() => {
+    const saved = localStorage.getItem("ks_currency");
+    if (saved === "RM") return "MYR"; // Migration
+    return saved || "MYR";
+  });
 
   useEffect(() => {
     const p = new URLSearchParams(window.location.search);
