@@ -1266,24 +1266,6 @@ function GuestView({ session, onBack }) {
     return () => clearInterval(t);
   }, []);
 
-  const prevPaidMap = usePrevious(paidMap);
-  useEffect(() => {
-    if (!prevPaidMap || !paidMap) return;
-    Object.keys(paidMap).forEach(itemId => {
-      const currentPayers = paidMap[itemId]?.payers || [];
-      const prevPayers = prevPaidMap[itemId]?.payers || [];
-      const newPayers = currentPayers.filter(p => !prevPayers.includes(p));
-
-      newPayers.forEach(payer => {
-        if (payer !== name) {
-          const item = items.find(i => i.id.toString() === itemId.toString());
-          sendLocalNotification("New Payment!", `${payer} paid for ${item?.name || "an item"}`);
-        }
-      });
-    });
-  }, [paidMap, name, items]);
-
-
   const myItems = items.filter(i => sel[i.id]);
   const myTotal = myItems.reduce((s, i) => {
     const paidInfo = paidMap[i.id];
@@ -1718,15 +1700,22 @@ function HostView({ onHome }) {
   const prevPaidMap = usePrevious(paidMap);
   useEffect(() => {
     if (!prevPaidMap || !paidMap || step !== 4) return;
+    
+    const newPaymentsByPayer = {}; 
     Object.keys(paidMap).forEach(itemId => {
-      const currentPayers = paidMap[itemId]?.payers || [];
-      const prevPayers = prevPaidMap[itemId]?.payers || [];
-      const newPayers = currentPayers.filter(p => !prevPayers.includes(p));
-
-      newPayers.forEach(payer => {
+      const current = paidMap[itemId]?.payers || [];
+      const prev = prevPaidMap[itemId]?.payers || [];
+      const news = current.filter(p => !prev.includes(p));
+      news.forEach(payer => {
         const item = items.find(i => i.id.toString() === itemId.toString());
-        sendLocalNotification("Incoming Payment!", `${payer} paid for ${item?.name || "an item"}`);
+        if (!newPaymentsByPayer[payer]) newPaymentsByPayer[payer] = [];
+        newPaymentsByPayer[payer].push(item?.name || "an item");
       });
+    });
+
+    Object.keys(newPaymentsByPayer).forEach(payer => {
+      const itemsList = newPaymentsByPayer[payer].join(", ");
+      sendLocalNotification("Incoming Payment!", `${payer} paid for ${itemsList}`);
     });
   }, [paidMap, items, step]);
 
@@ -2000,15 +1989,22 @@ function HostReturn({ onHome }) {
   const prevPaidMap = usePrevious(paidMap);
   useEffect(() => {
     if (!prevPaidMap || !paidMap || !session) return;
+    
+    const newPaymentsByPayer = {};
     Object.keys(paidMap).forEach(itemId => {
-      const currentPayers = paidMap[itemId]?.payers || [];
-      const prevPayers = prevPaidMap[itemId]?.payers || [];
-      const newPayers = currentPayers.filter(p => !prevPayers.includes(p));
-
-      newPayers.forEach(payer => {
+      const current = paidMap[itemId]?.payers || [];
+      const prev = prevPaidMap[itemId]?.payers || [];
+      const news = current.filter(p => !prev.includes(p));
+      news.forEach(payer => {
         const item = session.items.find(i => i.id.toString() === itemId.toString());
-        sendLocalNotification("Incoming Payment!", `${payer} paid for ${item?.name || "an item"}`);
+        if (!newPaymentsByPayer[payer]) newPaymentsByPayer[payer] = [];
+        newPaymentsByPayer[payer].push(item?.name || "an item");
       });
+    });
+
+    Object.keys(newPaymentsByPayer).forEach(payer => {
+      const itemsList = newPaymentsByPayer[payer].join(", ");
+      sendLocalNotification("Incoming Payment!", `${payer} paid for ${itemsList}`);
     });
   }, [paidMap, session]);
 
