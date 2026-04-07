@@ -1311,7 +1311,7 @@ function GuestView({ session, onBack }) {
         <div style={{ background: "var(--ink)", borderRadius: 4, padding: "16px 20px", marginBottom: 16, textAlign: "center" }}>
           <div style={{ fontSize: "0.55rem", color: "rgba(245,240,232,0.4)", letterSpacing: 3, textTransform: "uppercase", marginBottom: 6 }}>You paid</div>
           <div style={{ fontFamily: "Unbounded,sans-serif", fontSize: "2.4rem", fontWeight: 900, color: "var(--neon-lime)", letterSpacing: -1 }}>
-            RM {myTotal.toFixed(2)}
+            {currency} {myTotal.toFixed(2)}
           </div>
         </div>
 
@@ -1322,7 +1322,7 @@ function GuestView({ session, onBack }) {
           return (
             <div key={i.id} className="bill-summary-row">
               <span>{i.name}{totalSplit > 1 ? ` (split ${totalSplit} ways)` : ""}</span>
-              <span className="bill-summary-val">RM {splitPrice.toFixed(2)}</span>
+              <span className="bill-summary-val">{currency} {splitPrice.toFixed(2)}</span>
             </div>
           );
         })}
@@ -1372,7 +1372,7 @@ function GuestView({ session, onBack }) {
                   onClick={() => setSel(s => ({ ...s, [item.id]: !s[item.id] }))}>
                   <div className="g-check">{sel[item.id] ? "✓" : ""}</div>
                   <span className="g-name">{item.name}</span>
-                  <span className="g-price">RM {splitPrice.toFixed(2)}</span>
+                  <span className="g-price">{currency} {splitPrice.toFixed(2)}</span>
                 </div>
                 {paidBy.length > 0 && (
                   <div style={{ padding: "4px 24px 4px 56px", fontSize: "0.65rem", color: "var(--ink-light)" }}>
@@ -1402,7 +1402,7 @@ function GuestView({ session, onBack }) {
       <div className="sticky-total">
         <div>
           <div className="sticky-label">Your total</div>
-          <div className="sticky-amt">{myTotal > 0 ? `RM ${myTotal.toFixed(2)}` : "— —"}</div>
+          <div className="sticky-amt">{myTotal > 0 ? `${currency} ${myTotal.toFixed(2)}` : "— —"}</div>
         </div>
         <button className="sticky-pay-btn" disabled={myTotal === 0} onClick={() => qrImage ? setShowQR(true) : confirmPayment()}>
           {qrImage ? "Pay Now →" : "Confirm →"}
@@ -1416,7 +1416,7 @@ function GuestView({ session, onBack }) {
               <div className="qr-modal-title">Scan & Pay</div>
               <div className="qr-modal-sub">Pay exactly this amount</div>
             </div>
-            <div className="qr-modal-amt">RM {myTotal.toFixed(2)}</div>
+            <div className="qr-modal-amt">{currency} {myTotal.toFixed(2)}</div>
             <div className="qr-img-wrap">
               <img src={qrImage} className="qr-img" alt="QR" />
             </div>
@@ -1569,13 +1569,13 @@ function ScanToExcel({ onHome }) {
                   <input className="item-price-in" type="number" step="1" min="1" value={it.qty}
                     onChange={e => upd(it.id, "qty", parseInt(e.target.value) || 1)}
                     style={{ width: 36, textAlign: "center" }} title="Qty" />
-                  <span className="rm-tag">RM</span>
+                  <span className="rm-tag">{currency}</span>
                   <input className="item-price-in" type="number" step="0.01" value={it.price} onChange={e => upd(it.id, "price", parseFloat(e.target.value) || 0)} />
                 </div>
               ))}
               <div className="total-row grand" style={{ marginTop: 12 }}>
                 <span className="total-label">GRAND TOTAL</span>
-                <span className="total-val">RM {(items.reduce((s, it) => s + it.price * it.qty, 0) + tax + sc - discount).toFixed(2)}</span>
+                <span className="total-val">{currency} {(items.reduce((s, it) => s + it.price * it.qty, 0) + tax + sc - discount).toFixed(2)}</span>
               </div>
             </div>
 
@@ -1849,7 +1849,7 @@ function HostView({ onHome }) {
           {items.map(it => (
             <div key={it.id} className="line-item">
               <input className="item-name-in" value={it.name} onChange={e => upd(it.id, "name", e.target.value)} />
-              <span className="rm-tag">RM</span>
+              <span className="rm-tag">{currency}</span>
               <input className="item-price-in" type="number" step="0.01" value={it.price} onChange={e => upd(it.id, "price", e.target.value)} />
               <button className="del-btn" onClick={() => deleteItem(it.id)}>×</button>
             </div>
@@ -1860,7 +1860,7 @@ function HostView({ onHome }) {
           <div style={{ marginTop: 16 }}>
             <div className="total-row grand">
               <span className="total-label">TOTAL (incl. tax)</span>
-              <span className="total-val">RM {subtotal.toFixed(2)}</span>
+              <span className="total-val">{currency} {subtotal.toFixed(2)}</span>
             </div>
           </div>
           <div style={{ marginTop: 20 }}>
@@ -1925,14 +1925,14 @@ function HostView({ onHome }) {
                   </span>
                   {isPaid
                     ? <span className="paid-tag">✓ {payers.join(", ")}</span>
-                    : <span style={{ fontFamily: "'DM Mono',monospace", fontSize: "0.85rem", color: "var(--ink-light)", fontWeight: 500 }}>RM {parseFloat(i.price).toFixed(2)}</span>
+                    : <span style={{ fontFamily: "'DM Mono',monospace", fontSize: "0.85rem", color: "var(--ink-light)", fontWeight: 500 }}>{currency} {parseFloat(i.price).toFixed(2)}</span>
                   }
                 </div>
               );
             })}
             <div className="bill-summary-row highlight" style={{ marginTop: 8, paddingTop: 8, borderTop: "2px solid var(--ink)" }}>
               <span style={{ fontWeight: 500, color: "var(--ink)" }}>Total</span>
-              <span className="bill-summary-val">RM {subtotal.toFixed(2)}</span>
+              <span className="bill-summary-val">{currency} {subtotal.toFixed(2)}</span>
             </div>
           </div>
           <button className="btn btn-outline" style={{ marginTop: 16 }} onClick={() => { setStep(0); setImg(null); setB64(null); setItems([]); setQrImg(null); setCode(""); setCopied(false); }}>
@@ -2111,7 +2111,7 @@ function HostReturn({ onHome }) {
                   {i.name}
                 </span>
                 <span style={{ fontFamily: "'DM Mono',monospace", fontSize: "0.85rem", color: "var(--neon-pink)", fontWeight: 500 }}>
-                  RM {parseFloat(i.price).toFixed(2)}
+                  {currency} {parseFloat(i.price).toFixed(2)}
                 </span>
               </div>
             ))}
@@ -2146,7 +2146,7 @@ function HostReturn({ onHome }) {
 
         <div className="bill-summary-row highlight" style={{ marginTop: 8, paddingTop: 8, borderTop: "2px solid var(--ink)" }}>
           <span style={{ fontWeight: 500, color: "var(--ink)" }}>Total</span>
-          <span className="bill-summary-val">RM {subtotal.toFixed(2)}</span>
+          <span className="bill-summary-val">{currency} {subtotal.toFixed(2)}</span>
         </div>
 
         <button className="btn btn-ink" style={{ marginTop: 16 }} onClick={() => {
@@ -2193,7 +2193,7 @@ function HostReturn({ onHome }) {
 }
 
 // ── LANDING PAGE ──────────────────────────────────────────────
-function LandingPage({ onHost, onGuest, onScanExcel, onReturnTable }) {
+function LandingPage({ onHost, onGuest, onScanExcel, onReturnTable, currency, onCurrencyChange }) {
   const tables = JSON.parse(localStorage.getItem("ks_tables") || "[]");
   const [notifState, setNotifState] = useState(Notification.permission);
 
@@ -2202,12 +2202,11 @@ function LandingPage({ onHost, onGuest, onScanExcel, onReturnTable }) {
     setNotifState(res);
   };
 
-  // Check for any tables that are more than 12 hours old
   const oldTables = tables.filter(t => {
     const tableDate = new Date(t.date);
     const now = new Date();
     const diff = now - tableDate;
-    return diff > 12 * 60 * 60 * 1000; // 12 hours
+    return diff > 12 * 60 * 60 * 1000;
   });
 
   return (
@@ -2220,6 +2219,17 @@ function LandingPage({ onHost, onGuest, onScanExcel, onReturnTable }) {
       )}
 
       <div className="hero">
+        <div style={{ display: "flex", justifyContent: "flex-end", padding: "0 4px 12px" }}>
+          <select value={currency} onChange={e => onCurrencyChange(e.target.value)}
+            style={{
+              background: "var(--ink)", color: "var(--neon-lime)", padding: "4px 8px",
+              border: "1px solid var(--ink-faint)", borderRadius: 3, fontFamily: "DM Mono", fontSize: "0.65rem"
+            }}>
+            {["RM", "SGD", "USD", "EUR", "GBP", "IDR", "THB", "PHP", "VND"].map(c => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+        </div>
         <img src={LOGO_SRC} alt="KakiSplit" className="hero-logo" />
 
         {oldTables.length > 0 && (
@@ -2270,7 +2280,7 @@ function LandingPage({ onHost, onGuest, onScanExcel, onReturnTable }) {
             <div className="how-step-num">03</div>
             <div>
               <div className="how-step-title">Settle up</div>
-              <div className="how-step-desc">Everyone scans your DuitNow QR and pays their exact share.</div>
+              <div className="how-step-desc">Everyone scans your {currency === "RM" ? "DuitNow" : ""} QR and pays their exact share.</div>
             </div>
           </div>
         </div>
@@ -2305,6 +2315,7 @@ export default function KakiSplit() {
   const [mode, setMode] = useState(null);
   const [guestSession, setGuestSession] = useState(null);
   const [initializing, setInitializing] = useState(true);
+  const [currency, setCurrency] = useState(localStorage.getItem("ks_currency") || "RM");
 
   useEffect(() => {
     const p = new URLSearchParams(window.location.search);
@@ -2320,12 +2331,16 @@ export default function KakiSplit() {
     }
   }, []);
 
+  const changeCurrency = (c) => {
+    setCurrency(c);
+    localStorage.setItem("ks_currency", c);
+  };
+
   return (
     <>
       <style>{css}</style>
       <div className="bg" />
       <div className="app">
-
         {initializing && (
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
             <div style={{ textAlign: "center", color: "var(--paper)" }}>
@@ -2336,20 +2351,20 @@ export default function KakiSplit() {
         )}
 
         {!initializing && <>
-
-          {/* HOME */}
           {!mode && (
             <LandingPage
               onHost={() => setMode("host")}
               onGuest={() => setMode("guest-code")}
               onScanExcel={() => setMode("scan-excel")}
               onReturnTable={code => { localStorage.setItem("ks_current_code", code); setMode("host-return"); }}
+              currency={currency}
+              onCurrencyChange={changeCurrency}
             />
           )}
 
-          {mode === "host" && <HostView onHome={() => setMode(null)} />}
-          {mode === "host-return" && <HostReturn onHome={() => setMode(null)} />}
-          {mode === "scan-excel" && <ScanToExcel onHome={() => setMode(null)} />}
+          {mode === "host" && <HostView onHome={() => setMode(null)} currency={currency} />}
+          {mode === "host-return" && <HostReturn onHome={() => setMode(null)} currency={currency} />}
+          {mode === "scan-excel" && <ScanToExcel onHome={() => setMode(null)} currency={currency} />}
 
           {mode === "guest" && guestSession && (
             <>
@@ -2364,7 +2379,7 @@ export default function KakiSplit() {
                   <div><span className="badge-strip guest-badge">👥 Guest</span></div>
                 </div>
               </div>
-              <GuestView session={guestSession} onBack={() => setMode(null)} />
+              <GuestView session={guestSession} onBack={() => setMode(null)} currency={currency} />
             </>
           )}
 
@@ -2395,10 +2410,8 @@ export default function KakiSplit() {
               </div>
             </div>
           )}
-
         </>}
-
-      </div >
+      </div>
     </>
   );
 }
