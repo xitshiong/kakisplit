@@ -1762,7 +1762,7 @@ function HostView({ onHome }) {
   };
 
   const url = code ? `${window.location.origin}${window.location.pathname}?table=${code}` : "";
-  const subtotal = items.reduce((s, i) => s + parseFloat(i.price || 0), 0);
+  const subtotal = (items || []).reduce((s, i) => s + parseFloat(i?.price || 0), 0) || 0;
   const upd = (id, f, v) => setItems(its => its.map(it => it.id === id ? { ...it, [f]: v } : it));
 
   return (
@@ -1827,8 +1827,11 @@ function HostView({ onHome }) {
               const date = new Date();
               date.setDate(date.getDate() - d);
               const val = date.toISOString().split("T")[0];
-              const label = d === 0 ? "Today" : d === 1 ? "Yesterday" : date.toLocaleDateString("en-MY", { weekday: "short" });
-              const day = date.toLocaleDateString("en-MY", { day: "numeric" });
+              
+              const dayNames = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+              const label = d === 0 ? "Today" : d === 1 ? "Yesterday" : dayNames[date.getDay()];
+              const dayNum = date.getDate();
+              
               return (
                 <div key={val} className="date-chip" onClick={() => setTableDate(val)}
                   style={{
@@ -1836,7 +1839,7 @@ function HostView({ onHome }) {
                     border: tableDate === val ? "1.5px solid var(--ink)" : "1.5px solid var(--ink-faint)",
                   }}>
                   <div style={{ fontSize: "0.55rem", color: tableDate === val ? "var(--neon-lime)" : "var(--ink-faint)", letterSpacing: 1, textTransform: "uppercase", marginBottom: 3 }}>{label}</div>
-                  <div style={{ fontSize: "0.85rem", fontWeight: 500, color: tableDate === val ? "var(--neon-lime)" : "var(--ink)" }}>{day}</div>
+                  <div style={{ fontSize: "0.85rem", fontWeight: 500, color: tableDate === val ? "var(--neon-lime)" : "var(--ink)" }}>{dayNum}</div>
                 </div>
               );
             })}
