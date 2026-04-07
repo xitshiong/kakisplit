@@ -1490,17 +1490,23 @@ function ScanToExcel({ onHome }) {
   };
 
   const copyForExcel = () => {
-    const rows = ["Item\tQty\tUnit Price\tTotal"];
-    items.forEach(it => {
-      const lineTotal = (it.price * it.qty).toFixed(2);
-      rows.push(`${it.name}\t${it.qty}\t${it.price.toFixed(2)}\t${lineTotal}`);
-    });
     const subtotal = items.reduce((s, it) => s + it.price * it.qty, 0);
-    rows.push(`\t\tSubtotal\t${subtotal.toFixed(2)}`);
-    if (tax > 0) rows.push(`\t\tTax (SST)\t${tax.toFixed(2)}`);
-    if (sc > 0) rows.push(`\t\tService Charge\t${sc.toFixed(2)}`);
-    if (discount > 0) rows.push(`\t\tDiscount\t-${discount.toFixed(2)}`);
-    rows.push(`\t\tGrand Total\t${(subtotal + tax + sc - discount).toFixed(2)}`);
+    const extras = tax + sc - discount;
+    const rows = ["Item Name\tPrice\tTax\tTotal"];
+    items.forEach(it => {
+      const lineTotalRaw = it.price * it.qty;
+      const proportion = subtotal > 0 ? lineTotalRaw / subtotal : 0;
+      const itemTaxTotal = extras * proportion;
+      const itemTaxUnit = itemTaxTotal / it.qty;
+      const itemFinalTotal = (it.price + itemTaxUnit) * it.qty;
+      rows.push(`${it.name}\t${it.price.toFixed(2)}\t${itemTaxUnit.toFixed(2)}\t${(it.price + itemTaxUnit).toFixed(2)}`);
+    });
+    rows.push(`\t\t\t`);
+    rows.push(`Subtotal\t${subtotal.toFixed(2)}\t\t`);
+    if (tax > 0) rows.push(`Tax (SST)\t\t${tax.toFixed(2)}\t`);
+    if (sc > 0) rows.push(`Service Charge\t\t${sc.toFixed(2)}\t`);
+    if (discount > 0) rows.push(`Discount\t\t-${discount.toFixed(2)}\t`);
+    rows.push(`Grand Total\t\t\t${(subtotal + extras).toFixed(2)}`);
     navigator.clipboard.writeText(rows.join("\n"));
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
@@ -1652,10 +1658,15 @@ function HostView({ onHome }) {
         const qty = parseInt(it.qty || 1);
         const lineTotal = itemPrice * qty;
         const proportion = rawSubtotal > 0 ? lineTotal / rawSubtotal : 0;
-        const finalUnitPrice = parseFloat((itemPrice + extras * proportion / qty).toFixed(2));
+        const totalExtras = extras * proportion;
+        const taxPerUnit = parseFloat((totalExtras / qty).toFixed(2));
+        const finalUnitPrice = parseFloat((itemPrice + taxPerUnit).toFixed(2));
+        
         for (let q = 0; q < qty; q++) {
           baked.push({
             name: qty > 1 ? `${it.name} (${q + 1}/${qty})` : it.name,
+            rawPrice: itemPrice,
+            itemTax: taxPerUnit,
             price: finalUnitPrice,
             id: idCounter++
           });
@@ -1673,6 +1684,38 @@ function HostView({ onHome }) {
     r.onload = e => setQrImg(e.target.result);
     r.readAsDataURL(f);
   };
+
+  const notifiedRef = useRef(new Set());
+  useEffect(() => {
+    if (!paidMap || step !== 4) return;
+    
+    // On first data load, mark everything already paid as notified
+    if (notifiedRef.current.size === 0 && Object.keys(paidMap).length > 0) {
+      Object.keys(paidMap).forEach(itemId => {
+        const payers = paidMap[itemId]?.payers || [];
+        payers.forEach(p => notifiedRef.current.add(`${itemId}-${p}`));
+      });
+      return;
+    }
+
+    const newPaymentsByPayer = {}; 
+    Object.keys(paidMap).forEach(itemId => {
+      const current = paidMap[itemId]?.payers || [];
+      current.forEach(payer => {
+        const key = `${itemId}-${payer}`;
+        if (!notifiedRef.current.has(key)) {
+          const item = items.find(i => i.id.toString() === itemId.toString());
+          if (!newPaymentsByPayer[payer]) newPaymentsByPayer[payer] = [];
+          newPaymentsByPayer[payer].push(item?.name || "an item");
+          notifiedRef.current.add(key);
+        }
+      });
+    });
+
+    Object.keys(newPaymentsByPayer).forEach(payer => {
+      sendLocalNotification("Incoming Payment!", `${payer} paid for ${newPaymentsByPayer[payer].join(", ")}`);
+    });
+  }, [paidMap, items, step]);
 
   const finalise = async () => {
     const c = genCode();
@@ -1696,28 +1739,6 @@ function HostView({ onHome }) {
     }, 2000);
     return () => clearInterval(t);
   }, [step, code]);
-
-  const prevPaidMap = usePrevious(paidMap);
-  useEffect(() => {
-    if (!prevPaidMap || !paidMap || step !== 4) return;
-
-    const newPaymentsByPayer = {};
-    Object.keys(paidMap).forEach(itemId => {
-      const current = paidMap[itemId]?.payers || [];
-      const prev = prevPaidMap[itemId]?.payers || [];
-      const news = current.filter(p => !prev.includes(p));
-      news.forEach(payer => {
-        const item = items.find(i => i.id.toString() === itemId.toString());
-        if (!newPaymentsByPayer[payer]) newPaymentsByPayer[payer] = [];
-        newPaymentsByPayer[payer].push(item?.name || "an item");
-      });
-    });
-
-    Object.keys(newPaymentsByPayer).forEach(payer => {
-      const itemsList = newPaymentsByPayer[payer].join(", ");
-      sendLocalNotification("Incoming Payment!", `${payer} paid for ${itemsList}`);
-    });
-  }, [paidMap, items, step]);
 
   const [toast, setToast] = useState(null);   // {item, timer}
 
@@ -1978,6 +1999,38 @@ function HostReturn({ onHome }) {
     });
   }, []);
 
+  const notifiedRef = useRef(new Set());
+  useEffect(() => {
+    if (!paidMap || !session || !code) return;
+    
+    // On first load, mark existing as notified
+    if (notifiedRef.current.size === 0 && Object.keys(paidMap).length > 0) {
+      Object.keys(paidMap).forEach(itemId => {
+        const payers = paidMap[itemId]?.payers || [];
+        payers.forEach(p => notifiedRef.current.add(`${itemId}-${p}`));
+      });
+      return;
+    }
+
+    const newPaymentsByPayer = {};
+    Object.keys(paidMap).forEach(itemId => {
+      const current = paidMap[itemId]?.payers || [];
+      current.forEach(payer => {
+        const key = `${itemId}-${payer}`;
+        if (!notifiedRef.current.has(key)) {
+          const item = session.items.find(i => i.id.toString() === itemId.toString());
+          if (!newPaymentsByPayer[payer]) newPaymentsByPayer[payer] = [];
+          newPaymentsByPayer[payer].push(item?.name || "an item");
+          notifiedRef.current.add(key);
+        }
+      });
+    });
+
+    Object.keys(newPaymentsByPayer).forEach(payer => {
+      sendLocalNotification("Incoming Payment!", `${payer} paid for ${newPaymentsByPayer[payer].join(", ")}`);
+    });
+  }, [paidMap, session, code]);
+
   useEffect(() => {
     if (!code) return;
     const t = setInterval(() => {
@@ -2104,14 +2157,16 @@ function HostReturn({ onHome }) {
           {copiedLink ? "✓ Copied!" : "📋 Copy Table Link"}
         </button>
         <button className="btn btn-outline" style={{ marginTop: 10 }} onClick={() => {
-          const rows = ["Item\tPaid By\tPrice"];
+          const rows = ["Item\tPrice\tTax\tTotal\tPaid By"];
           session.items.forEach(i => {
             const paidInfo = paidMap[i.id];
             const payers = paidInfo?.payers ? paidInfo.payers.join(", ") : (paidInfo || "");
-            rows.push(`${i.name}\t${payers}\t${parseFloat(i.price).toFixed(2)}`);
+            const originalPrice = i.rawPrice || i.price;
+            const itemTax = i.itemTax || 0;
+            rows.push(`${i.name}\t${originalPrice.toFixed(2)}\t${itemTax.toFixed(2)}\t${parseFloat(i.price).toFixed(2)}\t${payers}`);
           });
-          rows.push(`\t\t`);
-          rows.push(`Total\t\t${subtotal.toFixed(2)}`);
+          rows.push(`\t\t\t\t`);
+          rows.push(`Total\t\t\t${subtotal.toFixed(2)}\t`);
           navigator.clipboard.writeText(rows.join("\n"));
           setCopiedExcel(true);
           setTimeout(() => setCopiedExcel(false), 2000);
