@@ -1184,9 +1184,26 @@ async function requestNotificationPermission() {
 
 function sendLocalNotification(title, body) {
   if (typeof window === "undefined" || !("Notification" in window) || Notification.permission !== "granted") return;
+  
+  const options = {
+    body,
+    icon: LOGO_SRC,
+    vibrate: [200, 100, 200],
+    tag: 'kakisplit-payment', // Prevents flooding
+    renotify: true
+  };
+
   try {
-    new Notification(title, { body, icon: LOGO_SRC });
-  } catch (e) { console.warn("Notification failed:", e); }
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.ready.then(reg => {
+        reg.showNotification(title, options);
+      });
+    } else {
+      new Notification(title, options);
+    }
+  } catch (e) {
+    console.warn("Notification failed:", e);
+  }
 }
 
 function genCode() { return Math.floor(1000 + Math.random() * 9000).toString(); }
@@ -2205,7 +2222,18 @@ function LandingPage({ onHost, onGuest, onScanExcel, onReturnTable, currency, on
       {notifState === "default" && (
         <div className="notify-banner">
           <span>🔔 Want real-time payment alerts?</span>
-          <button className="btn-notify-perm" onClick={handleNotifReq}>Enable</button>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button className="btn-notify-perm" onClick={handleNotifReq}>Enable</button>
+          </div>
+        </div>
+      )}
+      {notifState === "granted" && (
+        <div className="notify-banner" style={{ background: "var(--paper-dark)", borderTop: "1px dashed var(--ink-faint)" }}>
+          <span style={{ fontSize: "0.65rem", color: "var(--ink-light)" }}>✅ Notifications enabled</span>
+          <button className="btn-notify-perm" style={{ background: "transparent", border: "1px solid var(--ink-faint)", color: "var(--ink-faint)", fontSize: "0.55rem" }} 
+            onClick={() => sendLocalNotification("KakiSplit ⚡️", "Test notification works!")}>
+            Send Test
+          </button>
         </div>
       )}
 
