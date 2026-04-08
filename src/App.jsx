@@ -1172,8 +1172,14 @@ async function requestNotificationPermission() {
   if (typeof window === "undefined" || !("Notification" in window)) return "unsupported";
   if (Notification.permission === "granted") return "granted";
   try {
-    return await Notification.requestPermission();
-  } catch (e) { return "denied"; }
+    const permission = await new Promise((resolve, reject) => {
+      const p = Notification.requestPermission(resolve);
+      if (p && p.then) p.then(resolve).catch(reject);
+    });
+    return permission;
+  } catch (e) {
+    return "denied";
+  }
 }
 
 function sendLocalNotification(title, body) {
@@ -2298,6 +2304,12 @@ export default function KakiSplit() {
   const [mode, setMode] = useState(null);
   const [guestSession, setGuestSession] = useState(null);
   const [initializing, setInitializing] = useState(true);
+  useEffect(() => {
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js").catch(e => console.error("SW failed:", e));
+    }
+  }, []);
+
   const [currency, setCurrency] = useState(() => {
     const saved = localStorage.getItem("ks_currency");
     if (saved === "RM") return "MYR"; // Migration
