@@ -1251,7 +1251,7 @@ function StepBar({ current, steps }) {
 }
 
 // ── GUEST VIEW ────────────────────────────────────────────────
-function GuestView({ session, onBack }) {
+function GuestView({ session, onBack, currency }) {
   const [named, setNamed] = useState(false);
   const [name, setName] = useState("");
   const [sel, setSel] = useState({});
