@@ -2045,27 +2045,6 @@ function HostReturn({ onHome, currency }) {
     return () => clearInterval(t);
   }, [code]);
 
-  const prevPaidMap = usePrevious(paidMap);
-  useEffect(() => {
-    if (!prevPaidMap || !paidMap || !session) return;
-
-    const newPaymentsByPayer = {};
-    Object.keys(paidMap).forEach(itemId => {
-      const current = paidMap[itemId]?.payers || [];
-      const prev = prevPaidMap[itemId]?.payers || [];
-      const news = current.filter(p => !prev.includes(p));
-      news.forEach(payer => {
-        const item = session.items.find(i => i.id.toString() === itemId.toString());
-        if (!newPaymentsByPayer[payer]) newPaymentsByPayer[payer] = [];
-        newPaymentsByPayer[payer].push(item?.name || "an item");
-      });
-    });
-
-    Object.keys(newPaymentsByPayer).forEach(payer => {
-      const itemsList = newPaymentsByPayer[payer].join(", ");
-      sendLocalNotification("Incoming Payment!", `${payer} paid for ${itemsList}`);
-    });
-  }, [paidMap, session]);
 
   if (!session) return (
     <div className="receipt">
