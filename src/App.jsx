@@ -1621,8 +1621,7 @@ function ScanToExcel({ onHome, currency }) {
 // ── HOST VIEW ─────────────────────────────────────────────────
 function HostView({ onHome, currency }) {
   const [step, setStep] = useState(0);
-  const [img, setImg] = useState(null);
-  const [b64, setB64] = useState(null);
+  const [receipts, setReceipts] = useState([]); // [{id, img, b64, items, tax, sc, discount}]
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const [drag, setDrag] = useState(false);
@@ -1637,12 +1636,25 @@ function HostView({ onHome, currency }) {
   const [tableName, setTableName] = useState("");
   const [tableDate, setTableDate] = useState(new Date().toISOString().split("T")[0]);
 
-  const handleFile = f => {
-    if (!f?.type.startsWith("image/")) return;
-    setImg(URL.createObjectURL(f));
-    const r = new FileReader();
-    r.onload = e => setB64(e.target.result.split(",")[1]);
-    r.readAsDataURL(f);
+  const handleFile = async (files) => {
+    const newReceipts = [];
+    for (const f of Array.from(files)) {
+      if (!f.type.startsWith("image/")) continue;
+      
+      const b64Str = await new Promise((resolve) => {
+        const r = new FileReader();
+        r.onload = e => resolve(e.target.result.split(",")[1]);
+        r.readAsDataURL(f);
+      });
+
+      newReceipts.push({
+        id: Math.random().toString(36).substr(2, 9),
+        img: URL.createObjectURL(f),
+        b64: b64Str,
+        items: []
+      });
+    }
+    setReceipts(prev => [...prev, ...newReceipts]);
     setErr("");
   };
 
@@ -1650,57 +1662,60 @@ function HostView({ onHome, currency }) {
     setLoading(true); setErr("");
     try {
       const GEMINI_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-      console.log("KEY:", GEMINI_KEY);
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${GEMINI_KEY}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{
-              parts: [
-                { inline_data: { mime_type: "image/jpeg", data: b64 } },
-                { text: `Extract individual line items from this receipt. Return ONLY valid JSON, no markdown, no explanation:\n{"items":[{"name":"Item Name","price":12.50,"qty":2}],"tax":1.50,"serviceCharge":2.00,"discount":0}\nRules:\n- price = unit price for ONE item (divide total by qty)\n- qty = quantity shown on receipt, default 1\n- If same item appears multiple times, combine them into one entry with combined qty\n- IGNORE subtotal, total, grand total, rounding rows\n- tax = Govt SST amount, serviceCharge = Service Charge amount, discount = discount amount, all in ringgit not %\n- use 0 if any field absent` }
-              ]
-            }],
-            generationConfig: { temperature: 0.1, maxOutputTokens: 8192 }
-          })
-        }
-      );
-      const data = await res.json();
-      console.log("RESPONSE:", JSON.stringify(data));
-      const txt = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-      const parsed = JSON.parse(txt.replace(/```json|```/g, "").trim());
-      const rawItems = parsed.items || [];
-      const tax = parseFloat(parsed.tax || 0);
-      const sc = parseFloat(parsed.serviceCharge || 0);
-      const discount = parseFloat(parsed.discount || 0);
-      const extras = tax + sc - discount;
-      const rawSubtotal = rawItems.reduce((s, i) => s + parseFloat(i.price || 0) * parseInt(i.qty || 1), 0);
-      const baked = [];
-      let idCounter = 1;
-      rawItems.forEach(it => {
-        const itemPrice = parseFloat(it.price || 0);
-        const qty = parseInt(it.qty || 1);
-        const lineTotal = itemPrice * qty;
-        const proportion = rawSubtotal > 0 ? lineTotal / rawSubtotal : 0;
-        const totalExtras = extras * proportion;
-        const taxPerUnit = parseFloat((totalExtras / qty).toFixed(2));
-        const finalUnitPrice = parseFloat((itemPrice + taxPerUnit).toFixed(2));
+      const allBakedItems = [];
+      let globalIdCounter = 1;
+
+      for (const receipt of receipts) {
+        const res = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${GEMINI_KEY}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{
+                parts: [
+                  { inline_data: { mime_type: "image/jpeg", data: receipt.b64 } },
+                  { text: `Extract individual line items from this receipt. Return ONLY valid JSON, no markdown, no explanation:\n{"items":[{"name":"Item Name","price":12.50,"qty":2}],"tax":1.50,"serviceCharge":2.00,"discount":0}\nRules:\n- price = unit price for ONE item (divide total by qty)\n- qty = quantity shown on receipt, default 1\n- If same item appears multiple times, combine them into one entry with combined qty\n- IGNORE subtotal, total, grand total, rounding rows\n- tax = Govt SST amount, serviceCharge = Service Charge amount, discount = discount amount, all in ringgit not %\n- use 0 if any field absent` }
+                ]
+              }],
+              generationConfig: { temperature: 0.1, maxOutputTokens: 8192 }
+            })
+          }
+        );
+        const data = await res.json();
+        const txt = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+        const parsed = JSON.parse(txt.replace(/```json|```/g, "").trim());
+        const rawItems = parsed.items || [];
+        const tax = parseFloat(parsed.tax || 0);
+        const sc = parseFloat(parsed.serviceCharge || 0);
+        const discount = parseFloat(parsed.discount || 0);
+        const extras = tax + sc - discount;
+        const rawSubtotal = rawItems.reduce((s, i) => s + parseFloat(i.price || 0) * parseInt(i.qty || 1), 0);
         
-        for (let q = 0; q < qty; q++) {
-          baked.push({
-            name: qty > 1 ? `${it.name} (${q + 1}/${qty})` : it.name,
-            rawPrice: itemPrice,
-            itemTax: taxPerUnit,
-            price: finalUnitPrice,
-            id: idCounter++
-          });
-        }
-      });
-      setItems(baked);
+        rawItems.forEach(it => {
+          const itemPrice = parseFloat(it.price || 0);
+          const qty = parseInt(it.qty || 1);
+          const lineTotal = itemPrice * qty;
+          const proportion = rawSubtotal > 0 ? lineTotal / rawSubtotal : 0;
+          const totalExtras = extras * proportion;
+          const taxPerUnit = parseFloat((totalExtras / qty).toFixed(2));
+          const finalUnitPrice = parseFloat((itemPrice + taxPerUnit).toFixed(2));
+          
+          for (let q = 0; q < qty; q++) {
+            allBakedItems.push({
+              name: qty > 1 ? `${it.name} (${q + 1}/${qty})` : it.name,
+              rawPrice: itemPrice,
+              itemTax: taxPerUnit,
+              price: finalUnitPrice,
+              id: globalIdCounter++,
+              receiptId: receipt.id // Track which receipt it came from
+            });
+          }
+        });
+      }
+      setItems(allBakedItems);
       setStep(1);
-    } catch (e) { setErr("Couldn't read receipt. Try a clearer photo or snap again."); }
+    } catch (e) { setErr("Couldn't read receipt. Try clearer photos or snap again."); }
     setLoading(false);
   };
 
@@ -1804,38 +1819,47 @@ function HostView({ onHome, currency }) {
 
         {/* STEP 0 */}
         {step === 0 && <div className="section">
-          <div className="section-head">Snap the receipt</div>
-          <div className="section-sub">Reading items instantly...</div>
-          {!img ? (
-            <div className={`upload-zone ${drag ? "drag" : ""}`}
-              onClick={() => fileRef.current.click()}
-              onDragOver={e => { e.preventDefault(); setDrag(true); }}
-              onDragLeave={() => setDrag(false)}
-              onDrop={e => { e.preventDefault(); setDrag(false); handleFile(e.dataTransfer.files[0]); }}>
-              <input ref={fileRef} type="file" accept="image/*" onChange={e => handleFile(e.target.files[0])} />
-              <span className="upload-emoji">📸</span>
-              <div className="upload-label">Tap to snap or upload</div>
-              <div className="upload-hint">Any receipt • JPG, PNG, HEIC</div>
-            </div>
-          ) : (
-            <>
-              <img src={img} className="preview-img" alt="Receipt" />
-              {err && <div className="error-strip">⚠ {err}</div>}
+          <div className="section-head">Snap receipts</div>
+          <div className="section-sub">You can upload multiple receipts</div>
+          
+          <div className={`upload-zone ${drag ? "drag" : ""}`}
+            onClick={() => fileRef.current.click()}
+            onDragOver={e => { e.preventDefault(); setDrag(true); }}
+            onDragLeave={() => setDrag(false)}
+            onDrop={e => { e.preventDefault(); setDrag(false); handleFile(e.dataTransfer.files); }}>
+            <input ref={fileRef} type="file" accept="image/*" multiple onChange={e => handleFile(e.target.files)} />
+            <span className="upload-emoji">📸</span>
+            <div className="upload-label">Tap to snap or upload</div>
+            <div className="upload-hint">Upload one or more receipts</div>
+          </div>
+
+          {receipts.length > 0 && (
+            <div style={{ marginTop: 20 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(80px, 1fr))", gap: 10, marginBottom: 20 }}>
+                {receipts.map(r => (
+                  <div key={r.id} style={{ position: "relative", aspectRatio: "3/4" }}>
+                    <img src={r.img} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 4, border: "1px solid var(--ink-faint)" }} />
+                    <button onClick={() => setReceipts(prev => prev.filter(x => x.id !== r.id))}
+                      style={{ position: "absolute", top: -5, right: -5, background: "var(--neon-pink)", color: "white", border: "none", borderRadius: "50%", width: 24, height: 24, cursor: "pointer", fontSize: "14px" }}>×</button>
+                  </div>
+                ))}
+              </div>
+              
               {loading ? (
                 <div className="loading-receipt">
                   <div className="spinner" />
-                  <div className="loading-label">Extracting menu items...</div>
-                  <div className="loading-sub">Reading your receipt</div>
+                  <div className="loading-label">Extracting items...</div>
+                  <div className="loading-sub">Processing {receipts.length} receipt{receipts.length > 1 ? "s" : ""}</div>
                 </div>
               ) : (
                 <>
-                  <button className="btn btn-ink" onClick={parseReceipt}>Extract Menu Items →</button>
-                  <button className="btn btn-outline" onClick={() => { setImg(null); setB64(null); setErr(""); }}>Try another photo</button>
+                  <button className="btn btn-ink" onClick={parseReceipt}>Scan All Receipts →</button>
+                  <button className="btn btn-outline" onClick={() => setReceipts([])}>Clear All</button>
                 </>
               )}
-            </>
+            </div>
           )}
-
+          {err && <div className="error-strip" style={{ marginTop: 16 }}>⚠ {err}</div>}
         </div>}
         {/* STEP 1 - TABLE DETAILS */}
         {step === 1 && <div className="section">
@@ -1874,15 +1898,47 @@ function HostView({ onHome, currency }) {
         {/* STEP 2 - CHECK ITEMS */}
         {step === 2 && <div className="section">
           <div className="section-head">Check items</div>
-          <div className="section-sub">Prices already include tax & service charge</div>
-          {items.map(it => (
-            <div key={it.id} className="line-item">
-              <input className="item-name-in" value={it.name} onChange={e => upd(it.id, "name", e.target.value)} />
-              <span className="rm-tag">{currency}</span>
-              <input className="item-price-in" type="number" step="0.01" value={it.price} onChange={e => upd(it.id, "price", e.target.value)} />
-              <button className="del-btn" onClick={() => deleteItem(it.id)}>×</button>
-            </div>
-          ))}
+          <div className="section-sub">Review items from all receipts</div>
+          
+          {receipts.map((receipt, idx) => {
+            const receiptItems = items.filter(it => it.receiptId === receipt.id);
+            if (receiptItems.length === 0) return null;
+            return (
+              <div key={receipt.id} style={{ marginBottom: 32, border: "1px solid var(--paper-dark)", borderRadius: 8, overflow: "hidden" }}>
+                <div style={{ background: "var(--paper-dark)", padding: "12px 16px", display: "flex", alignItems: "center", gap: 12 }}>
+                  <img src={receipt.img} style={{ width: 40, height: 54, objectFit: "cover", borderRadius: 2 }} />
+                  <div>
+                    <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--ink)" }}>Receipt #{idx + 1}</div>
+                    <div style={{ fontSize: "0.6rem", color: "var(--ink-faint)", textTransform: "uppercase" }}>{receiptItems.length} items</div>
+                  </div>
+                </div>
+                <div style={{ padding: "0 16px" }}>
+                  {receiptItems.map(it => (
+                    <div key={it.id} className="line-item">
+                      <input className="item-name-in" value={it.name} onChange={e => upd(it.id, "name", e.target.value)} />
+                      <span className="rm-tag">{currency}</span>
+                      <input className="item-price-in" type="number" step="0.01" value={it.price} onChange={e => upd(it.id, "price", e.target.value)} />
+                      <button className="del-btn" onClick={() => deleteItem(it.id)}>×</button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+
+          {items.filter(it => !it.receiptId).length > 0 && (
+             <div style={{ marginBottom: 32 }}>
+               <div style={{ fontSize: "0.65rem", color: "var(--ink-faint)", letterSpacing: 1, textTransform: "uppercase", marginBottom: 8, paddingLeft: 8 }}>Manual Items</div>
+               {items.filter(it => !it.receiptId).map(it => (
+                 <div key={it.id} className="line-item">
+                   <input className="item-name-in" value={it.name} onChange={e => upd(it.id, "name", e.target.value)} />
+                   <span className="rm-tag">{currency}</span>
+                   <input className="item-price-in" type="number" step="0.01" value={it.price} onChange={e => upd(it.id, "price", e.target.value)} />
+                   <button className="del-btn" onClick={() => deleteItem(it.id)}>×</button>
+                 </div>
+               ))}
+             </div>
+          )}
           <button className="add-line-btn" onClick={() => setItems(its => [...its, { id: Date.now(), name: "New Item", price: 0 }])}>
             + Add item
           </button>
@@ -1964,7 +2020,7 @@ function HostView({ onHome, currency }) {
               <span className="bill-summary-val">{currency} {subtotal.toFixed(2)}</span>
             </div>
           </div>
-          <button className="btn btn-outline" style={{ marginTop: 16 }} onClick={() => { setStep(0); setImg(null); setB64(null); setItems([]); setQrImg(null); setCode(""); setCopied(false); }}>
+          <button className="btn btn-outline" style={{ marginTop: 16 }} onClick={() => { setStep(0); setReceipts([]); setItems([]); setQrImg(null); setCode(""); setCopied(false); }}>
             🔄 Start new table
           </button>
         </div>}
