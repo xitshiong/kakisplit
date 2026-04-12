@@ -1184,7 +1184,7 @@ async function requestNotificationPermission() {
 
 function sendLocalNotification(title, body) {
   if (typeof window === "undefined" || !("Notification" in window) || Notification.permission !== "granted") return;
-  
+
   const options = {
     body,
     icon: LOGO_SRC,
@@ -1248,14 +1248,33 @@ async function savePaid(itemId, name, code, splitCount = 1) {
   await supabase.from("sessions").update({ paid }).eq("code", code);
 }
 
-async function loadPaid(code) {
-  const { data, error } = await supabase
-    .from("sessions")
-    .select("paid")
-    .eq("code", code)
-    .limit(1);
-  if (!data || error || data.length === 0) return {};
-  return data[0]?.paid || {};
+async function loadSessionState(code) {
+  const { data, error } = await supabase.from("sessions").select("paid, selections").eq("code", code).single();
+  if (error || !data) return { paid: {}, selections: {} };
+  return { paid: data.paid || {}, selections: data.selections || {} };
+}
+
+async function updateGuestSelection(code, name, sel) {
+  if (!code || !name) return;
+  const { data } = await supabase.from("sessions").select("selections").eq("code", code).single();
+  let selections = data?.selections || {};
+  
+  // Remove user from all previously held items
+  Object.keys(selections).forEach(itemId => {
+    if (Array.isArray(selections[itemId])) {
+      selections[itemId] = selections[itemId].filter(n => n !== name);
+    }
+  });
+
+  // Add user to currently selected items
+  Object.keys(sel).forEach(itemId => {
+    if (sel[itemId]) {
+      if (!selections[itemId]) selections[itemId] = [];
+      if (!selections[itemId].includes(name)) selections[itemId].push(name);
+    }
+  });
+
+  await supabase.from("sessions").update({ selections }).eq("code", code);
 }
 // ── STEP BAR ──────────────────────────────────────────────────
 function StepBar({ current, steps }) {
@@ -1284,13 +1303,25 @@ function GuestView({ session, onBack, currency }) {
   const [paidMap, setPaidMap] = useState({});
   const { items = [], qrImage } = session;
 
-  // Reload paid map periodically
+  const [selections, setSelections] = useState({});
+
+  // Reload session state (paid + selections) periodically
   useEffect(() => {
     const t = setInterval(() => {
-      loadPaid(session.code).then(setPaidMap);
+      loadSessionState(session.code).then(state => {
+        setPaidMap(state.paid);
+        setSelections(state.selections);
+      });
     }, 2000);
     return () => clearInterval(t);
-  }, []);
+  }, [session.code]);
+
+  // Sync our selection to Supabase
+  useEffect(() => {
+    if (named && name) {
+      updateGuestSelection(session.code, name, sel);
+    }
+  }, [sel, named, name, session.code]);
 
   const myItems = items.filter(i => sel[i.id]);
   const myTotal = myItems.reduce((s, i) => {
@@ -1305,8 +1336,8 @@ function GuestView({ session, onBack, currency }) {
       const totalSplit = paidInfo?.total || splits[i.id] || 1;
       await savePaid(i.id, name, session.code, totalSplit);
     }
-    const updated = await loadPaid(session.code);
-    setPaidMap(updated);
+    const { paid } = await loadSessionState(session.code);
+    setPaidMap(paid);
     setDone(true);
     setShowQR(false);
   };
@@ -1397,7 +1428,14 @@ function GuestView({ session, onBack, currency }) {
                 <div className={`guest-item ${sel[item.id] ? "sel" : ""}`}
                   onClick={() => setSel(s => ({ ...s, [item.id]: !s[item.id] }))}>
                   <div className="g-check">{sel[item.id] ? "✓" : ""}</div>
-                  <span className="g-name">{item.name}</span>
+                  <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+                    <span className="g-name">{item.name}</span>
+                    {selections[item.id] && selections[item.id].filter(n => n !== name).length > 0 && (
+                      <span style={{ fontSize: "0.6rem", color: "var(--neon-pink)", fontWeight: 600 }}>
+                        Highlighted by {selections[item.id].filter(n => n !== name).join(", ")}
+                      </span>
+                    )}
+                  </div>
                   <span className="g-price">{currency} {splitPrice.toFixed(2)}</span>
                 </div>
                 {paidBy.length > 0 && (
@@ -1640,7 +1678,7 @@ function HostView({ onHome, currency }) {
     const newReceipts = [];
     for (const f of Array.from(files)) {
       if (!f.type.startsWith("image/")) continue;
-      
+
       const b64Str = await new Promise((resolve) => {
         const r = new FileReader();
         r.onload = e => resolve(e.target.result.split(",")[1]);
@@ -1691,7 +1729,7 @@ function HostView({ onHome, currency }) {
         const discount = parseFloat(parsed.discount || 0);
         const extras = tax + sc - discount;
         const rawSubtotal = rawItems.reduce((s, i) => s + parseFloat(i.price || 0) * parseInt(i.qty || 1), 0);
-        
+
         rawItems.forEach(it => {
           const itemPrice = parseFloat(it.price || 0);
           const qty = parseInt(it.qty || 1);
@@ -1700,7 +1738,7 @@ function HostView({ onHome, currency }) {
           const totalExtras = extras * proportion;
           const taxPerUnit = parseFloat((totalExtras / qty).toFixed(2));
           const finalUnitPrice = parseFloat((itemPrice + taxPerUnit).toFixed(2));
-          
+
           for (let q = 0; q < qty; q++) {
             allBakedItems.push({
               name: qty > 1 ? `${it.name} (${q + 1}/${qty})` : it.name,
@@ -1729,7 +1767,7 @@ function HostView({ onHome, currency }) {
   const notifiedRef = useRef(new Set());
   useEffect(() => {
     if (!paidMap || step !== 4) return;
-    
+
     // On first data load, mark everything already paid as notified
     if (notifiedRef.current.size === 0 && Object.keys(paidMap).length > 0) {
       Object.keys(paidMap).forEach(itemId => {
@@ -1739,7 +1777,7 @@ function HostView({ onHome, currency }) {
       return;
     }
 
-    const newPaymentsByPayer = {}; 
+    const newPaymentsByPayer = {};
     Object.keys(paidMap).forEach(itemId => {
       const current = paidMap[itemId]?.payers || [];
       current.forEach(payer => {
@@ -1776,7 +1814,7 @@ function HostView({ onHome, currency }) {
   useEffect(() => {
     if (step !== 4) return;
     const t = setInterval(() => {
-      loadPaid(code).then(setPaidMap);
+      loadSessionState(code).then(s => setPaidMap(s.paid));
     }, 2000);
     return () => clearInterval(t);
   }, [step, code]);
@@ -1821,7 +1859,7 @@ function HostView({ onHome, currency }) {
         {step === 0 && <div className="section">
           <div className="section-head">Snap receipts</div>
           <div className="section-sub">You can upload multiple receipts</div>
-          
+
           <div className={`upload-zone ${drag ? "drag" : ""}`}
             onClick={() => fileRef.current.click()}
             onDragOver={e => { e.preventDefault(); setDrag(true); }}
@@ -1844,7 +1882,7 @@ function HostView({ onHome, currency }) {
                   </div>
                 ))}
               </div>
-              
+
               {loading ? (
                 <div className="loading-receipt">
                   <div className="spinner" />
@@ -1874,11 +1912,11 @@ function HostView({ onHome, currency }) {
               const date = new Date();
               date.setDate(date.getDate() - d);
               const val = date.toISOString().split("T")[0];
-              
-              const dayNames = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+
+              const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
               const label = d === 0 ? "Today" : d === 1 ? "Yesterday" : dayNames[date.getDay()];
               const dayNum = date.getDate();
-              
+
               return (
                 <div key={val} className="date-chip" onClick={() => setTableDate(val)}
                   style={{
@@ -1899,7 +1937,7 @@ function HostView({ onHome, currency }) {
         {step === 2 && <div className="section">
           <div className="section-head">Check items</div>
           <div className="section-sub">Review items from all receipts</div>
-          
+
           {receipts.map((receipt, idx) => {
             const receiptItems = items.filter(it => it.receiptId === receipt.id);
             if (receiptItems.length === 0) return null;
@@ -1927,17 +1965,17 @@ function HostView({ onHome, currency }) {
           })}
 
           {items.filter(it => !it.receiptId).length > 0 && (
-             <div style={{ marginBottom: 32 }}>
-               <div style={{ fontSize: "0.65rem", color: "var(--ink-faint)", letterSpacing: 1, textTransform: "uppercase", marginBottom: 8, paddingLeft: 8 }}>Manual Items</div>
-               {items.filter(it => !it.receiptId).map(it => (
-                 <div key={it.id} className="line-item">
-                   <input className="item-name-in" value={it.name} onChange={e => upd(it.id, "name", e.target.value)} />
-                   <span className="rm-tag">{currency}</span>
-                   <input className="item-price-in" type="number" step="0.01" value={it.price} onChange={e => upd(it.id, "price", e.target.value)} />
-                   <button className="del-btn" onClick={() => deleteItem(it.id)}>×</button>
-                 </div>
-               ))}
-             </div>
+            <div style={{ marginBottom: 32 }}>
+              <div style={{ fontSize: "0.65rem", color: "var(--ink-faint)", letterSpacing: 1, textTransform: "uppercase", marginBottom: 8, paddingLeft: 8 }}>Manual Items</div>
+              {items.filter(it => !it.receiptId).map(it => (
+                <div key={it.id} className="line-item">
+                  <input className="item-name-in" value={it.name} onChange={e => upd(it.id, "name", e.target.value)} />
+                  <span className="rm-tag">{currency}</span>
+                  <input className="item-price-in" type="number" step="0.01" value={it.price} onChange={e => upd(it.id, "price", e.target.value)} />
+                  <button className="del-btn" onClick={() => deleteItem(it.id)}>×</button>
+                </div>
+              ))}
+            </div>
           )}
           <button className="add-line-btn" onClick={() => setItems(its => [...its, { id: Date.now(), name: "New Item", price: 0 }])}>
             + Add item
@@ -2087,7 +2125,7 @@ function HostReturn({ onHome, currency }) {
   const notifiedRef = useRef(new Set());
   useEffect(() => {
     if (!paidMap || !session || !code) return;
-    
+
     // On first load, mark existing as notified
     if (notifiedRef.current.size === 0 && Object.keys(paidMap).length > 0) {
       Object.keys(paidMap).forEach(itemId => {
@@ -2119,7 +2157,7 @@ function HostReturn({ onHome, currency }) {
   useEffect(() => {
     if (!code) return;
     const t = setInterval(() => {
-      loadPaid(code).then(setPaidMap);
+      loadSessionState(code).then(s => setPaidMap(s.paid));
     }, 2000);
     return () => clearInterval(t);
   }, [code]);
@@ -2281,15 +2319,6 @@ function LandingPage({ onHost, onGuest, onScanExcel, onReturnTable, currency, on
           <div style={{ display: "flex", gap: 8 }}>
             <button className="btn-notify-perm" onClick={handleNotifReq}>Enable</button>
           </div>
-        </div>
-      )}
-      {notifState === "granted" && (
-        <div className="notify-banner" style={{ background: "var(--paper-dark)", borderTop: "1px dashed var(--ink-faint)" }}>
-          <span style={{ fontSize: "0.65rem", color: "var(--ink-light)" }}>✅ Notifications enabled</span>
-          <button className="btn-notify-perm" style={{ background: "transparent", border: "1px solid var(--ink-faint)", color: "var(--ink-faint)", fontSize: "0.55rem" }} 
-            onClick={() => sendLocalNotification("KakiSplit ⚡️", "Test notification works!")}>
-            Send Test
-          </button>
         </div>
       )}
 
