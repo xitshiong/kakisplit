@@ -1260,7 +1260,7 @@ async function updateGuestSelection(code, name, sel) {
   try {
     const { data } = await supabase.from("sessions").select("selections").eq("code", code).single();
     let selections = data?.selections || {};
-    
+
     // Remove user from all previously held items
     Object.keys(selections).forEach(itemId => {
       if (Array.isArray(selections[itemId])) {
@@ -1719,47 +1719,85 @@ function HostView({ onHome, currency }) {
               contents: [{
                 parts: [
                   { inline_data: { mime_type: "image/jpeg", data: receipt.b64 } },
-                  { text: `Extract individual line items from this receipt. Return ONLY valid JSON, no markdown, no explanation:\n{"items":[{"name":"Item Name","price":12.50,"qty":2}],"tax":1.50,"serviceCharge":2.00,"discount":0}\nRules:\n- price = unit price for ONE item (divide total by qty)\n- qty = quantity shown on receipt, default 1\n- If same item appears multiple times, combine them into one entry with combined qty\n- IGNORE subtotal, total, grand total, rounding rows\n- tax = Govt SST amount, serviceCharge = Service Charge amount, discount = discount amount, all in ringgit not %\n- use 0 if any field absent` }
+                  { text: `You are a professional accounting auditor. Extract data from this receipt with 100% mathematical integrity.
+                  
+                  RETURN ONLY THIS JSON SCHEMA:
+                  {
+                    "items": [{"name": "Item Name", "price": 12.50, "qty": 1}],
+                    "tax": 1.50,
+                    "serviceCharge": 2.20,
+                    "discount": 0.00,
+                    "rounding": 0.02,
+                    "grandTotal": 16.22
+                  }
+
+                  STRICT AUDIT RULES:
+                  1. ITEM PRICE: Extract the unit price (price for 1 qty).
+                  2. INDIVIDUAL ENTRIES: DO NOT combine duplicates. If an item appears multiple times as separate lines on the receipt, LIST THEM INDIVIDUALLY in the JSON.
+                  3. BALANCE THE BOOKS: The sum of (price * qty) + tax + serviceCharge - discount + rounding MUST EQUAL grandTotal exactly.
+                  4. ROUNDING: Use the 'rounding' field for small balancing adjustments (e.g. 0.01, -0.05) to ensure the equation is perfect.
+                  5. CLEAN NAMES: Remove prefix numbers or symbols from item names.
+
+                  Return ONLY the raw JSON object. No markdown, no prose.` }
                 ]
               }],
-              generationConfig: { temperature: 0.1, maxOutputTokens: 8192 }
+              generationConfig: { temperature: 0.1, maxOutputTokens: 2048 }
             })
           }
         );
         const data = await res.json();
         const txt = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
         const parsed = JSON.parse(txt.replace(/```json|```/g, "").trim());
+        
         const rawItems = parsed.items || [];
         const tax = parseFloat(parsed.tax || 0);
         const sc = parseFloat(parsed.serviceCharge || 0);
         const discount = parseFloat(parsed.discount || 0);
-        const extras = tax + sc - discount;
+        const rounding = parseFloat(parsed.rounding || 0);
+        const receiptGrandTotal = parseFloat(parsed.grandTotal || 0);
+        
+        const extras = tax + sc - discount + rounding;
         const rawSubtotal = rawItems.reduce((s, i) => s + parseFloat(i.price || 0) * parseInt(i.qty || 1), 0);
-
+        
+        const currentReceiptBaked = [];
         rawItems.forEach(it => {
           const itemPrice = parseFloat(it.price || 0);
           const qty = parseInt(it.qty || 1);
           const lineTotal = itemPrice * qty;
           const proportion = rawSubtotal > 0 ? lineTotal / rawSubtotal : 0;
           const totalExtras = extras * proportion;
-          const taxPerUnit = parseFloat((totalExtras / qty).toFixed(2));
+          const taxPerUnit = totalExtras / qty;
           const finalUnitPrice = parseFloat((itemPrice + taxPerUnit).toFixed(2));
-
+          
           for (let q = 0; q < qty; q++) {
-            allBakedItems.push({
+            currentReceiptBaked.push({
               name: qty > 1 ? `${it.name} (${q + 1}/${qty})` : it.name,
               rawPrice: itemPrice,
               itemTax: taxPerUnit,
               price: finalUnitPrice,
               id: globalIdCounter++,
-              receiptId: receipt.id // Track which receipt it came from
+              receiptId: receipt.id
             });
           }
         });
+
+        // RECONCILIATION: Ensure unit price rounding doesn't create a discrepancy
+        const bakedSum = currentReceiptBaked.reduce((s, i) => s + i.price, 0);
+        const targetSum = receiptGrandTotal > 0 ? receiptGrandTotal : (rawSubtotal + extras);
+        const diff = targetSum - bakedSum;
+        
+        if (Math.abs(diff) > 0 && Math.abs(diff) < 1 && currentReceiptBaked.length > 0) {
+          currentReceiptBaked[currentReceiptBaked.length - 1].price = parseFloat((currentReceiptBaked[currentReceiptBaked.length - 1].price + diff).toFixed(2));
+        }
+        
+        allBakedItems.push(...currentReceiptBaked);
       }
       setItems(allBakedItems);
       setStep(1);
-    } catch (e) { setErr("Couldn't read receipt. Try clearer photos or snap again."); }
+    } catch (e) { 
+      console.error("Auditor error:", e);
+      setErr("Auditor Error: Couldn't verify the receipt balance. Try a clearer photo."); 
+    }
     setLoading(false);
   };
 
