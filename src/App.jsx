@@ -1249,32 +1249,38 @@ async function savePaid(itemId, name, code, splitCount = 1) {
 }
 
 async function loadSessionState(code) {
-  const { data, error } = await supabase.from("sessions").select("paid, selections").eq("code", code).single();
+  // Use select("*") to avoid crashing if certain columns (like selections) haven't been added yet
+  const { data, error } = await supabase.from("sessions").select("*").eq("code", code).single();
   if (error || !data) return { paid: {}, selections: {} };
   return { paid: data.paid || {}, selections: data.selections || {} };
 }
 
 async function updateGuestSelection(code, name, sel) {
   if (!code || !name) return;
-  const { data } = await supabase.from("sessions").select("selections").eq("code", code).single();
-  let selections = data?.selections || {};
-  
-  // Remove user from all previously held items
-  Object.keys(selections).forEach(itemId => {
-    if (Array.isArray(selections[itemId])) {
-      selections[itemId] = selections[itemId].filter(n => n !== name);
-    }
-  });
+  try {
+    const { data } = await supabase.from("sessions").select("selections").eq("code", code).single();
+    let selections = data?.selections || {};
+    
+    // Remove user from all previously held items
+    Object.keys(selections).forEach(itemId => {
+      if (Array.isArray(selections[itemId])) {
+        selections[itemId] = selections[itemId].filter(n => n !== name);
+      }
+    });
 
-  // Add user to currently selected items
-  Object.keys(sel).forEach(itemId => {
-    if (sel[itemId]) {
-      if (!selections[itemId]) selections[itemId] = [];
-      if (!selections[itemId].includes(name)) selections[itemId].push(name);
-    }
-  });
+    // Add user to currently selected items
+    Object.keys(sel).forEach(itemId => {
+      if (sel[itemId]) {
+        if (!selections[itemId]) selections[itemId] = [];
+        if (!selections[itemId].includes(name)) selections[itemId].push(name);
+      }
+    });
 
-  await supabase.from("sessions").update({ selections }).eq("code", code);
+    // We use a try-catch in case the 'selections' column is missing in Supabase
+    await supabase.from("sessions").update({ selections }).eq("code", code);
+  } catch (e) {
+    console.warn("Selections sync failed (Column might be missing)", e);
+  }
 }
 // ── STEP BAR ──────────────────────────────────────────────────
 function StepBar({ current, steps }) {
