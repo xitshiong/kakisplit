@@ -1737,7 +1737,9 @@ function HostView({ onHome, currency }) {
                   2. INDIVIDUAL ENTRIES: DO NOT combine duplicates. If an item appears multiple times as separate lines on the receipt, LIST THEM INDIVIDUALLY in the JSON.
                   3. BALANCE THE BOOKS: The sum of (price * qty) + tax + serviceCharge - discount + rounding MUST EQUAL grandTotal exactly.
                   4. ROUNDING: Use the 'rounding' field for small balancing adjustments (e.g. 0.01, -0.05) to ensure the equation is perfect.
-                  5. CLEAN NAMES: Remove prefix numbers or symbols from item names.
+                  5. CLEAN NAMES: Remove prefix numbers or symbols like *, #, @, i« from item names.
+                  6. MODIFIERS: If a line has NO price and sits beneath a priced item, it is a modifier — NOT a separate item. Append it to the parent item name in parentheses. Example: "Shroom Burger Meal (+Shroom Burger, Fries, Coca Cola Less Sugar)". Never list zero-price lines as their own entries.
+                  7. IGNORE: Promo/discount math lines (e.g. "Value Set Promo (-8.58)") are not food items. Skip them entirely.
 
                   Return ONLY the raw JSON object. No markdown, no prose.` }
                 ]
