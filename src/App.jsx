@@ -1719,52 +1719,27 @@ function HostView({ onHome, currency }) {
               contents: [{
                 parts: [
                   { inline_data: { mime_type: "image/jpeg", data: receipt.b64 } },
-                  { text: `You are an expert OCR receipt parser and accounting auditor.
+                  {
+                    text: `You are a professional accounting auditor. Extract data from this receipt with 100% mathematical integrity.
+                  
+                  RETURN ONLY THIS JSON SCHEMA:
+                  {
+                    "items": [{"name": "Item Name", "price": 12.50, "qty": 1}],
+                    "tax": 1.50,
+                    "serviceCharge": 2.20,
+                    "discount": 0.00,
+                    "rounding": 0.02,
+                    "grandTotal": 16.22
+                  }
 
-TASK: Extract structured data from this receipt image and return it as a single raw JSON object. No markdown, no backticks, no explanation — ONLY the JSON.
+                  STRICT AUDIT RULES:
+                  1. ITEM PRICE: Extract the unit price (price for 1 qty).
+                  2. INDIVIDUAL ENTRIES: DO NOT combine duplicates. If an item appears multiple times as separate lines on the receipt, LIST THEM INDIVIDUALLY in the JSON.
+                  3. BALANCE THE BOOKS: The sum of (price * qty) + tax + serviceCharge - discount + rounding MUST EQUAL grandTotal exactly.
+                  4. ROUNDING: Use the 'rounding' field for small balancing adjustments (e.g. 0.01, -0.05) to ensure the equation is perfect.
+                  5. CLEAN NAMES: Remove prefix numbers or symbols from item names.
 
-STEP 1 — LOCATE ANCHOR VALUES
-Find and note these values first before extracting anything else:
-- Grand Total / Net Total (your final target)
-- SubTotal (sum of items before tax)
-- Tax amount
-- Service charge (if any)
-- Rounding adjustment (if any)
-- Discount (if any)
-
-STEP 2 — EXTRACT LINE ITEMS
-Scan every line between the header and subtotal.
-
-RULE A — PRICED ITEMS:
-A line is a priced item if it has a numeric value on the far right (e.g. "38.59").
-Extract: name, price, qty (default qty to 1 if not shown).
-
-RULE B — MODIFIERS (no-price lines):
-If a line has NO price and appears directly beneath a priced item, it is a modifier of that parent item.
-DO NOT create a separate JSON entry for modifiers. Append all modifiers to the parent item name in parentheses.
-Example:
-  "1  Shroom Burger Meal    38.59"  is a priced item
-  "   1  Shroom Burger"            is a modifier — NO separate entry
-  "   1  Fries"                    is a modifier — NO separate entry
-  "   1  Fountain Soda Regular"    is a modifier — NO separate entry
-Result: { "name": "Shroom Burger Meal (Shroom Burger, Fries, Fountain Soda Regular)", "price": 38.59, "qty": 1 }
-
-RULE C — IGNORE THESE LINES COMPLETELY:
-- Promotional math lines (e.g. "Value Set Promo X2 (17.92-8.58)[48%]")
-- Any line that contains a formula, percentage, or promo label but represents NO actual food item
-- Header/footer lines, payment method lines, cashier info
-
-RULE D — CLEANING:
-- Strip symbols: *, #, @, from all names
-- Strip leading numbers used as prefixes (e.g. "1 Fries" becomes "Fries")
-- If the same item appears as separate PRICED lines, keep them as separate JSON entries
-
-STEP 3 — SELF-AUDIT
-Before returning JSON, verify: (sum of all item price x qty) + tax + serviceCharge - discount + rounding = grandTotal
-If it does NOT balance, re-examine the receipt for missed items or wrong prices and adjust until it balances.
-
-Return ONLY this JSON structure. Raw. No wrapping. No extra text.
-{ "items": [ { "name": "Item name with modifiers if any", "price": 0.00, "qty": 1 } ], "tax": 0.00, "serviceCharge": 0.00, "discount": 0.00, "rounding": 0.00, "grandTotal": 0.00 }` }
+                  Return ONLY the raw JSON object. No markdown, no prose.` }
                 ]
               }],
               generationConfig: { temperature: 0.1, maxOutputTokens: 8192 }
@@ -1774,17 +1749,17 @@ Return ONLY this JSON structure. Raw. No wrapping. No extra text.
         const data = await res.json();
         const txt = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
         const parsed = JSON.parse(txt.replace(/```json|```/g, "").trim());
-        
+
         const rawItems = parsed.items || [];
         const tax = parseFloat(parsed.tax || 0);
         const sc = parseFloat(parsed.serviceCharge || 0);
         const discount = parseFloat(parsed.discount || 0);
         const rounding = parseFloat(parsed.rounding || 0);
         const receiptGrandTotal = parseFloat(parsed.grandTotal || 0);
-        
+
         const extras = tax + sc - discount + rounding;
         const rawSubtotal = rawItems.reduce((s, i) => s + parseFloat(i.price || 0) * parseInt(i.qty || 1), 0);
-        
+
         const currentReceiptBaked = [];
         rawItems.forEach(it => {
           const itemPrice = parseFloat(it.price || 0);
@@ -1794,7 +1769,7 @@ Return ONLY this JSON structure. Raw. No wrapping. No extra text.
           const totalExtras = extras * proportion;
           const taxPerUnit = totalExtras / qty;
           const finalUnitPrice = parseFloat((itemPrice + taxPerUnit).toFixed(2));
-          
+
           for (let q = 0; q < qty; q++) {
             currentReceiptBaked.push({
               name: qty > 1 ? `${it.name} (${q + 1}/${qty})` : it.name,
@@ -1811,18 +1786,18 @@ Return ONLY this JSON structure. Raw. No wrapping. No extra text.
         const bakedSum = currentReceiptBaked.reduce((s, i) => s + i.price, 0);
         const targetSum = receiptGrandTotal > 0 ? receiptGrandTotal : (rawSubtotal + extras);
         const diff = targetSum - bakedSum;
-        
+
         if (Math.abs(diff) > 0 && Math.abs(diff) < 1 && currentReceiptBaked.length > 0) {
           currentReceiptBaked[currentReceiptBaked.length - 1].price = parseFloat((currentReceiptBaked[currentReceiptBaked.length - 1].price + diff).toFixed(2));
         }
-        
+
         allBakedItems.push(...currentReceiptBaked);
       }
       setItems(allBakedItems);
       setStep(1);
-    } catch (e) { 
+    } catch (e) {
       console.error("Auditor error:", e);
-      setErr("Auditor Error: Couldn't verify the receipt balance. Try a clearer photo."); 
+      setErr("Auditor Error: Couldn't verify the receipt balance. Try a clearer photo.");
     }
     setLoading(false);
   };
