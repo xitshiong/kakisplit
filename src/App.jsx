@@ -1239,13 +1239,38 @@ async function load(code) {
 
 async function savePaid(itemId, name, code, splitCount = 1) {
   if (!code) code = new URLSearchParams(window.location.search).get("table") || localStorage.getItem("ks_current_code");
-  if (!code) return;
-  const { data } = await supabase.from("sessions").select("paid").eq("code", code).single();
-  const paid = data?.paid || {};
-  if (!paid[itemId]) paid[itemId] = { payers: [], total: splitCount };
-  if (!paid[itemId].payers) paid[itemId] = { payers: [paid[itemId]], total: 1 };
-  if (!paid[itemId].payers.includes(name)) paid[itemId].payers.push(name);
-  await supabase.from("sessions").update({ paid }).eq("code", code);
+  if (!code) return { success: false };
+
+  // Optimistic concurrency: retry up to 4 times if update races
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const { data, error } = await supabase.from("sessions").select("paid").eq("code", code).single();
+    if (error) return { success: false };
+
+    const paid = data?.paid || {};
+    if (!paid[itemId]) paid[itemId] = { payers: [], total: splitCount };
+    if (!paid[itemId].payers) paid[itemId] = { payers: [paid[itemId]], total: 1 };
+
+    const payers = paid[itemId].payers;
+    const total = paid[itemId].total || splitCount;
+
+    // Already paid by this user
+    if (payers.includes(name)) return { success: true, alreadyPaid: true };
+
+    // Item already full
+    if (payers.length >= total) return { success: false, full: true };
+
+    payers.push(name);
+
+    const { error: updateError } = await supabase
+      .from("sessions")
+      .update({ paid })
+      .eq("code", code);
+
+    if (!updateError) return { success: true };
+    // If update failed (race), wait briefly and retry
+    await new Promise(r => setTimeout(r, 100 + Math.random() * 200));
+  }
+  return { success: false };
 }
 
 async function loadSessionState(code) {
@@ -1337,15 +1362,21 @@ function GuestView({ session, onBack, currency }) {
   }, 0);
 
   const confirmPayment = async () => {
+    const failures = [];
     for (const i of myItems) {
       const paidInfo = paidMap[i.id];
       const totalSplit = paidInfo?.total || splits[i.id] || 1;
-      await savePaid(i.id, name, session.code, totalSplit);
+      const result = await savePaid(i.id, name, session.code, totalSplit);
+      if (result?.full) failures.push(i.name);
     }
     const { paid } = await loadSessionState(session.code);
     setPaidMap(paid);
-    setDone(true);
-    setShowQR(false);
+    if (failures.length > 0) {
+      alert(`Someone else just paid for: ${failures.join(", ")}. Please review your selection.`);
+    } else {
+      setDone(true);
+      setShowQR(false);
+    }
   };
 
   if (!named) return (
@@ -1784,13 +1815,17 @@ function HostView({ onHome, currency }) {
           }
         });
 
-        // RECONCILIATION: Ensure unit price rounding doesn't create a discrepancy
+        // RECONCILIATION: Distribute rounding diff cent-by-cent across items
         const bakedSum = currentReceiptBaked.reduce((s, i) => s + i.price, 0);
         const targetSum = receiptGrandTotal > 0 ? receiptGrandTotal : (rawSubtotal + extras);
-        const diff = targetSum - bakedSum;
+        const diff = parseFloat((targetSum - bakedSum).toFixed(2));
 
         if (Math.abs(diff) > 0 && Math.abs(diff) < 1 && currentReceiptBaked.length > 0) {
-          currentReceiptBaked[currentReceiptBaked.length - 1].price = parseFloat((currentReceiptBaked[currentReceiptBaked.length - 1].price + diff).toFixed(2));
+          const cent = diff > 0 ? 0.01 : -0.01;
+          const steps = Math.round(Math.abs(diff) / 0.01);
+          for (let i = 0; i < steps && i < currentReceiptBaked.length; i++) {
+            currentReceiptBaked[i].price = parseFloat((currentReceiptBaked[i].price + cent).toFixed(2));
+          }
         }
 
         allBakedItems.push(...currentReceiptBaked);
