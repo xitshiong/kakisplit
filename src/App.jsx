@@ -1771,6 +1771,7 @@ function HostView({ onHome, currency }) {
                   5. CLEAN NAMES: Remove prefix numbers or symbols like *, #, @, i« from item names.
                   6. MODIFIERS: If a line has NO price and sits beneath a priced item, it is a modifier — NOT a separate item. Append it to the parent item name in parentheses. Example: "Shroom Burger Meal (+Shroom Burger, Fries, Coca Cola Less Sugar)". Never list zero-price lines as their own entries.
                   7. IGNORE: Promo/discount math lines (e.g. "Value Set Promo (-8.58)") are not food items. Skip them entirely.
+                  8. QTY FORMAT: Lines like "5 ADULT @38.79  193.95" mean qty=5, unit price=38.79 (the @price), line total=193.95. Extract qty=5 and price=38.79, NOT price=193.95.
 
                   Return ONLY the raw JSON object. No markdown, no prose.` }
                 ]
