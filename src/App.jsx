@@ -1363,16 +1363,23 @@ function GuestView({ session, onBack, currency }) {
 
   const confirmPayment = async () => {
     const failures = [];
+    const failedIds = [];
     for (const i of myItems) {
       const paidInfo = paidMap[i.id];
       const totalSplit = paidInfo?.total || splits[i.id] || 1;
       const result = await savePaid(i.id, name, session.code, totalSplit);
-      if (result?.full) failures.push(i.name);
+      if (result?.full) { failures.push(i.name); failedIds.push(i.id); }
     }
     const { paid } = await loadSessionState(session.code);
     setPaidMap(paid);
     if (failures.length > 0) {
-      alert(`Someone else just paid for: ${failures.join(", ")}. Please review your selection.`);
+      // Deselect items that were already taken
+      setSel(s => {
+        const next = { ...s };
+        failedIds.forEach(id => { delete next[id]; });
+        return next;
+      });
+      alert(`Someone else just paid for: ${failures.join(", ")}. Removed from your total.`);
     } else {
       setDone(true);
       setShowQR(false);
