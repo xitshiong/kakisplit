@@ -99,10 +99,10 @@ body {
 .login-pill { background: rgba(26, 18, 8, 0.4); backdrop-filter: blur(8px); border: 1.5px solid var(--ink-faint); color: var(--paper); padding: 6px 14px; border-radius: 20px; font-size: 0.7rem; font-weight: 600; cursor: pointer; }
 .user-chip { display: flex; align-items: center; gap: 8px; background: var(--ink); color: var(--paper); padding: 4px 12px 4px 4px; border-radius: 20px; cursor: pointer; transition: transform 0.2s; border: 1.5px solid var(--ink-faint); }
 .user-chip:active { transform: scale(0.95); }
-.user-avatar { width: 26px; height: 26px; border-radius: 50%; border: 1.5px solid var(--neon-lime); object-fit: cover; }
+.user-avatar { width: 26px; height: 26px; border-radius: 50%; border: 1.5px solid var(--neon-lime); object-fit: cover; background: var(--paper-dark); color: transparent; }
 .user-name { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.5px; }
 .profile-hero { text-align: center; padding: 40px 20px 20px; border-bottom: 1px dashed var(--ink-faint); margin-bottom: 24px; }
-.profile-large-avatar { width: 100px; height: 100px; border-radius: 50%; border: 3px solid var(--neon-lime); margin-bottom: 16px; box-shadow: 0 8px 30px rgba(0,0,0,0.4); object-fit: cover; }
+.profile-large-avatar { width: 100px; height: 100px; border-radius: 50%; border: 3px solid var(--neon-lime); margin-bottom: 16px; box-shadow: 0 8px 30px rgba(0,0,0,0.4); object-fit: cover; background: var(--paper-dark); color: transparent; }
 .profile-name { font-family: 'Unbounded', sans-serif; font-size: 1.3rem; font-weight: 900; color: var(--ink); margin-bottom: 4px; letter-spacing: -0.5px; }
 .profile-email { font-size: 0.7rem; color: var(--ink-faint); letter-spacing: 1px; text-transform: uppercase; }
 .vault-card { background: var(--paper-dark); border: 2px dashed var(--ink-faint); border-radius: 12px; padding: 24px; margin-top: 10px; }
@@ -2633,19 +2633,35 @@ export default function KakiSplit() {
   }, []);
 
   const fetchProfile = async (uid) => {
+    const { data: { user: currentUser } } = await supabase.auth.getUser();
+    if (!currentUser) return;
+
     const { data, error } = await supabase.from('profiles').select('*').eq('id', uid).single();
-    if (data) setProfile(data);
-    else if (error && error.code === 'PGRST116') {
-      // Create profile if missing
-      const { data: newUser } = await supabase.auth.getUser();
-      if (newUser.user) {
-        const { data: created } = await supabase.from('profiles').insert({
-          id: newUser.user.id,
-          full_name: newUser.user.user_metadata.full_name,
-          avatar_url: newUser.user.user_metadata.avatar_url
-        }).select().single();
-        if (created) setProfile(created);
+    
+    // Google metadata fallbacks
+    const meta = currentUser.user_metadata || {};
+    const gName = meta.full_name || meta.name || currentUser.email.split("@")[0];
+    const gPic = meta.avatar_url || meta.picture || "";
+
+    if (data) {
+      // Refresh profile if name/photo is missing but available in metadata
+      if (!data.full_name || !data.avatar_url) {
+        const { data: updated } = await supabase.from('profiles').update({
+          full_name: data.full_name || gName,
+          avatar_url: data.avatar_url || gPic
+        }).eq('id', uid).select().single();
+        if (updated) setProfile(updated);
+      } else {
+        setProfile(data);
       }
+    } else if (error && error.code === 'PGRST116') {
+      // Create profile if missing
+      const { data: created } = await supabase.from('profiles').insert({
+        id: uid,
+        full_name: gName,
+        avatar_url: gPic
+      }).select().single();
+      if (created) setProfile(created);
     }
   };
 
