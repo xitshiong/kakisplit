@@ -2494,7 +2494,7 @@ function LandingPage({ onHost, onGuest, onScanExcel, onReturnTable, currency, on
       <div className="top-nav">
         {user ? (
           <div className="user-chip" onClick={onProfile}>
-            <img src={profile?.avatar_url} alt="Profile" className="user-avatar" />
+            <img src={user.user_metadata.picture || user.user_metadata.avatar_url || profile?.avatar_url} alt="Profile" className="user-avatar" />
             <span className="user-name">{profile?.full_name?.split(" ")[0]}</span>
           </div>
         ) : (
@@ -2513,10 +2513,6 @@ function LandingPage({ onHost, onGuest, onScanExcel, onReturnTable, currency, on
 
       <div className="hero">
         <img src={LOGO_SRC} alt="KakiSplit" className="hero-logo" />
-
-        {user && (
-          <div className="welcome-tag">Hey {profile?.full_name?.split(" ")[0]}! ⚡️</div>
-        )}
 
         {oldTables.length > 0 && (
           <div className="pending-alert">
