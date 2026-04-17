@@ -93,6 +93,28 @@ body {
 
 .receipt-inner { padding: 28px 24px 24px; }
 
+/* ── NEW AUTH & PROFILE STYLES ── */
+.top-nav { display: flex; justify-content: flex-end; padding: 16px 20px; position: absolute; top: 0; right: 0; width: 100%; z-index: 10; pointer-events: none; }
+.login-pill, .user-chip { pointer-events: auto; }
+.login-pill { background: rgba(26, 18, 8, 0.4); backdrop-filter: blur(8px); border: 1.5px solid var(--ink-faint); color: var(--paper); padding: 6px 14px; border-radius: 20px; font-size: 0.7rem; font-weight: 600; cursor: pointer; }
+.user-chip { display: flex; align-items: center; gap: 8px; background: var(--ink); color: var(--paper); padding: 4px 12px 4px 4px; border-radius: 20px; cursor: pointer; transition: transform 0.2s; border: 1.5px solid var(--ink-faint); }
+.user-chip:active { transform: scale(0.95); }
+.user-avatar { width: 26px; height: 26px; border-radius: 50%; border: 1.5px solid var(--neon-lime); object-fit: cover; }
+.user-name { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.5px; }
+.profile-hero { text-align: center; padding: 40px 20px 20px; border-bottom: 1px dashed var(--ink-faint); margin-bottom: 24px; }
+.profile-large-avatar { width: 100px; height: 100px; border-radius: 50%; border: 3px solid var(--neon-lime); margin-bottom: 16px; box-shadow: 0 8px 30px rgba(0,0,0,0.4); object-fit: cover; }
+.profile-name { font-family: 'Unbounded', sans-serif; font-size: 1.3rem; font-weight: 900; color: var(--ink); margin-bottom: 4px; letter-spacing: -0.5px; }
+.profile-email { font-size: 0.7rem; color: var(--ink-faint); letter-spacing: 1px; text-transform: uppercase; }
+.vault-card { background: var(--paper-dark); border: 2px dashed var(--ink-faint); border-radius: 12px; padding: 24px; margin-top: 10px; }
+.vault-title { font-family: 'Unbounded', sans-serif; font-size: 0.9rem; font-weight: 800; color: var(--ink); margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+.vault-desc { font-size: 0.68rem; color: var(--ink-light); line-height: 1.5; margin-bottom: 20px; opacity: 0.8; }
+.vault-qr-area { width: 100%; aspect-ratio: 1; border: 1.5px solid var(--ink); border-radius: 12px; overflow: hidden; position: relative; cursor: pointer; background: white; box-shadow: inset 0 2px 10px rgba(0,0,0,0.05); }
+.vault-qr-placeholder { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--ink-faint); gap: 12px; }
+.vault-qr-placeholder span { font-size: 2.5rem; filter: grayscale(1); }
+.vault-qr-preview { width: 100%; height: 100%; object-fit: contain; padding: 20px; }
+.welcome-tag { font-family: 'Playfair Display', serif; font-size: 1.2rem; font-weight: 700; color: var(--ink-light); margin-top: 16px; animation: slideUp 0.6s cubic-bezier(0.23, 1, 0.32, 1); }
+@keyframes slideUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+
 /* ── HEADER ── */
 .header-receipt {
   text-align: center;
@@ -1701,7 +1723,7 @@ function ScanToExcel({ onHome, currency }) {
 }
 
 // ── HOST VIEW ─────────────────────────────────────────────────
-function HostView({ onHome, currency }) {
+function HostView({ onHome, currency, user, profile }) {
   const [step, setStep] = useState(0);
   const [receipts, setReceipts] = useState([]); // [{id, img, b64, items, tax, sc, discount}]
   const [loading, setLoading] = useState(false);
@@ -1709,6 +1731,13 @@ function HostView({ onHome, currency }) {
   const [drag, setDrag] = useState(false);
   const [items, setItems] = useState([]);
   const [qrImg, setQrImg] = useState(null);
+
+  // Pre-fill QR from profile if it exists
+  useEffect(() => {
+    if (profile?.qr_url && !qrImg) {
+      setQrImg(profile.qr_url);
+    }
+  }, [profile, qrImg]);
   const [code, setCode] = useState("");
   const [copied, setCopied] = useState(false);
   const [paidMap, setPaidMap] = useState({});
@@ -2197,7 +2226,66 @@ function GuestCode({ onJoin, onBack }) {
   );
 }
 
-// ── ROOT ──────────────────────────────────────────────────────
+// ── PROFILE VIEW ─────────────────────────────────────────────
+function ProfileView({ onHome, user, profile, setProfile, onLogout }) {
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef();
+
+  const handleQR = async (f) => {
+    if (!f?.type.startsWith("image/")) return;
+    setUploading(true);
+    
+    // Upload to Supabase Storage or just Base64 for simplicity in MVP
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      const b64 = e.target.result;
+      const { error } = await supabase.from('profiles').update({ qr_url: b64 }).eq('id', user.id);
+      if (!error) setProfile(prev => ({ ...prev, qr_url: b64 }));
+      setUploading(false);
+    };
+    reader.readAsDataURL(f);
+  };
+
+  return (
+    <div className="receipt">
+      <div className="header-receipt">
+        <button className="home-btn" onClick={onHome}>
+          <span className="home-btn-icon">←</span>
+          <span className="home-btn-label">Back</span>
+        </button>
+        <div className="profile-hero">
+          <img src={profile?.avatar_url} alt="User" className="profile-large-avatar" />
+          <div className="profile-name">{profile?.full_name}</div>
+          <div className="profile-email">{user.email}</div>
+        </div>
+      </div>
+
+      <div className="section" style={{ paddingTop: 0 }}>
+        <div className="vault-card">
+          <div className="vault-title">🛡️ The Kaki Vault</div>
+          <p className="vault-desc">Save your default payment QR code here. It will be pre-filled every time you start a table.</p>
+          
+          <div className="vault-qr-area" onClick={() => fileRef.current.click()}>
+            {profile?.qr_url ? (
+              <img src={profile.qr_url} alt="Default QR" className="vault-qr-preview" />
+            ) : (
+              <div className="vault-qr-placeholder">
+                <span>➕</span>
+                <p>Upload Payment QR</p>
+              </div>
+            )}
+            <input type="file" ref={fileRef} hidden accept="image/*" onChange={e => handleQR(e.target.files[0])} />
+          </div>
+          {uploading && <div className="spinner" style={{ margin: "10px auto" }} />}
+        </div>
+
+        <button className="btn btn-outline" style={{ marginTop: 40, color: "var(--neon-pink)", borderColor: "var(--neon-pink)" }} onClick={onLogout}>
+          Sign Out
+        </button>
+      </div>
+    </div>
+  );
+}
 function HostReturn({ onHome, currency }) {
   const [session, setSession] = useState(null);
   const [paidMap, setPaidMap] = useState({});
@@ -2385,7 +2473,7 @@ function HostReturn({ onHome, currency }) {
 }
 
 // ── LANDING PAGE ──────────────────────────────────────────────
-function LandingPage({ onHost, onGuest, onScanExcel, onReturnTable, currency, onCurrencyChange }) {
+function LandingPage({ onHost, onGuest, onScanExcel, onReturnTable, currency, onCurrencyChange, user, profile, onLogin, onProfile }) {
   const tables = JSON.parse(localStorage.getItem("ks_tables") || "[]");
   const [notifState, setNotifState] = useState(() => (typeof window !== "undefined" && "Notification" in window ? Notification.permission : "unsupported"));
 
@@ -2403,6 +2491,17 @@ function LandingPage({ onHost, onGuest, onScanExcel, onReturnTable, currency, on
 
   return (
     <div className="receipt landing">
+      <div className="top-nav">
+        {user ? (
+          <div className="user-chip" onClick={onProfile}>
+            <img src={profile?.avatar_url} alt="Profile" className="user-avatar" />
+            <span className="user-name">{profile?.full_name?.split(" ")[0]}</span>
+          </div>
+        ) : (
+          <button className="login-pill" onClick={onLogin}>Host Login</button>
+        )}
+      </div>
+
       {notifState === "default" && (
         <div className="notify-banner">
           <span>🔔 Want real-time payment alerts?</span>
@@ -2414,6 +2513,10 @@ function LandingPage({ onHost, onGuest, onScanExcel, onReturnTable, currency, on
 
       <div className="hero">
         <img src={LOGO_SRC} alt="KakiSplit" className="hero-logo" />
+
+        {user && (
+          <div className="welcome-tag">Hey {profile?.full_name?.split(" ")[0]}! ⚡️</div>
+        )}
 
         {oldTables.length > 0 && (
           <div className="pending-alert">
@@ -2507,11 +2610,58 @@ export default function KakiSplit() {
   const [mode, setMode] = useState(null);
   const [guestSession, setGuestSession] = useState(null);
   const [initializing, setInitializing] = useState(true);
+  const [user, setUser] = useState(null);
+  const [profile, setProfile] = useState(null);
+
   useEffect(() => {
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("/sw.js").catch(e => console.error("SW failed:", e));
     }
+
+    // Listen for Auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        fetchProfile(session.user.id);
+      } else {
+        setProfile(null);
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
+
+  const fetchProfile = async (uid) => {
+    const { data, error } = await supabase.from('profiles').select('*').eq('id', uid).single();
+    if (data) setProfile(data);
+    else if (error && error.code === 'PGRST116') {
+      // Create profile if missing
+      const { data: newUser } = await supabase.auth.getUser();
+      if (newUser.user) {
+        const { data: created } = await supabase.from('profiles').insert({
+          id: newUser.user.id,
+          full_name: newUser.user.user_metadata.full_name,
+          avatar_url: newUser.user.user_metadata.avatar_url
+        }).select().single();
+        if (created) setProfile(created);
+      }
+    }
+  };
+
+  const handleLogin = async () => {
+    await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: window.location.origin
+      }
+    });
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+    setProfile(null);
+  };
 
   const [currency, setCurrency] = useState(() => {
     const saved = localStorage.getItem("ks_currency");
