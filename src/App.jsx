@@ -2286,7 +2286,7 @@ function ProfileView({ onHome, user, profile, setProfile, onLogout }) {
     </div>
   );
 }
-function HostReturn({ onHome, currency }) {
+function HostReturn({ onHome, currency, user, profile }) {
   const [session, setSession] = useState(null);
   const [paidMap, setPaidMap] = useState({});
   const [copiedLink, setCopiedLink] = useState(false);
@@ -2622,10 +2622,11 @@ export default function KakiSplit() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       setUser(session?.user ?? null);
       if (session?.user) {
-        fetchProfile(session.user.id);
+        await fetchProfile(session.user.id);
       } else {
         setProfile(null);
       }
+      setInitializing(false);
     });
 
     return () => subscription.unsubscribe();
@@ -2649,12 +2650,18 @@ export default function KakiSplit() {
   };
 
   const handleLogin = async () => {
-    await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: window.location.origin
-      }
-    });
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: window.location.origin
+        }
+      });
+      if (error) throw error;
+    } catch (e) {
+      console.error("Login failed:", e);
+      alert("Login failed. Check your Supabase settings.");
+    }
   };
 
   const handleLogout = async () => {
@@ -2711,12 +2718,17 @@ export default function KakiSplit() {
               onReturnTable={code => { localStorage.setItem("ks_current_code", code); setMode("host-return"); }}
               currency={currency}
               onCurrencyChange={changeCurrency}
+              user={user}
+              profile={profile}
+              onLogin={handleLogin}
+              onProfile={() => setMode("profile")}
             />
           )}
 
-          {mode === "host" && <HostView onHome={() => setMode(null)} currency={currency} />}
-          {mode === "host-return" && <HostReturn onHome={() => setMode(null)} currency={currency} />}
+          {mode === "host" && <HostView onHome={() => setMode(null)} currency={currency} user={user} profile={profile} />}
+          {mode === "host-return" && <HostReturn onHome={() => setMode(null)} currency={currency} user={user} profile={profile} />}
           {mode === "scan-excel" && <ScanToExcel onHome={() => setMode(null)} currency={currency} />}
+          {mode === "profile" && <ProfileView onHome={() => setMode(null)} user={user} profile={profile} setProfile={setProfile} onLogout={handleLogout} />}
 
           {mode === "guest" && guestSession && (
             <>
