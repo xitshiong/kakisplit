@@ -1800,14 +1800,12 @@ function HostView({ onHome, currency, user, profile }) {
                   }
 
                   STRICT AUDIT RULES:
-                  1. ITEM PRICE: Extract the unit price (price for 1 qty).
-                  2. INDIVIDUAL ENTRIES: DO NOT combine duplicates. If an item appears multiple times as separate lines on the receipt, LIST THEM INDIVIDUALLY in the JSON.
+                  1. ITEM PRICE: Extract the unit price (price for 1 qty) BEFORE any tax or discount.
+                  2. SIGNAGE: Return ALL numbers (tax, serviceCharge, discount, rounding, grandTotal) as POSITIVE decimals. The 'discount' field will always be treated as a deduction.
                   3. BALANCE THE BOOKS: The sum of (price * qty) + tax + serviceCharge - discount + rounding MUST EQUAL grandTotal exactly.
-                  4. ROUNDING: Use the 'rounding' field for small balancing adjustments (e.g. 0.01, -0.05) to ensure the equation is perfect.
-                  5. CLEAN NAMES: Remove prefix numbers or symbols like *, #, @, i« from item names.
-                  6. MODIFIERS: If a line has NO price and sits beneath a priced item, it is a modifier — NOT a separate item. Append it to the parent item name in parentheses. Example: "Shroom Burger Meal (+Shroom Burger, Fries, Coca Cola Less Sugar)". Never list zero-price lines as their own entries.
-                  7. IGNORE: Promo/discount math lines (e.g. "Value Set Promo (-8.58)") are not food items. Skip them entirely.
-                  8. QTY FORMAT: Lines like "5 ADULT @38.79  193.95" mean qty=5, unit price=38.79 (the @price), line total=193.95. Extract qty=5 and price=38.79, NOT price=193.95.
+                  4. INDIVIDUAL ENTRIES: DO NOT combine duplicates. List every line on the receipt separately.
+                  5. CLEAN NAMES: Remove symbols like *, #, @, i«, or numbers from the start of item names.
+                  6. MODIFIERS: Append zero-price modifier lines to their parent item name in parentheses.
 
                   Return ONLY the raw JSON object. No markdown, no prose.` }
                 ]
@@ -1821,12 +1819,13 @@ function HostView({ onHome, currency, user, profile }) {
         const parsed = JSON.parse(txt.replace(/```json|```/g, "").trim());
 
         const rawItems = parsed.items || [];
-        const tax = parseFloat(parsed.tax || 0);
-        const sc = parseFloat(parsed.serviceCharge || 0);
-        const discount = parseFloat(parsed.discount || 0);
+        const tax = Math.abs(parseFloat(parsed.tax || 0));
+        const sc = Math.abs(parseFloat(parsed.serviceCharge || 0));
+        const discount = Math.abs(parseFloat(parsed.discount || 0));
         const rounding = parseFloat(parsed.rounding || 0);
         const receiptGrandTotal = parseFloat(parsed.grandTotal || 0);
 
+        // Equation: Items + Tax + SC - Discount + Rounding = Total
         const extras = tax + sc - discount + rounding;
         const rawSubtotal = rawItems.reduce((s, i) => s + parseFloat(i.price || 0) * parseInt(i.qty || 1), 0);
 
