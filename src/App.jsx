@@ -2253,7 +2253,7 @@ function ProfileView({ onHome, user, profile, setProfile, onLogout }) {
           <span className="home-btn-label">Back</span>
         </button>
         <div className="profile-hero">
-          <img src={profile?.avatar_url} alt="User" className="profile-large-avatar" />
+          <img src={user?.user_metadata?.picture || user?.user_metadata?.avatar_url || profile?.avatar_url} alt="User" className="profile-large-avatar" />
           <div className="profile-name">{profile?.full_name}</div>
           <div className="profile-email">{user.email}</div>
         </div>
@@ -2261,7 +2261,7 @@ function ProfileView({ onHome, user, profile, setProfile, onLogout }) {
 
       <div className="section" style={{ paddingTop: 0 }}>
         <div className="vault-card">
-          <div className="vault-title">🛡️ The Kaki Vault</div>
+          <div className="vault-title">🛡️ Personal QR</div>
           <p className="vault-desc">Save your default payment QR code here. It will be pre-filled every time you start a table.</p>
           
           <div className="vault-qr-area" onClick={() => fileRef.current.click()}>
