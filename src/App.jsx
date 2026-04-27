@@ -1787,27 +1787,37 @@ function HostView({ onHome, currency, user, profile }) {
                 parts: [
                   { inline_data: { mime_type: "image/jpeg", data: receipt.b64 } },
                   {
-                    text: `You are a professional accounting auditor. Extract data from this receipt with 100% mathematical integrity.
-                  
-                  RETURN ONLY THIS JSON SCHEMA:
-                  {
-                    "items": [{"name": "Item Name", "price": 12.50, "qty": 1}],
-                    "tax": 1.50,
-                    "serviceCharge": 2.20,
-                    "discount": 0.00,
-                    "rounding": 0.02,
-                    "grandTotal": 16.22
-                  }
+                    text: `You are a professional accounting auditor extracting data from a receipt image.
 
-                  STRICT AUDIT RULES:
-                  1. ITEM PRICE: Extract the unit price (price for 1 qty) BEFORE any tax or discount.
-                  2. SIGNAGE: Return ALL numbers (tax, serviceCharge, discount, rounding, grandTotal) as POSITIVE decimals. The 'discount' field will always be treated as a deduction.
-                  3. BALANCE THE BOOKS: The sum of (price * qty) + tax + serviceCharge - discount + rounding MUST EQUAL grandTotal exactly.
-                  4. INDIVIDUAL ENTRIES: DO NOT combine duplicates. List every line on the receipt separately.
-                  5. CLEAN NAMES: Remove symbols like *, #, @, i«, or numbers from the start of item names.
-                  6. MODIFIERS: Append zero-price modifier lines to their parent item name in parentheses.
+RETURN ONLY THIS JSON SCHEMA — no markdown, no prose:
+{
+  "items": [{"name": "Item Name", "price": 12.50, "qty": 1}],
+  "tax": 1.50,
+  "serviceCharge": 0.00,
+  "discount": 8.40,
+  "rounding": -0.02,
+  "grandTotal": 50.45
+}
 
-                  Return ONLY the raw JSON object. No markdown, no prose.` }
+EXTRACTION RULES:
+
+ITEMS:
+- Extract the ORIGINAL unit price (before any discount), e.g. if the receipt shows "30.00  4.50  1  25.50", the price is 30.00.
+- qty is always the number in the Qty column.
+- DO NOT combine duplicate items. List every line separately.
+- Remove leading symbols (*, #, @) from item names.
+- Modifier lines (e.g. "NORMAL ICE", "CHEESE SAUCE") with no price of their own: append them to the parent item name in parentheses. e.g. "Basics (Iced Lemon Tea)(Normal Ice)"
+
+TOTALS:
+- "tax": SST or GST shown at the bottom summary (positive number).
+- "serviceCharge": service charge if shown, else 0.
+- "discount": the TOTAL discount shown at the bottom of the receipt (positive number). This includes both per-item and any global discounts already summed by the receipt. DO NOT sum per-item discounts yourself.
+- "rounding": rounding adjustment shown on the receipt. Use SIGNED value (negative if the receipt shows "-RM0.02").
+- "grandTotal": the final TOTAL printed on the receipt. Copy it exactly.
+
+BALANCE RULE (for your internal verification only — do not output this):
+sum(price * qty) - discount + tax + serviceCharge + rounding = grandTotal
+Verify this balances before returning. If it does not balance, recheck your extracted values.` }
                 ]
               }],
               generationConfig: { temperature: 0.1, maxOutputTokens: 8192 }
@@ -2233,7 +2243,7 @@ function ProfileView({ onHome, user, profile, setProfile, onLogout }) {
   const handleQR = async (f) => {
     if (!f?.type.startsWith("image/")) return;
     setUploading(true);
-    
+
     // Upload to Supabase Storage or just Base64 for simplicity in MVP
     const reader = new FileReader();
     reader.onload = async (e) => {
@@ -2263,7 +2273,7 @@ function ProfileView({ onHome, user, profile, setProfile, onLogout }) {
         <div className="vault-card">
           <div className="vault-title">🛡️ Personal QR</div>
           <p className="vault-desc">Save your default payment QR code here. It will be pre-filled every time you start a table.</p>
-          
+
           <div className="vault-qr-area" onClick={() => fileRef.current.click()}>
             {profile?.qr_url ? (
               <img src={profile.qr_url} alt="Default QR" className="vault-qr-preview" />
@@ -2632,7 +2642,7 @@ export default function KakiSplit() {
     if (!currentUser) return;
 
     const { data, error } = await supabase.from('profiles').select('*').eq('id', uid).single();
-    
+
     // Google metadata fallbacks
     const meta = currentUser.user_metadata || {};
     const gName = meta.full_name || meta.name || currentUser.email.split("@")[0];
