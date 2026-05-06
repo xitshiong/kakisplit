@@ -203,11 +203,13 @@ body {
 .step-num.done { background: var(--neon-lime); color: var(--ink); border-color: var(--neon-lime); }
 
 .step-label {
-  font-size: 0.6rem;
-  letter-spacing: 1px;
+  font-size: 0.55rem;
+  letter-spacing: 0.5px;
   text-transform: uppercase;
   color: var(--ink-faint);
   transition: color 0.3s;
+  text-align: center;
+  line-height: 1.2;
 }
 
 .step-item .step-num.active ~ .step-label { color: var(--ink); }
@@ -370,8 +372,31 @@ body {
   padding: 14px 0;
   border-bottom: 1px dotted var(--ink-faint);
   min-height: 56px;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .line-item:last-of-type { border-bottom: none; }
+
+.line-item.host-selectable {
+  cursor: pointer;
+  padding: 14px 12px;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  border: 2px solid transparent;
+}
+
+.line-item.host-selectable:hover {
+  background: rgba(184, 255, 0, 0.1);
+}
+
+.line-item.host-selected {
+  background: var(--neon-lime);
+  border-color: var(--ink);
+  opacity: 1;
+}
+
+.line-item.host-unselected {
+  opacity: 0.7;
+}
 
 .item-name-in {
   flex: 1;
@@ -2139,19 +2164,12 @@ Verify this balances before returning. If it does not balance, recheck your extr
               const isSelected = hostSelected.has(it.id);
               return (
                 <div key={it.id}
-                  className="line-item"
+                  className={`line-item host-selectable ${isSelected ? 'host-selected' : 'host-unselected'}`}
                   onClick={() => {
                     const newSet = new Set(hostSelected);
                     if (isSelected) newSet.delete(it.id);
                     else newSet.add(it.id);
                     setHostSelected(newSet);
-                  }}
-                  style={{
-                    cursor: "pointer",
-                    background: isSelected ? "var(--neon-lime)" : "transparent",
-                    border: isSelected ? "2px solid var(--ink)" : "1px solid var(--ink-faint)",
-                    opacity: isSelected ? 1 : 0.7,
-                    transition: "all 0.2s"
                   }}>
                   <span style={{
                     flex: 1,
