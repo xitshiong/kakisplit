@@ -1234,7 +1234,7 @@ async function save(d) {
     code: d.code,
     items: d.items,
     qr_image: d.qrImage || null,
-    paid: {},
+    paid: d.paid || {},
     table_name: d.tableName || "My Table",
     table_date: d.tableDate || new Date().toISOString().split("T")[0]
   });
@@ -1743,9 +1743,10 @@ function HostView({ onHome, currency, user, profile }) {
   const [paidMap, setPaidMap] = useState({});
   const fileRef = useRef();
   const qrRef = useRef();
-  const STEPS = ["Receipt", "Details", "Items", "QR", "Share"];
+  const STEPS = ["Receipt", "Details", "Items", "Your Items", "QR", "Share"];
   const [tableName, setTableName] = useState("");
   const [tableDate, setTableDate] = useState(new Date().toISOString().split("T")[0]);
+  const [hostSelected, setHostSelected] = useState(new Set());
 
   const handleFile = async (files) => {
     const newReceipts = [];
@@ -1812,6 +1813,7 @@ TOTALS:
 - "tax": SST or GST shown at the bottom summary (positive number).
 - "serviceCharge": service charge if shown, else 0.
 - "discount": the TOTAL discount shown at the bottom of the receipt (positive number). This includes both per-item and any global discounts already summed by the receipt. DO NOT sum per-item discounts yourself.
+- "rounding": rounding adjustment shown on the receipt. Use SIGNED value (negative if the receipt shows "-RM0.02").
 - "rounding": rounding adjustment shown on the receipt. Use SIGNED value (negative if the receipt shows "-RM0.02").
 - "grandTotal": the final TOTAL printed on the receipt. Copy it exactly.
 
@@ -1933,14 +1935,21 @@ Verify this balances before returning. If it does not balance, recheck your extr
     localStorage.setItem("ks_current_code", c);
     localStorage.setItem("ks_current_name", tableName || "My Table");
     localStorage.setItem("ks_current_date", tableDate);
-    await save({ code: c, items, qrImage: qrImg, tableName: tableName || "My Table", tableDate });
+
+    // Pre-populate paid map with host selections
+    const initialPaid = {};
+    hostSelected.forEach(itemId => {
+      initialPaid[itemId] = { name: "Host", full: true };
+    });
+
+    await save({ code: c, items, qrImage: qrImg, tableName: tableName || "My Table", tableDate, paid: initialPaid });
     setCode(c);
-    setPaidMap({});
-    setStep(4);
+    setPaidMap(initialPaid);
+    setStep(5);
   };
   // Poll paid status every 2s once live
   useEffect(() => {
-    if (step !== 4) return;
+    if (step !== 5) return;
     const t = setInterval(() => {
       loadSessionState(code).then(s => setPaidMap(s.paid));
     }, 2000);
@@ -2120,8 +2129,77 @@ Verify this balances before returning. If it does not balance, recheck your extr
           </div>
         </div>}
 
-        {/* STEP 3 */}
+        {/* STEP 3 - HOST PRE-SELECTION */}
         {step === 3 && <div className="section">
+          <div className="section-head">Mark your items</div>
+          <div className="section-sub">Select what you're paying for — these will be crossed out when guests see the bill</div>
+
+          <div style={{ marginTop: 16 }}>
+            {items.map(it => {
+              const isSelected = hostSelected.has(it.id);
+              return (
+                <div key={it.id}
+                  className="line-item"
+                  onClick={() => {
+                    const newSet = new Set(hostSelected);
+                    if (isSelected) newSet.delete(it.id);
+                    else newSet.add(it.id);
+                    setHostSelected(newSet);
+                  }}
+                  style={{
+                    cursor: "pointer",
+                    background: isSelected ? "var(--neon-lime)" : "transparent",
+                    border: isSelected ? "2px solid var(--ink)" : "1px solid var(--ink-faint)",
+                    opacity: isSelected ? 1 : 0.7,
+                    transition: "all 0.2s"
+                  }}>
+                  <span style={{
+                    flex: 1,
+                    fontSize: "0.85rem",
+                    color: "var(--ink)",
+                    fontFamily: "'DM Mono',monospace",
+                    textDecoration: isSelected ? "line-through" : "none"
+                  }}>
+                    {isSelected ? "✓ " : ""}{it.name}
+                  </span>
+                  <span style={{
+                    fontFamily: "'DM Mono',monospace",
+                    fontSize: "0.85rem",
+                    color: "var(--ink)",
+                    fontWeight: 500
+                  }}>
+                    {currency} {parseFloat(it.price).toFixed(2)}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+
+          {hostSelected.size > 0 && (
+            <div style={{ marginTop: 16, padding: "12px 16px", background: "var(--paper-dark)", borderRadius: 4 }}>
+              <div style={{ fontSize: "0.7rem", color: "var(--ink-faint)", letterSpacing: 1, textTransform: "uppercase", marginBottom: 6 }}>
+                You're paying for {hostSelected.size} item{hostSelected.size > 1 ? "s" : ""}
+              </div>
+              <div style={{ fontSize: "1rem", fontWeight: 700, color: "var(--ink)", fontFamily: "'DM Mono',monospace" }}>
+                {currency} {items.filter(it => hostSelected.has(it.id)).reduce((sum, it) => sum + parseFloat(it.price), 0).toFixed(2)}
+              </div>
+            </div>
+          )}
+
+          <div style={{ marginTop: 20, fontSize: "0.75rem", color: "var(--ink-light)", padding: "12px", background: "var(--paper-dark)", borderRadius: 4, border: "1px dashed var(--ink-faint)" }}>
+            💡 <strong>Tip:</strong> Items you select here will appear as already paid when guests join the table. You can skip this if you're splitting everything.
+          </div>
+
+          <div style={{ marginTop: 20 }}>
+            <button className="btn btn-ink" onClick={() => setStep(4)}>
+              {hostSelected.size > 0 ? `Next: Payment QR →` : "Skip: Payment QR →"}
+            </button>
+            <button className="btn btn-outline" onClick={() => setStep(2)}>← Back</button>
+          </div>
+        </div>}
+
+        {/* STEP 4 - QR */}
+        {step === 4 && <div className="section">
           <div className="section-head">Your payment QR</div>
           <div className="section-sub">Guests scan this to pay you directly</div>
           {!qrImg ? (
@@ -2140,12 +2218,12 @@ Verify this balances before returning. If it does not balance, recheck your extr
           <div style={{ marginTop: 16 }}>
             <button className="btn btn-ink" disabled={!qrImg} onClick={finalise}>🔗 Generate Table Link →</button>
             {!qrImg && <div className="error-strip" style={{ marginTop: 12 }}>Upload your payment QR to continue — guests need it to pay you.</div>}
-            <button className="btn btn-outline" onClick={() => setStep(1)}>← Back</button>
+            <button className="btn btn-outline" onClick={() => setStep(3)}>← Back</button>
           </div>
         </div>}
 
-        {/* STEP 4 */}
-        {step === 4 && <div className="section">
+        {/* STEP 5 - SHARE */}
+        {step === 5 && <div className="section">
           <div className="section-head">Table is live!</div>
           <div className="section-sub">Share with everyone at the table</div>
           <div className="share-receipt">
