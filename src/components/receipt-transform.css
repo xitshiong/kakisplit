@@ -156,8 +156,7 @@
   65% { opacity: 1; transform: translate(105px, 170px); }
   71% { opacity: 1; transform: translate(10px, calc(100% - 36px)) scale(1); }
   72% { opacity: 1; transform: translate(10px, calc(100% - 36px)) scale(0.8); }
-  73%, 82% { opacity: 1; transform: translate(10px, calc(100% - 36px)) scale(1); }
-  86%, 100% { opacity: 0; transform: translate(25px, calc(100% - 44px)); }
+  73%, 100% { opacity: 0; transform: translate(10px, calc(100% - 36px)) scale(1); }
 }
 @keyframes receipt-cursor-charles {
   0%, 32% { opacity: 0; transform: translate(45px, 120px); }
@@ -170,8 +169,7 @@
   65% { opacity: 1; transform: translate(70px, 190px); }
   75% { opacity: 1; transform: translate(90px, calc(100% - 36px)) scale(1); }
   76% { opacity: 1; transform: translate(90px, calc(100% - 36px)) scale(0.8); }
-  77%, 82% { opacity: 1; transform: translate(90px, calc(100% - 36px)) scale(1); }
-  86%, 100% { opacity: 0; transform: translate(105px, calc(100% - 44px)); }
+  77%, 100% { opacity: 0; transform: translate(90px, calc(100% - 36px)) scale(1); }
 }
 @keyframes receipt-cursor-stefan {
   0%, 32% { opacity: 0; transform: translate(165px, 145px); }
@@ -182,12 +180,11 @@
   55% { opacity: 1; transform: translate(0, 84px) scale(0.8); }
   56% { opacity: 1; transform: translate(0, 84px) scale(1); }
   61% { opacity: 1; transform: translate(90px, 120px); }
-  69% { opacity: 1; transform: translate(25px, 190px); }
-  74% { opacity: 1; transform: translate(25px, calc(100% - 36px)); }
-  79% { opacity: 1; transform: translate(170px, calc(100% - 36px)) scale(1); }
-  80% { opacity: 1; transform: translate(170px, calc(100% - 36px)) scale(0.8); }
-  81%, 82% { opacity: 1; transform: translate(170px, calc(100% - 36px)) scale(1); }
-  86%, 100% { opacity: 0; transform: translate(155px, calc(100% - 44px)); }
+  69% { opacity: 1; transform: translate(25px, 170px); }
+  75%, 77% { opacity: 1; transform: translate(25px, calc(100% - 36px)); }
+  83% { opacity: 1; transform: translate(170px, calc(100% - 36px)) scale(1); }
+  84% { opacity: 1; transform: translate(170px, calc(100% - 36px)) scale(0.8); }
+  85%, 100% { opacity: 0; transform: translate(170px, calc(100% - 36px)) scale(1); }
 }
 @keyframes receipt-share-pick { 0%, 59% { opacity: 1; } 62%, 100% { opacity: 0; } }
 @keyframes receipt-share-pay { 0%, 59% { opacity: 0; } 62%, 100% { opacity: 1; } }
