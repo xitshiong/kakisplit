@@ -94,7 +94,7 @@
 .demo-cursor.demo-person-cyan { animation-name: receipt-cursor-charles; }
 .demo-cursor.demo-person-lime { animation-name: receipt-cursor-stefan; }
 .demo-cursor svg { display: block; overflow: visible; }
-.demo-cursor > span { position: absolute; top: 18px; left: 12px; padding: 3px 6px; border-radius: 2px 6px 6px; background: var(--person-color); color: var(--person-ink); font-size: 0.55rem; line-height: 1.2; box-shadow: 0 2px 5px rgba(0, 0, 0, 0.12); }
+.demo-cursor > span { position: absolute; top: -18px; left: 12px; padding: 3px 6px; border-radius: 6px 6px 6px 2px; background: var(--person-color); color: var(--person-ink); font-size: 0.55rem; line-height: 1.2; box-shadow: 0 2px 5px rgba(0, 0, 0, 0.12); }
 
 .demo-scan-track { position: absolute; width: 314px; height: 448px; top: 28px; left: calc(50% - 157px); pointer-events: none; }
 .demo-scan-line { position: absolute; top: 0; width: 100%; height: 2px; background: var(--lime); box-shadow: 0 0 16px rgba(166, 255, 0, 0.65); animation: receipt-scan var(--demo-duration) infinite both; }
