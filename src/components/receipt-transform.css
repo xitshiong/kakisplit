@@ -90,7 +90,7 @@
 .demo-person-cyan { --person-color: var(--cyan); --person-ink: var(--ink); }
 .demo-person-lime { --person-color: var(--lime); --person-ink: var(--ink); }
 .demo-cursors { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
-.demo-cursor { position: absolute; top: 18px; left: 8px; width: 0; height: 100%; display: block; color: var(--person-color); transform-origin: 2px 2px; animation: receipt-cursor-dylan var(--demo-duration) infinite both; }
+.demo-cursor { position: absolute; top: 18px; left: 8px; width: 0; height: 100%; display: block; color: var(--person-color); transform-origin: 2px 2px; animation: receipt-cursor-dylan var(--demo-duration) cubic-bezier(0.45, 0, 0.55, 1) infinite both; }
 .demo-cursor.demo-person-cyan { animation-name: receipt-cursor-charles; }
 .demo-cursor.demo-person-lime { animation-name: receipt-cursor-stefan; }
 .demo-cursor svg { display: block; overflow: visible; }
@@ -145,14 +145,11 @@
 @keyframes receipt-cursor-dylan {
   0%, 32% { opacity: 0; transform: translate(160px, 60px); }
   35% { opacity: 1; transform: translate(160px, 60px); }
-  38% { opacity: 1; transform: translate(85px, 110px); }
-  41% { opacity: 1; transform: translate(130px, 18px); }
+  40% { opacity: 1; transform: translate(75px, 30px); }
   44% { opacity: 1; transform: translate(0, 0) scale(1); }
   45% { opacity: 1; transform: translate(0, 0) scale(0.8); }
   46% { opacity: 1; transform: translate(0, 0) scale(1); }
-  49% { opacity: 1; transform: translate(70px, 18px); }
-  52% { opacity: 1; transform: translate(135px, 100px); }
-  55% { opacity: 1; transform: translate(65px, 145px); }
+  52% { opacity: 1; transform: translate(120px, 85px); }
   58% { opacity: 1; transform: translate(0, 126px) scale(1); }
   59% { opacity: 1; transform: translate(0, 126px) scale(0.8); }
   60% { opacity: 1; transform: translate(0, 126px) scale(1); }
@@ -165,12 +162,10 @@
 @keyframes receipt-cursor-charles {
   0%, 32% { opacity: 0; transform: translate(45px, 120px); }
   35% { opacity: 1; transform: translate(45px, 120px); }
-  39% { opacity: 1; transform: translate(100px, 85px); }
-  45% { opacity: 1; transform: translate(150px, 50px); }
+  42% { opacity: 1; transform: translate(125px, 95px); }
   49% { opacity: 1; transform: translate(0, 42px) scale(1); }
   50% { opacity: 1; transform: translate(0, 42px) scale(0.8); }
   51% { opacity: 1; transform: translate(0, 42px) scale(1); }
-  55% { opacity: 1; transform: translate(75px, 90px); }
   59% { opacity: 1; transform: translate(135px, 155px); }
   65% { opacity: 1; transform: translate(160px, 190px); }
   75% { opacity: 1; transform: translate(90px, calc(100% - 36px)) scale(1); }
@@ -181,8 +176,7 @@
 @keyframes receipt-cursor-stefan {
   0%, 32% { opacity: 0; transform: translate(165px, 145px); }
   35% { opacity: 1; transform: translate(165px, 145px); }
-  40% { opacity: 1; transform: translate(155px, 100px); }
-  45% { opacity: 1; transform: translate(90px, 130px); }
+  43% { opacity: 1; transform: translate(105px, 120px); }
   50% { opacity: 1; transform: translate(55px, 65px); }
   54% { opacity: 1; transform: translate(0, 84px) scale(1); }
   55% { opacity: 1; transform: translate(0, 84px) scale(0.8); }
