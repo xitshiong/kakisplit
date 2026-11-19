@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { createClient } from "@supabase/supabase-js";
 import { Analytics } from "@vercel/analytics/react"
+import { scanReceipt, scanReceiptBatch } from "./lib/receiptOcr.js";
 
 const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL,
@@ -1686,76 +1687,29 @@ function sendLocalNotification(title, body) {
 
 function genCode() { return Math.floor(1000 + Math.random() * 9000).toString(); }
 
-function withTimeout(promise, ms = 20000) {
-  return Promise.race([
-    promise,
-    new Promise((_, reject) =>
-      setTimeout(() => reject(new Error("Request timed out. Check your connection and try again.")), ms)
-    ),
-  ]);
-}
-
 function isDuplicateCodeError(error) {
   return error?.code === "23505" || /duplicate key/i.test(error?.message || "");
 }
 
-function extractOpenRouterResponseText(data) {
-  if (data?.error) {
-    throw new Error(data.error.message || data.error || "OpenRouter API error");
-  }
-  const text = data?.choices?.[0]?.message?.content || "";
-  if (!text.trim()) {
-    throw new Error("Empty AI response. Try a clearer photo.");
-  }
-  return text.trim();
-}
-
-function parseReceiptJson(txt) {
-  const cleaned = txt.replace(/```json\s*|```/gi, "").trim();
+async function prepareReceiptImage(file) {
+  const source = URL.createObjectURL(file);
   try {
-    return JSON.parse(cleaned);
-  } catch {
-    const start = cleaned.indexOf("{");
-    const end = cleaned.lastIndexOf("}");
-    if (start >= 0 && end > start) {
-      return JSON.parse(cleaned.slice(start, end + 1));
-    }
-    throw new Error("Couldn't parse receipt data from AI response.");
+    const image = new Image();
+    image.src = source;
+    await image.decode();
+    const maxSide = image.height > image.width * 2 ? 3200 : 2000;
+    const scale = Math.min(1, maxSide / Math.max(image.width, image.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(image.width * scale));
+    canvas.height = Math.max(1, Math.round(image.height * scale));
+    const context = canvas.getContext("2d");
+    context.fillStyle = "#fff";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL("image/jpeg", 0.85);
+  } finally {
+    URL.revokeObjectURL(source);
   }
-}
-
-async function callReceiptOcr(b64, prompt) {
-  const OR_KEY = import.meta.env.VITE_OPENROUTER_API_KEY;
-  if (!OR_KEY) {
-    throw new Error("Scanning is not configured. Missing API key.");
-  }
-  const res = await withTimeout(fetch(
-    "https://openrouter.ai/api/v1/chat/completions",
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${OR_KEY}`
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [{
-          role: "user",
-          content: [
-            { type: "image_url", image_url: { url: `data:image/jpeg;base64,${b64}` } },
-            { type: "text", text: prompt }
-          ]
-        }],
-        temperature: 0.1,
-        max_tokens: 8192
-      })
-    }
-  ));
-  const data = await res.json();
-  if (!res.ok && !data?.error) {
-    throw new Error(`Scan request failed (${res.status})`);
-  }
-  return parseReceiptJson(extractOpenRouterResponseText(data));
 }
 
 function prepareQrForSave(qr) {
@@ -2133,8 +2087,10 @@ function GuestView({ session, onBack, currency }) {
 // ── HOST VIEW ─────────────────────────────────────────────────
 function HostView({ onHome, currency, user, profile }) {
   const [step, setStep] = useState(0);
-  const [receipts, setReceipts] = useState([]); // [{id, img, b64, items, tax, sc, discount}]
+  const [receipts, setReceipts] = useState([]);
+  const [preparing, setPreparing] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [scanWarnings, setScanWarnings] = useState([]);
   const [err, setErr] = useState("");
   const [drag, setDrag] = useState(false);
   const [items, setItems] = useState([]);
@@ -2156,133 +2112,41 @@ function HostView({ onHome, currency, user, profile }) {
   const [tableDate, setTableDate] = useState(new Date().toISOString().split("T")[0]);
 
   const handleFile = async (files) => {
+    if (preparing || loading) return;
+    setPreparing(true);
+    setErr("");
     const newReceipts = [];
-    for (const f of Array.from(files)) {
-      if (!f.type.startsWith("image/")) continue;
-
-      const b64Str = await new Promise((resolve) => {
-        const r = new FileReader();
-        r.onload = e => {
-          const img = new Image();
-          img.onload = () => {
-            const MAX = 1280;
-            const scale = Math.min(1, MAX / Math.max(img.width, img.height));
-            const canvas = document.createElement("canvas");
-            canvas.width = img.width * scale;
-            canvas.height = img.height * scale;
-            canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
-            resolve(canvas.toDataURL("image/jpeg", 0.8).split(",")[1]);
-          };
-          img.src = e.target.result;
-        };
-        r.readAsDataURL(f);
-      });
-
-      newReceipts.push({
-        id: Math.random().toString(36).substr(2, 9),
-        img: URL.createObjectURL(f),
-        b64: b64Str,
-        items: []
-      });
+    let failed = 0;
+    for (const file of files) {
+      try {
+        if (file.type && !file.type.startsWith("image/")) throw new Error();
+        const img = await prepareReceiptImage(file);
+        newReceipts.push({ id: Math.random().toString(36).slice(2), img });
+      } catch {
+        failed++;
+      }
     }
     setReceipts(prev => [...prev, ...newReceipts]);
-    setErr("");
+    if (failed) setErr("Some files couldn't be opened. Try uploading JPEG or PNG photos.");
+    setPreparing(false);
   };
 
   const parseReceipt = async () => {
-    setLoading(true); setErr("");
+    setLoading(true);
+    setErr("");
     try {
-      const allBakedItems = [];
-      let globalIdCounter = 1;
-
-      for (const receipt of receipts) {
-        const parsed = await callReceiptOcr(receipt.b64, `You are an expert OCR accounting auditor. Extract line items from this receipt image with 100% precision.
-
-RETURN ONLY THIS JSON SCHEMA (no markdown formatting, no backticks, no prose):
-{
-  "items": [{"name": "Item Name", "price": 12.50, "qty": 1}],
-  "tax": 1.50,
-  "serviceCharge": 0.00,
-  "discount": 8.40,
-  "rounding": -0.02,
-  "grandTotal": 50.45
-}
-
-STRICT EXTRACTION RULES:
-
-1. ITEM PRICE: Extract the raw unit price for ONE quantity. Do NOT extract the line total. e.g., for "Burger 2 20.00", the unit price is 10.00. If the receipt lists the unit price explicitly (e.g., "10.00 2 20.00"), use 10.00.
-2. EXCLUDE NON-ITEMS: DO NOT include Subtotal, Tax, SST, GST, Service Charge, Discount, Rounding, Cash, Change, Credit Card, or Total rows in the "items" array. These go ONLY into their dedicated fields at the root of the JSON.
-3. MODIFIERS: Lines below an item with NO price (like "Less Sugar", "Extra Spicy") are modifiers. Append them to the parent item's name: "Latte (Less Sugar)". DO NOT list them as separate items.
-4. QUANTITY: Default is 1 if missing. If the item name contains a multiplier like "1x Burger", the qty is 1, and the name is "Burger".
-5. CLEAN NAMES: Remove asterisks (*), hashtags (#), bullet points, and currency symbols (RM, $, MYR) from all names and numbers.
-6. DUPLICATES: DO NOT group duplicates. List every line exactly as it appears.
-7. FINANCIAL FIELDS:
-   - tax: The total tax amount (e.g., SST, GST, VAT).
-   - serviceCharge: The service charge amount.
-   - discount: The total discount amount (return as a POSITIVE number).
-   - rounding: The rounding adjustment (can be positive or negative, e.g. -0.02).
-   - grandTotal: The final amount paid.
-8. MATHEMATICAL CHECK: Ensure: sum(items price * items qty) - discount + tax + serviceCharge + rounding = grandTotal. If the numbers don't perfectly balance, adjust the "rounding" field by a few cents until they do.`);
-
-        // Filter out invalid items (price <= 0 or missing)
-        const rawItems = (parsed.items || []).filter(it => {
-          const price = parseFloat(it.price || 0);
-          return price > 0;
-        });
-        const tax = Math.abs(parseFloat(parsed.tax || 0));
-        const sc = Math.abs(parseFloat(parsed.serviceCharge || 0));
-        const discount = Math.abs(parseFloat(parsed.discount || 0));
-        const rounding = parseFloat(parsed.rounding || 0);
-        const receiptGrandTotal = parseFloat(parsed.grandTotal || 0);
-
-        // Equation: Items + Tax + SC - Discount + Rounding = Total
-        const extras = tax + sc - discount + rounding;
-        const rawSubtotal = rawItems.reduce((s, i) => s + parseFloat(i.price || 0) * parseInt(i.qty || 1), 0);
-
-        const currentReceiptBaked = [];
-        rawItems.forEach(it => {
-          const itemPrice = parseFloat(it.price || 0);
-          const qty = parseInt(it.qty || 1);
-          const lineTotal = itemPrice * qty;
-          const proportion = rawSubtotal > 0 ? lineTotal / rawSubtotal : 0;
-          const totalExtras = extras * proportion;
-          const taxPerUnit = totalExtras / qty;
-          const finalUnitPrice = parseFloat((itemPrice + taxPerUnit).toFixed(2));
-
-          for (let q = 0; q < qty; q++) {
-            currentReceiptBaked.push({
-              name: qty > 1 ? `${it.name} (${q + 1}/${qty})` : it.name,
-              rawPrice: itemPrice,
-              itemTax: taxPerUnit,
-              price: finalUnitPrice,
-              id: globalIdCounter++,
-              receiptId: receipt.id
-            });
-          }
-        });
-
-        // RECONCILIATION: Distribute rounding diff cent-by-cent across items
-        const bakedSum = currentReceiptBaked.reduce((s, i) => s + i.price, 0);
-        const targetSum = receiptGrandTotal > 0 ? receiptGrandTotal : (rawSubtotal + extras);
-        const diff = parseFloat((targetSum - bakedSum).toFixed(2));
-
-        if (Math.abs(diff) > 0 && Math.abs(diff) < 1 && currentReceiptBaked.length > 0) {
-          const cent = diff > 0 ? 0.01 : -0.01;
-          const steps = Math.round(Math.abs(diff) / 0.01);
-          for (let i = 0; i < steps && i < currentReceiptBaked.length; i++) {
-            currentReceiptBaked[i].price = parseFloat((currentReceiptBaked[i].price + cent).toFixed(2));
-          }
-        }
-
-        allBakedItems.push(...currentReceiptBaked);
-      }
-      setItems(allBakedItems);
-      setStep(1);
-    } catch (e) {
-      console.error("Auditor error:", e);
-      setErr(e.message || "Auditor Error: Couldn't verify the receipt balance. Try a clearer photo.");
+      const result = await scanReceiptBatch(receipts, image => scanReceipt(image, import.meta.env.VITE_OPENROUTER_API_KEY));
+      setItems(prev => [...result.items, ...prev.filter(item => !item.receiptId)]);
+      setScanWarnings(result.warnings);
+      if (result.items.length) setStep(1);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
+  };
+
+  const enterItemsManually = () => {
+    setItems(prev => prev.filter(item => !item.receiptId || receipts.some(receipt => receipt.id === item.receiptId)));
+    setStep(1);
   };
 
   const handleQR = f => {
@@ -2429,6 +2293,13 @@ STRICT EXTRACTION RULES:
   const url = code ? `${window.location.origin}${window.location.pathname}?table=${code}` : "";
   const subtotal = (items || []).reduce((s, i) => s + parseFloat(i?.price || 0), 0) || 0;
   const upd = (id, f, v) => setItems(its => its.map(it => it.id === id ? { ...it, [f]: v } : it));
+  const busy = loading || preparing;
+  const scanNotices = receipts.map((receipt, index) => {
+    const warning = scanWarnings.find(entry => entry.receiptId === receipt.id);
+    return warning && <div key={receipt.id} className="error-strip" role="status" style={{ marginBottom: 12 }}>
+      <strong>Receipt #{index + 1}:</strong> {warning.message}
+    </div>;
+  });
 
   return (
     <>
@@ -2450,11 +2321,14 @@ STRICT EXTRACTION RULES:
           <div className="section-sub">You can upload multiple receipts</div>
 
           <div className={`upload-zone ${drag ? "drag" : ""}`}
-            onClick={() => fileRef.current.click()}
+            onClick={() => !busy && fileRef.current.click()}
             onDragOver={e => { e.preventDefault(); setDrag(true); }}
             onDragLeave={() => setDrag(false)}
             onDrop={e => { e.preventDefault(); setDrag(false); handleFile(e.dataTransfer.files); }}>
-            <input ref={fileRef} type="file" accept="image/*" multiple onChange={e => handleFile(e.target.files)} />
+            <input ref={fileRef} type="file" accept="image/*" multiple disabled={busy} onChange={e => {
+              handleFile(Array.from(e.target.files));
+              e.target.value = "";
+            }} />
             <span className="upload-emoji">📸</span>
             <div className="upload-label">Tap to snap or upload</div>
             <div className="upload-hint">Upload one or more receipts</div>
@@ -2463,10 +2337,10 @@ STRICT EXTRACTION RULES:
           {receipts.length > 0 && (
             <div style={{ marginTop: 20 }}>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(80px, 1fr))", gap: 10, marginBottom: 20 }}>
-                {receipts.map(r => (
+                {receipts.map((r, index) => (
                   <div key={r.id} style={{ position: "relative", aspectRatio: "3/4" }}>
-                    <img src={r.img} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 4, border: "1px solid var(--ink-faint)" }} />
-                    <button onClick={() => setReceipts(prev => prev.filter(x => x.id !== r.id))}
+                    <img src={r.img} alt={`Receipt #${index + 1}`} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 4, border: "1px solid var(--ink-faint)" }} />
+                    <button disabled={busy} aria-label={`Remove receipt #${index + 1}`} onClick={() => setReceipts(prev => prev.filter(x => x.id !== r.id))}
                       style={{ position: "absolute", top: -5, right: -5, background: "var(--neon-pink)", color: "white", border: "none", borderRadius: "50%", width: 24, height: 24, cursor: "pointer", fontSize: "14px" }}>×</button>
                   </div>
                 ))}
@@ -2480,13 +2354,16 @@ STRICT EXTRACTION RULES:
                 </div>
               ) : (
                 <>
-                  <button className="btn btn-ink" onClick={parseReceipt}>Scan All Receipts →</button>
-                  <button className="btn btn-outline" onClick={() => setReceipts([])}>Clear All</button>
+                  <button className="btn btn-ink" disabled={busy} onClick={parseReceipt}>Scan All Receipts →</button>
+                  <button className="btn btn-outline" disabled={busy} onClick={() => setReceipts([])}>Clear All</button>
                 </>
               )}
             </div>
           )}
+          {preparing && <div className="section-sub" role="status">Preparing photos…</div>}
           {err && <div className="error-strip" style={{ marginTop: 16 }}>⚠ {err}</div>}
+          {!busy && scanNotices}
+          <button className="btn btn-outline" disabled={busy} onClick={enterItemsManually}>Enter Items Manually →</button>
         </div>}
         {/* STEP 1 - TABLE DETAILS */}
         {step === 1 && <div className="section">
@@ -2526,6 +2403,7 @@ STRICT EXTRACTION RULES:
         {step === 2 && <div className="section">
           <div className="section-head">Check items</div>
           <div className="section-sub">Review items from all receipts</div>
+          {scanNotices}
 
           {receipts.map((receipt, idx) => {
             const receiptItems = items.filter(it => it.receiptId === receipt.id);
