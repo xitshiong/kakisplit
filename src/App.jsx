@@ -1157,7 +1157,7 @@ body {
 }
 .how-step:nth-child(1) .how-step-num { color: var(--accent-ink); }
 .how-step:nth-child(2) .how-step-num { color: var(--ink); }
-.how-step:nth-child(3) .how-step-num { color: var(--teal-ink); }
+.how-step:nth-child(3) .how-step-num { color: var(--ink); background: var(--neon-cyan); }
 
 .how-step-title {
   font-family: 'DM Sans', sans-serif;
@@ -1237,15 +1237,14 @@ body {
   --paper-dark: #EFE6D8;
   --ink: #120A04;
   --ink-light: #3F2A18;
-  --ink-faint: #6B5948;
+  --ink-faint: #907B63;
   --neon-pink: #FF0A85;
   --neon-lime: #A6FF00;
   --neon-cyan: #00FFD1;
   --neon-orange: #FF6B1A;
-  --accent-ink: #AD0053;
-  --accent-fill: #C90061;
-  --teal-ink: #006354;
-  --warning-ink: #934100;
+  --accent-ink: var(--neon-pink);
+  --accent-fill: var(--neon-pink);
+  --warning-ink: var(--neon-orange);
   --on-dark-muted: #C4B8AA;
   --focus-ring: #006354;
   --receipt-shadow: 0 22px 70px rgba(0,0,0,0.26), 0 2px 0 rgba(26,18,8,0.06);
@@ -1470,13 +1469,13 @@ body {
 .btn-hero-host {
   background: var(--accent-fill);
   color: white;
-  box-shadow: none;
+  box-shadow: 0 12px 30px rgba(255,10,133,0.25);
 }
 
 .btn-neon:hover,
 .btn-hero-host:hover {
-  background: var(--accent-ink);
-  box-shadow: none;
+  background: #E60075;
+  box-shadow: 0 0 28px rgba(255,10,133,0.3);
 }
 
 .btn-outline {
@@ -1644,7 +1643,7 @@ body {
   background: rgba(255,10,133,0.08);
 }
 
-/* Reading text stays ink on paper; neon is reserved for dark surfaces. */
+/* Original night-market palette with readable ink for small cyan labels. */
 button, input { font-family: inherit; }
 button { touch-action: manipulation; }
 :is(button, input, a, [tabindex]):focus-visible {
@@ -1718,7 +1717,7 @@ button { touch-action: manipulation; }
 .guest-receipt .g-price { color: var(--ink); font: 500 .88rem 'DM Mono', monospace; }
 .guest-item-detail { color: var(--ink-faint); font-size: .68rem; line-height: 1.5; }
 .guest-receipt .paid-item { opacity: 1; border-style: solid; }
-.guest-receipt .guest-paid-tag { color: var(--teal-ink); font-size: .7rem; }
+.guest-receipt .guest-paid-tag { color: var(--ink); background: var(--neon-cyan); font-size: .7rem; }
 .guest-receipt .split-controls { gap: 8px; padding: 8px 0 12px; font-family: 'DM Sans', sans-serif; font-size: .8rem; }
 .split-adjust { flex: 0 0 44px; width: 44px; height: 44px; border: 0; border-radius: 6px; background: var(--ink); color: var(--paper); cursor: pointer; font-size: 1.1rem; }
 .guest-receipt-summary { padding-top: 20px; }
@@ -1730,8 +1729,8 @@ button { touch-action: manipulation; }
 .guest-receipt-body { padding-top: 22px; }
 .guest-sticky .sticky-label { font-size: .65rem; letter-spacing: .04em; text-transform: none; }
 .guest-sticky .sticky-amt { font-family: 'DM Mono', monospace; font-size: 1.3rem; }
-.guest-sticky .sticky-pay-btn { background: var(--neon-lime); color: var(--ink); letter-spacing: .02em; text-transform: none; padding-inline: 20px; }
-.guest-sticky .sticky-pay-btn:not(:disabled):hover { background: #c8ff36; }
+.guest-sticky .sticky-pay-btn { background: var(--neon-pink); color: var(--paper); letter-spacing: .02em; text-transform: none; padding-inline: 20px; }
+.guest-sticky .sticky-pay-btn:not(:disabled):hover { background: #E60075; }
 .guest-sticky .sticky-pay-btn:disabled { background: #443a2e; color: var(--on-dark-muted); }
 
 @media (max-width: 360px) {
