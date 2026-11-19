@@ -1708,11 +1708,11 @@ button { touch-action: manipulation; }
 .guest-receipt-intro { padding-block: 18px; color: var(--ink); font-size: .82rem; line-height: 1.6; }
 .guest-receipt-intro > span { display: block; color: var(--ink-faint); font-size: .7rem; margin-top: 3px; }
 .guest-items-label { display: flex; justify-content: space-between; padding-block: 10px; border-block: 1px dashed #b7a997; color: var(--ink); font-size: .75rem; }
-.guest-receipt .guest-item { width: 100%; margin: 0; padding: 16px 0; gap: 10px; min-height: 72px; background: transparent; border: 0; border-bottom: 1px solid #e0d5c6; border-radius: 0; font: inherit; text-align: left; box-shadow: none; transform: none; }
+.guest-receipt .guest-item { width: 100%; margin: 0; padding: 16px 0; gap: 10px; min-height: 72px; background: transparent; border: 0; border-bottom: 1px solid #e0d5c6; border-radius: 0 !important; font: inherit; text-align: left; box-shadow: none; transform: none; }
 .guest-receipt button.guest-item { cursor: pointer; }
 .guest-receipt .guest-item:hover, .guest-receipt .guest-item.sel { background: transparent; }
-.guest-receipt .g-check { width: 24px; height: 24px; border: 1px solid #9a8771; border-radius: 6px; flex: 0 0 24px; color: var(--ink); font-size: .9rem; }
-.guest-receipt .guest-item.sel .g-check { background: var(--neon-lime); border-color: var(--neon-lime); box-shadow: none; }
+.guest-receipt .g-check { width: 24px; height: 24px; border: 1px solid #9a8771; border-radius: 6px !important; flex: 0 0 24px; color: var(--ink); font-size: .9rem; }
+.guest-receipt .guest-item.sel .g-check { background: var(--neon-lime); border-color: var(--neon-lime); color: var(--ink); box-shadow: none; }
 .guest-item-copy { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 4px; }
 .guest-receipt .g-name { font-family: 'DM Mono', monospace; font-size: .88rem; font-weight: 500; line-height: 1.5; overflow-wrap: anywhere; }
 .guest-receipt .g-price { color: var(--ink); font: 500 .88rem 'DM Mono', monospace; }
@@ -2007,6 +2007,10 @@ function GuestView({ session, onBack, currency }) {
   const { items = [], qrImage } = session;
 
   const [selections, setSelections] = useState({});
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "instant" });
+  }, [named, showQR, done]);
 
   // Reload session state (paid + selections) periodically
   useEffect(() => {
