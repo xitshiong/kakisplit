@@ -1336,8 +1336,8 @@ body {
 
 .hero-headline {
   font-family: 'Barlow Condensed', sans-serif;
-  font-size: clamp(2.8rem, 12vw, 3.6rem);
-  line-height: 0.98;
+  font-size: clamp(3.7rem, 16vw, 5.4rem);
+  line-height: 0.84;
   letter-spacing: -0.035em;
   text-transform: uppercase;
 }
@@ -1651,7 +1651,7 @@ button { touch-action: manipulation; }
   outline-offset: 3px;
 }
 .sticky-total { --focus-ring: var(--neon-lime); }
-.section-head, .hero-headline { text-wrap: balance; }
+.section-head { text-wrap: balance; }
 .hero-sub, .section-sub, .how-step-desc, .vault-desc { text-wrap: pretty; }
 .how-steps { gap: 10px; }
 .how-step-title { font-size: 1.2rem; line-height: 1.2; }
@@ -1758,7 +1758,7 @@ button { touch-action: manipulation; }
   .app { padding-left: 10px; padding-right: 10px; }
   .receipt-inner,
   .section { padding-left: 18px; padding-right: 18px; }
-  .hero-headline { font-size: clamp(2.6rem, 12vw, 3.4rem); }
+  .hero-headline { font-size: clamp(3.2rem, 15vw, 4.5rem); }
 }
 `;
 
