@@ -1468,13 +1468,13 @@ body {
 .btn-neon,
 .btn-hero-host {
   background: var(--accent-fill);
-  color: white;
+  color: var(--ink);
   box-shadow: 0 12px 30px rgba(255,10,133,0.25);
 }
 
 .btn-neon:hover,
 .btn-hero-host:hover {
-  background: #E60075;
+  background: var(--neon-pink);
   box-shadow: 0 0 28px rgba(255,10,133,0.3);
 }
 
@@ -1729,8 +1729,8 @@ button { touch-action: manipulation; }
 .guest-receipt-body { padding-top: 22px; }
 .guest-sticky .sticky-label { font-size: .65rem; letter-spacing: .04em; text-transform: none; }
 .guest-sticky .sticky-amt { font-family: 'DM Mono', monospace; font-size: 1.3rem; }
-.guest-sticky .sticky-pay-btn { background: var(--neon-pink); color: var(--paper); letter-spacing: .02em; text-transform: none; padding-inline: 20px; }
-.guest-sticky .sticky-pay-btn:not(:disabled):hover { background: #E60075; }
+.guest-sticky .sticky-pay-btn { background: var(--neon-pink); color: var(--ink); letter-spacing: .02em; text-transform: none; padding-inline: 20px; }
+.guest-sticky .sticky-pay-btn:not(:disabled):hover { background: var(--neon-pink); box-shadow: 0 0 20px rgba(255,10,133,0.3); }
 .guest-sticky .sticky-pay-btn:disabled { background: #443a2e; color: var(--on-dark-muted); }
 
 @media (max-width: 360px) {
