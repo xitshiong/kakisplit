@@ -2009,7 +2009,8 @@ function GuestView({ session, onBack, currency }) {
   const [selections, setSelections] = useState({});
 
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: "instant" });
+    // Preserve the browser's scroll-to-focus while the guest is entering a name.
+    if (named) window.scrollTo({ top: 0, behavior: "instant" });
   }, [named, showQR, done]);
 
   // Reload session state (paid + selections) periodically
