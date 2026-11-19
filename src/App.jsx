@@ -2808,7 +2808,7 @@ function HostReturn({ onHome, currency, user, profile }) {
   const [paidMap, setPaidMap] = useState({});
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedExcel, setCopiedExcel] = useState(false);
-  const code = localStorage.getItem("ks_current_code");
+  const [code] = useState(() => localStorage.getItem("ks_current_code"));
 
   useEffect(() => {
     if (!code) return;
@@ -3227,6 +3227,7 @@ export default function KakiSplit() {
     if (!intent) return;
     try {
       localStorage.removeItem(LOGIN_INTENT_KEY);
+      if (intent.mode === "host-return") localStorage.setItem("ks_current_code", intent.code);
     } catch { /* Restoring the screen must not depend on storage writes. */ }
     setAuthError("");
     setMode(intent.mode);
@@ -3309,11 +3310,11 @@ export default function KakiSplit() {
     };
   }, []);
 
-  const handleLogin = async (provider, intendedMode = "host") => {
+  const handleLogin = async (provider, intendedMode = "host", intendedCode) => {
     setAuthError("");
     try {
       try {
-        localStorage.setItem(LOGIN_INTENT_KEY, JSON.stringify({ mode: intendedMode, ts: Date.now() }));
+        localStorage.setItem(LOGIN_INTENT_KEY, JSON.stringify({ mode: intendedMode, code: intendedCode, ts: Date.now() }));
       } catch {
         setAuthError("Please allow browser storage so we can return you here after Google sign-in.");
         setShowAuthModal(false);
@@ -3348,6 +3349,7 @@ export default function KakiSplit() {
   const [showQROnboarding, setShowQROnboarding] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authIntentMode, setAuthIntentMode] = useState("host");
+  const [authIntentCode, setAuthIntentCode] = useState(null);
 
   useEffect(() => {
     if (user && profile && !profile.qr_url && !localStorage.getItem("ks_qr_skipped")) {
@@ -3393,7 +3395,7 @@ export default function KakiSplit() {
           {showAuthModal && (
             <AuthModal 
               onClose={() => setShowAuthModal(false)} 
-              onLogin={provider => handleLogin(provider, authIntentMode)}
+              onLogin={provider => handleLogin(provider, authIntentMode, authIntentCode)}
             />
           )}
 
@@ -3402,11 +3404,12 @@ export default function KakiSplit() {
               onHost={user ? () => setMode("host") : () => { setAuthIntentMode("host"); setShowAuthModal(true); }}
               onGuest={() => setMode("guest-code")}
               onReturnTable={code => {
-                localStorage.setItem("ks_current_code", code);
                 if (user) {
+                  localStorage.setItem("ks_current_code", code);
                   setMode("host-return");
                 } else {
                   setAuthIntentMode("host-return");
+                  setAuthIntentCode(code);
                   setShowAuthModal(true);
                 }
               }}

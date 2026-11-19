@@ -12,6 +12,13 @@ test('a Google sign-in lasting over one minute still resumes hosting', () => {
   assert.deepEqual(readLoginIntent(storage(JSON.stringify(intent)), 121000), intent);
 });
 
+test('returning-table intent retains its own valid code instead of changing the active table', () => {
+  const intent = { mode: 'host-return', code: '1234', ts: 1000 };
+  assert.deepEqual(readLoginIntent(storage(JSON.stringify(intent)), 121000), intent);
+  assert.equal(readLoginIntent(storage(JSON.stringify({ ...intent, code: 'bad' })), 121000), null);
+  assert.equal(readLoginIntent(storage(JSON.stringify({ mode: 'host-return', ts: 1000 })), 121000), null);
+});
+
 test('expired, future, corrupt and arbitrary routing intents are ignored', () => {
   for (const value of ['bad', JSON.stringify({ mode: 'https://evil.test', ts: 1000 }),
     JSON.stringify({ mode: 'host', ts: 1000 + LOGIN_INTENT_TTL + 1 })]) {

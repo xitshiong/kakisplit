@@ -6,7 +6,8 @@ export function readLoginIntent(storage, now = Date.now()) {
   try {
     const intent = JSON.parse(storage.getItem(LOGIN_INTENT_KEY));
     if (intent && MODES.has(intent.mode) && Number.isFinite(intent.ts) &&
-        now >= intent.ts && now - intent.ts < LOGIN_INTENT_TTL) return intent;
+        now >= intent.ts && now - intent.ts < LOGIN_INTENT_TTL &&
+        (intent.mode !== 'host-return' || /^\d{4}$/.test(intent.code))) return intent;
     storage.removeItem(LOGIN_INTENT_KEY);
   } catch { /* Storage can be unavailable in privacy-restricted browsers. */ }
   return null;
