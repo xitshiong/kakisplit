@@ -9,6 +9,90 @@ const photo = "data:image/jpeg;base64,dGVzdA==";
 const response = (data, finish_reason = "stop") => new Response(JSON.stringify({
   choices: [{ message: { content: typeof data === "string" ? data : JSON.stringify(data) }, finish_reason }],
 }));
+const geminiResponse = (data, finishReason = "STOP") => new Response(JSON.stringify({
+  candidates: [{ content: { parts: [{ text: JSON.stringify(data) }] }, finishReason }],
+}));
+
+test("Gemini success uses the direct Flash endpoint and JSON schema with inline image data", async () => {
+  const result = await scanReceipt(photo, { geminiApiKey: "success-key", openRouterApiKey: "fallback" }, async (url, options) => {
+    assert.equal(url, "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent");
+    assert.equal(options.headers["x-goog-api-key"], "success-key");
+    const body = JSON.parse(options.body);
+    assert.equal(body.generationConfig.temperature, 0);
+    assert.equal(body.generationConfig.responseMimeType, "application/json");
+    assert.deepEqual(body.generationConfig.responseJsonSchema.properties.grandTotal.type, ["number", "null"]);
+    assert.equal(body.generationConfig.responseJsonSchema.additionalProperties, false);
+    assert.deepEqual(body.contents[0].parts[1].inlineData, { mimeType: "image/jpeg", data: "dGVzdA==" });
+    return geminiResponse(reading([line("Tea", 1, 3)], 3));
+  });
+  assert.deepEqual(result.warnings, []);
+  assert.equal(result.items[0].price, 3);
+});
+
+test("Gemini quota exhaustion falls back to flash-lite and skips Gemini on later scans", async () => {
+  const requests = [];
+  const fetchReceipt = async (url, options) => {
+    requests.push(url);
+    if (url.includes("googleapis")) return new Response("{}", { status: 429 });
+    assert.equal(JSON.parse(options.body).model, "google/gemini-2.5-flash-lite");
+    return response(reading([line("Tea", 1, 3)], 3));
+  };
+  const keys = { geminiApiKey: "quota-key", openRouterApiKey: "fallback" };
+  await scanReceipt(photo, keys, fetchReceipt);
+  await scanReceipt(photo, keys, fetchReceipt);
+  assert.equal(requests.length, 3);
+  assert.equal(requests.filter(url => url.includes("googleapis")).length, 1);
+});
+
+test("Gemini transient failures fall back, but configuration errors do not", async () => {
+  for (const failure of [
+    () => new Response("{}", { status: 503 }),
+    () => { throw new TypeError("network"); },
+  ]) {
+    let calls = 0;
+    const result = await scanReceipt(photo, { geminiApiKey: "transient-key", openRouterApiKey: "fallback" }, async (...args) =>
+      ++calls === 1 ? failure(...args) : response(reading([line("Tea", 1, 3)], 3)));
+    assert.equal(calls, 2);
+    assert.equal(result.items.length, 1);
+  }
+  let calls = 0;
+  await assert.rejects(scanReceipt(photo, { geminiApiKey: "bad-key", openRouterApiKey: "fallback" }, async () => {
+    calls++;
+    return new Response("{}", { status: 403 });
+  }), /couldn't scan/);
+  assert.equal(calls, 1);
+});
+
+test("Gemini timeout falls back to OpenRouter", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  let calls = 0;
+  const pending = scanReceipt(photo, { geminiApiKey: "timeout-key", openRouterApiKey: "fallback" }, async (_, options) => {
+    if (++calls === 1) return new Promise((resolve, reject) => {
+      options.signal.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")));
+    });
+    return response(reading([line("Tea", 1, 3)], 3));
+  });
+  t.mock.timers.tick(45_000);
+  assert.equal((await pending).items.length, 1);
+  assert.equal(calls, 2);
+});
+
+test("Gemini retries unreconciled and empty readings with the same prompt logic", async () => {
+  for (const first of [reading([], 3), reading([line("Tea", 1, 2)], 3)]) {
+    let calls = 0;
+    const result = await scanReceipt(photo, { geminiApiKey: "retry-key" }, async (_, options) => {
+      calls++;
+      if (calls === 2) assert.match(JSON.parse(options.body).contents[0].parts[0].text, /again from scratch/);
+      return geminiResponse(calls === 1 ? first : reading([line("Tea", 1, 3)], 3));
+    });
+    assert.equal(calls, 2);
+    assert.deepEqual(result.warnings, []);
+  }
+});
+
+test("missing keys show the existing not-configured error without a request", async () => {
+  await assert.rejects(scanReceipt(photo, {}, () => assert.fail("unexpected request")), /Receipt scanning is not configured/);
+});
 
 test("tax-inclusive receipt uses printed line totals without redistributing included GST", () => {
   const result = reconcileReceipt(reading([line("Nasi Lemak", 2, 19.95, 10), line("Teh Tarik", 1, 2.55)], 22.5));
@@ -57,13 +141,14 @@ test("a missing printed total retains items for review, and payment-only slips d
 
 test("the scan uses structured image output and retries an unbalanced reading once", async () => {
   const requests = [];
-  const result = await scanReceipt(photo, "test-key", async (_, { body }) => {
+  const result = await scanReceipt(photo, { openRouterApiKey: "test-key" }, async (_, { body }) => {
     requests.push(JSON.parse(body));
     return requests.length === 1 ?
       response(reading([line("Roti", 1, 4)], 4, [0.24])) :
       response(reading([line("Roti", 1, 4)], 4));
   });
   assert.equal(requests.length, 2);
+  assert.equal(requests[0].model, "google/gemini-2.5-flash-lite");
   assert.equal(requests[0].response_format.type, "json_schema");
   assert.equal(requests[0].messages[0].content[1].image_url.url, photo);
   assert.match(requests[1].messages[0].content[0].text, /again from scratch/);
@@ -73,7 +158,7 @@ test("the scan uses structured image output and retries an unbalanced reading on
 
 test("clipped responses are retried rather than silently accepting a partial object", async () => {
   let calls = 0;
-  const result = await scanReceipt(photo, "test-key", async () => ++calls === 1 ?
+  const result = await scanReceipt(photo, { openRouterApiKey: "test-key" }, async () => ++calls === 1 ?
     response(reading([line("Partial scan", 1, 1)], 1), "length") :
     response(reading([line("Complete scan", 1, 2)], 2)));
   assert.equal(calls, 2);
@@ -82,7 +167,7 @@ test("clipped responses are retried rather than silently accepting a partial obj
 
 test("a failed retry keeps the first reading marked for review", async () => {
   let calls = 0;
-  const result = await scanReceipt(photo, "test-key", async () => ++calls === 1 ?
+  const result = await scanReceipt(photo, { openRouterApiKey: "test-key" }, async () => ++calls === 1 ?
     response(reading([line("Set lunch", 1, 10)], 15)) : new Response(null, { status: 503 }));
   assert.equal(calls, 2);
   assert.equal(result.items[0].price, 10);
