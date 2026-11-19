@@ -1693,7 +1693,7 @@ button { touch-action: manipulation; }
 
 /* The real bill uses the same compact, tear-off receipt as the landing demo. */
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
-.guest-nav { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--on-dark-muted); font-size: .75rem; }
+.guest-nav { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: env(safe-area-inset-top, 0px); color: var(--on-dark-muted); font-size: .75rem; }
 .guest-nav button { background: none; border: none; color: var(--paper); min-height: 44px; padding: 0 8px; cursor: pointer; --focus-ring: var(--neon-lime); }
 .guest-receipt { border: 0; border-radius: 10px 10px 0 0; overflow: visible; margin-bottom: 16px; padding: 26px 22px 18px; font-family: 'DM Mono', monospace; }
 .guest-receipt::before { display: none; }
