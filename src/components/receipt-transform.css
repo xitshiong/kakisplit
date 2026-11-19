@@ -1,0 +1,144 @@
+.receipt-demo {
+  width: 100%;
+  max-width: 480px;
+  margin: 0;
+  text-align: left;
+  align-self: center;
+}
+
+.demo-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--paper-muted);
+  font-size: 0.65rem;
+  padding: 0 4px 18px;
+  border-bottom: 1px dashed rgba(248, 240, 228, 0.2);
+}
+
+.demo-live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--lime); flex-shrink: 0; }
+.demo-example { margin-left: auto; color: var(--lime); }
+.demo-scene { position: relative; height: 540px; isolation: isolate; }
+.demo-registration { position: absolute; width: 18px; height: 18px; border-color: rgba(248, 240, 228, 0.25); border-style: solid; }
+.demo-registration-tl { top: 24px; left: 8px; border-width: 1px 0 0 1px; }
+.demo-registration-br { bottom: 45px; right: 8px; border-width: 0 1px 1px 0; }
+.demo-side-note { position: absolute; top: 175px; right: 0; writing-mode: vertical-rl; font-size: 0.55rem; letter-spacing: 0.2em; color: rgba(248, 240, 228, 0.38); }
+
+.demo-paper, .demo-digital {
+  position: absolute;
+  width: 290px;
+  height: 448px;
+  top: 28px;
+  left: calc(50% - 145px);
+  transform-origin: 50% 60%;
+}
+
+.demo-paper { animation: receipt-paper 9s infinite both; }
+.demo-paper img { position: absolute; width: 150%; max-width: none; height: auto; left: -25%; top: -9%; filter: drop-shadow(0 18px 16px rgba(0, 0, 0, 0.3)); }
+.demo-digital {
+  color: var(--receipt-ink);
+  background: var(--receipt);
+  padding: 20px;
+  border-radius: 12px 12px 0 0;
+  box-shadow: 0 22px 60px rgba(0, 0, 0, 0.3);
+  animation: receipt-digital 9s infinite both;
+}
+.demo-digital::after {
+  content: '';
+  position: absolute;
+  height: 8px;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: linear-gradient(135deg, var(--receipt) 25%, transparent 25%) -8px 0 / 16px 16px, linear-gradient(225deg, var(--receipt) 25%, transparent 25%) -8px 0 / 16px 16px;
+}
+.demo-receipt-top { display: flex; align-items: center; justify-content: space-between; }
+.demo-receipt-top img { display: block; width: 44px; height: auto; }
+.demo-ready { font-size: 0.55rem; color: #3f2a18; }
+.demo-ready > span { display: inline-grid; place-items: center; width: 16px; height: 16px; background: var(--lime); border-radius: 50%; }
+.demo-table { padding: 12px 0; }
+.demo-table > span { display: block; font-size: 0.55rem; color: #6e5a46; margin-bottom: 7px; }
+.demo-table > strong { display: block; font-family: 'Barlow Condensed', sans-serif; font-size: 2rem; line-height: 0.85; text-transform: uppercase; letter-spacing: -0.02em; }
+.demo-items-label { display: flex; justify-content: space-between; border-block: 1px dashed #b7a997; padding-block: 7px; font-size: 0.55rem; }
+.demo-item { display: flex; align-items: center; gap: 8px; min-height: 42px; border-bottom: 1px solid #e6ddcf; animation: receipt-item 9s infinite both; }
+.demo-item-check { display: grid; place-items: center; flex-shrink: 0; width: 19px; height: 19px; background: var(--lime); color: var(--ink); border-radius: 5px; font-size: 0.65rem; }
+.demo-item > div { flex: 1; min-width: 0; }
+.demo-item strong { display: block; font-size: 0.62rem; font-weight: 500; }
+.demo-item div > span { display: block; margin-top: 3px; color: #79634f; font-size: 0.5rem; }
+.demo-item b { font-size: 0.64rem; font-weight: 500; font-variant-numeric: tabular-nums; }
+.demo-item-1 { animation-name: receipt-item-two; }
+.demo-item-2 { animation-name: receipt-item-three; }
+.demo-item-3 { animation-name: receipt-item-four; }
+.demo-tax { display: flex; justify-content: space-between; font-size: 0.5rem; color: #79634f; padding-top: 9px; }
+.demo-total { display: flex; align-items: center; justify-content: space-between; padding-top: 9px; }
+.demo-total > span { font-size: 0.6rem; }
+.demo-total > strong { font-family: 'Barlow Condensed', sans-serif; color: var(--pink); font-size: 1.8rem; line-height: 1; }
+.demo-total small { font-family: 'DM Mono', monospace; font-size: 0.65rem; }
+.demo-share { display: flex; justify-content: space-between; background: var(--ink); color: var(--lime); font-size: 0.6rem; border-radius: 999px; padding: 11px 14px; margin-top: 12px; }
+
+.demo-scan-track { position: absolute; width: 314px; height: 448px; top: 28px; left: calc(50% - 157px); pointer-events: none; }
+.demo-scan-line { position: absolute; top: 0; width: 100%; height: 2px; background: var(--lime); box-shadow: 0 0 16px rgba(166, 255, 0, 0.65); animation: receipt-scan 9s infinite both; }
+.demo-scan-line::after { content: ''; position: absolute; height: 28px; bottom: 100%; width: 100%; background: linear-gradient(transparent, rgba(166, 255, 0, 0.13)); }
+.demo-scan-line > span { position: absolute; right: 0; bottom: 6px; padding: 5px 7px; font-size: 0.5rem; color: var(--ink); background: var(--lime); }
+.demo-stamp { position: absolute; right: 0; bottom: 78px; padding: 10px 14px; font-size: 0.65rem; line-height: 1.5; color: var(--ink); background: var(--lime); transform: rotate(-8deg); box-shadow: 3px 4px 0 var(--ink); animation: receipt-stamp 9s infinite both; }
+.demo-stamp strong { font-weight: 500; }
+.demo-stage-labels { position: absolute; bottom: 8px; inset-inline: 0; height: 18px; text-align: center; color: var(--lime-soft); font-size: 0.6rem; }
+.demo-stage-labels > span { position: absolute; inset: 0; }
+.demo-label-paper { animation: receipt-label-paper 9s infinite both; }
+.demo-label-scan { animation: receipt-label-scan 9s infinite both; }
+.demo-label-digital { animation: receipt-label-digital 9s infinite both; }
+.receipt-demo figcaption { margin-top: 12px; text-align: center; font-size: 0.72rem; line-height: 1.75; }
+.receipt-demo figcaption > span { color: var(--paper-muted); font-size: 0.63rem; }
+.demo-controls { display: flex; justify-content: center; gap: 10px; margin-top: 12px; }
+.demo-controls button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; min-width: 80px; padding: 0 10px; border: 1px solid transparent; background: transparent; color: var(--paper-muted); font: inherit; font-size: 0.6rem; cursor: pointer; border-radius: 999px; }
+.demo-controls button:hover { border-color: rgba(248, 240, 228, 0.25); color: var(--paper); }
+.demo-controls button:focus-visible { outline: 2px solid var(--lime); outline-offset: 2px; }
+.demo-controls button > span { font-size: 1rem; }
+.demo-reduced-note { display: none; }
+.demo-scene[data-running='false'] *, .demo-scene[data-running='false'] *::after { animation-play-state: paused !important; }
+
+@keyframes receipt-paper {
+  0%, 14% { opacity: 1; transform: rotate(-7deg) translateY(5px); }
+  23% { opacity: 1; transform: rotate(0) translateY(0); }
+  48%, 88% { opacity: 0; transform: rotate(0) translateY(0); }
+  97%, 100% { opacity: 1; transform: rotate(-7deg) translateY(5px); }
+}
+@keyframes receipt-digital {
+  0%, 20% { opacity: 0; clip-path: inset(0 0 100% 0); transform: translateY(0); }
+  23% { opacity: 1; clip-path: inset(0 0 100% 0); }
+  50%, 85% { opacity: 1; clip-path: inset(0 0 -10px 0); transform: translateY(0); }
+  92%, 100% { opacity: 0; clip-path: inset(0 0 -10px 0); transform: translateY(-8px); }
+}
+@keyframes receipt-scan {
+  0%, 20% { opacity: 0; transform: translateY(0); }
+  23% { opacity: 1; transform: translateY(0); }
+  50% { opacity: 1; transform: translateY(448px); }
+  53%, 100% { opacity: 0; transform: translateY(448px); }
+}
+@keyframes receipt-item { 0%, 30% { opacity: 0; transform: translateY(8px); } 36%, 100% { opacity: 1; transform: translateY(0); } }
+@keyframes receipt-item-two { 0%, 33% { opacity: 0; transform: translateY(8px); } 39%, 100% { opacity: 1; transform: translateY(0); } }
+@keyframes receipt-item-three { 0%, 36% { opacity: 0; transform: translateY(8px); } 42%, 100% { opacity: 1; transform: translateY(0); } }
+@keyframes receipt-item-four { 0%, 39% { opacity: 0; transform: translateY(8px); } 45%, 100% { opacity: 1; transform: translateY(0); } }
+@keyframes receipt-stamp { 0%, 49% { opacity: 0; transform: rotate(-12deg) scale(1.15); } 55%, 85% { opacity: 1; transform: rotate(-8deg) scale(1); } 91%, 100% { opacity: 0; transform: rotate(-8deg) scale(1); } }
+@keyframes receipt-label-paper { 0%, 18% { opacity: 1; } 23%, 93% { opacity: 0; } 98%, 100% { opacity: 1; } }
+@keyframes receipt-label-scan { 0%, 19% { opacity: 0; } 24%, 48% { opacity: 1; } 53%, 100% { opacity: 0; } }
+@keyframes receipt-label-digital { 0%, 49% { opacity: 0; } 54%, 85% { opacity: 1; } 91%, 100% { opacity: 0; } }
+
+@media (max-width: 760px) {
+  .receipt-demo { max-width: 400px; }
+  .demo-heading { padding-top: 6px; }
+}
+@media (max-width: 360px) {
+  .demo-scene { height: 500px; }
+  .demo-paper, .demo-digital { scale: 0.9; transform-origin: top center; }
+  .demo-scan-track { scale: 0.9; transform-origin: top center; }
+  .demo-stamp { right: -2px; bottom: 76px; }
+  .demo-side-note { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .demo-scene *, .demo-scene *::after { animation: none !important; }
+  .demo-paper, .demo-scan-track, .demo-label-paper, .demo-label-scan, .demo-controls { display: none; }
+  .demo-digital, .demo-item, .demo-stamp, .demo-label-digital { opacity: 1; }
+  .demo-digital { clip-path: none; }
+  .demo-reduced-note { display: block; text-align: center; margin-top: 16px; font-size: 0.6rem; color: var(--paper-muted); }
+}
