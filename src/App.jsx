@@ -2135,7 +2135,10 @@ function HostView({ onHome, currency, user, profile }) {
     setLoading(true);
     setErr("");
     try {
-      const result = await scanReceiptBatch(receipts, image => scanReceipt(image, import.meta.env.VITE_OPENROUTER_API_KEY));
+      const result = await scanReceiptBatch(receipts, image => scanReceipt(image, {
+        geminiApiKey: import.meta.env.VITE_GEMINI_API_KEY,
+        openRouterApiKey: import.meta.env.VITE_OPENROUTER_API_KEY,
+      }));
       setItems(prev => [...result.items, ...prev.filter(item => !item.receiptId)]);
       setScanWarnings(result.warnings);
       if (result.items.length) setStep(1);
