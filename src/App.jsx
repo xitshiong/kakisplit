@@ -2643,9 +2643,9 @@ function GuestCode({ onJoin, onBack }) {
         <div className="section-sub" id="table-code-hint" style={{ marginBottom: 16 }}>Ask your host for the 4-digit table code.</div>
         <label className="field-label" htmlFor="table-code">Table code</label>
         <input id="table-code" className="name-in table-code-input" placeholder="e.g. 1234" value={code} aria-describedby="table-code-hint" aria-invalid={!!err}
-          onChange={e => setCode(e.target.value.replace(/\D/g, ""))}
+          onChange={e => setCode(e.target.value.replace(/\D/g, "").slice(0, 4))}
           onKeyDown={e => e.key === "Enter" && code.length === 4 && !loading && tryJoin()} autoFocus
-          inputMode="numeric" pattern="[0-9]{4}" maxLength={4}
+          inputMode="numeric" pattern="[0-9]{4}"
           style={{ textAlign: "center", letterSpacing: 6, fontSize: "1.2rem" }} />
         {err && <div className="error-strip" role="alert">⚠ {err}</div>}
         <button className="btn btn-ink" disabled={code.length !== 4 || loading} onClick={tryJoin}>
