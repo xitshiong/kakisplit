@@ -1237,7 +1237,7 @@ body {
   --paper-dark: #EFE6D8;
   --ink: #120A04;
   --ink-light: #3F2A18;
-  --ink-faint: #907B63;
+  --ink-faint: var(--ink-light);
   --neon-pink: #FF0A85;
   --neon-lime: #A6FF00;
   --neon-cyan: #00FFD1;
