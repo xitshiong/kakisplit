@@ -2,21 +2,21 @@ import { useEffect, useRef, useState } from 'react'
 import './receipt-transform.css'
 
 const ITEMS = [
-  { name: 'Chicken tenders', detail: 'Twelve pieces', price: '25.50', kaki: 'Mei', color: 'pink', delay: '0s' },
-  { name: 'Iced lemon tea', detail: 'Normal ice', price: '5.10', kaki: 'Afiq', color: 'cyan', delay: '0.9s' },
-  { name: 'Onion rings', detail: 'For the table', price: '12.75', kaki: 'Jo', color: 'lime', delay: '1.8s' },
-  { name: 'Cheese sauce', detail: 'The essential extra', price: '4.25', kaki: 'Mei', color: 'pink', delay: '2s' },
+  { name: 'Chicken tenders', detail: 'Twelve pieces', price: '25.50', kaki: 'Dylan', delay: '0s' },
+  { name: 'Iced lemon tea', detail: 'Normal ice', price: '5.10', kaki: 'Charles', delay: '0.9s' },
+  { name: 'Onion rings', detail: 'For the table', price: '12.75', kaki: 'Stefan', delay: '1.8s' },
+  { name: 'Cheese sauce', detail: 'The essential extra', price: '4.25', kaki: 'Dylan', delay: '2.52s' },
 ]
 
 const KAKIS = [
-  { name: 'Mei', color: 'pink', delay: '0s' },
-  { name: 'Afiq', color: 'cyan', delay: '0.9s' },
-  { name: 'Jo', color: 'lime', delay: '1.8s' },
+  { name: 'Dylan', color: 'pink' },
+  { name: 'Charles', color: 'cyan' },
+  { name: 'Stefan', color: 'lime' },
 ]
 
-function DemoCursor({ name, className = '', style }) {
+function DemoCursor({ name, color }) {
   return (
-    <span className={`demo-cursor ${className}`} style={style}>
+    <span className={`demo-cursor demo-person-${color}`}>
       <svg width="19" height="23" viewBox="0 0 19 23" fill="none">
         <path d="M2 2L16 13L10 14L7 20L2 2Z" fill="currentColor" stroke="var(--ink)" strokeWidth="1.5" strokeLinejoin="round" />
       </svg>
@@ -75,44 +75,37 @@ export function ReceiptTransform() {
             <strong>Good food.<br />Fair shares.</strong>
           </div>
           <div className="demo-items-label"><span>Your items</span><span>MYR</span></div>
-          <div className="demo-items">
-            {ITEMS.map((item, index) => (
-              <div className={`demo-item demo-item-${index} demo-person-${item.color}`} key={item.name} style={{ '--claim-delay': item.delay }}>
-                <span className="demo-item-check"><span>✓</span></span>
-                <div>
-                  <strong>{item.name}</strong>
-                  <span className="demo-item-description">
-                    <span className="demo-item-detail">{item.detail}</span>
-                    <span className="demo-item-owner">{item.kaki}’s pick</span>
-                  </span>
+          <div className="demo-selection">
+            <div className="demo-items">
+              {ITEMS.map((item, index) => (
+                <div className={`demo-item demo-item-${index}`} key={item.name} style={{ '--claim-delay': item.delay }}>
+                  <span className="demo-item-check"><span>✓</span></span>
+                  <div>
+                    <strong>{item.name}</strong>
+                    <span className="demo-item-description">
+                      <span className="demo-item-detail">{item.detail}</span>
+                      <span className="demo-item-owner">{item.kaki}’s pick</span>
+                    </span>
+                  </div>
+                  <b>{item.price}</b>
                 </div>
-                <b>{item.price}</b>
-                <DemoCursor name={item.kaki} className="demo-pick-cursor" />
-              </div>
-            ))}
-          </div>
-          <div className="demo-tax"><span>SST + rounding</span><span>2.85</span></div>
-          <div className="demo-total"><span>Receipt total</span><strong><small>RM</small> 50.45</strong></div>
-          <div className="demo-share">
-            <span className="demo-share-pick">Pick what you ordered <span>↗</span></span>
-            <span className="demo-share-pay">Pay Charles, the host <span>↗</span></span>
-            <span className="demo-share-paid">Everyone marked paid <span>✓</span></span>
-            {KAKIS.map((kaki, index) => (
-              <DemoCursor key={kaki.name} name={kaki.name} className={`demo-pay-cursor demo-person-${kaki.color}`} style={{ '--pay-delay': kaki.delay, '--cursor-x': `${34 + index * 70}px` }} />
-            ))}
+              ))}
+            </div>
+            <div className="demo-tax"><span>SST + rounding</span><span>2.85</span></div>
+            <div className="demo-total"><span>Receipt total</span><strong><small>RM</small> 50.45</strong></div>
+            <div className="demo-share">
+              <span className="demo-share-pick">Pick what you ordered <span>↗</span></span>
+              <span className="demo-share-pay">Pay the host <span>↗</span></span>
+            </div>
+            <div className="demo-cursors">
+              {KAKIS.map((kaki) => (
+                <DemoCursor key={kaki.name} name={kaki.name} color={kaki.color} />
+              ))}
+            </div>
           </div>
         </div>
 
-        <div className="demo-kakis">
-          {KAKIS.map((kaki) => (
-            <div className={`demo-kaki demo-person-${kaki.color}`} key={kaki.name} style={{ '--pay-delay': kaki.delay }}>
-              <span className="demo-avatar">{kaki.name[0]}</span>
-              <div><strong>{kaki.name}</strong><span className="demo-kaki-status"><span className="demo-kaki-picking">Picking items</span><span className="demo-kaki-paid">Marked paid ✓</span></span></div>
-            </div>
-          ))}
-        </div>
         <div className="demo-scan-track"><div className="demo-scan-line"><span>Reading the receipt</span></div></div>
-        <div className="demo-stamp">All settled. <strong>No drama.</strong></div>
         <div className="demo-stage-labels">
           <span className="demo-label-paper">01 / The dinner evidence</span>
           <span className="demo-label-scan">02 / A little KakiSplit magic</span>
@@ -122,7 +115,7 @@ export function ReceiptTransform() {
         </div>
       </div>
 
-      <figcaption id="receipt-demo-caption">Snap. Pick. Pay the host.<br /><span>Mei, Afiq and Jo pick their items, then mark paid.</span></figcaption>
+      <figcaption id="receipt-demo-caption">Snap. Pick. Pay the host.<br /><span>Dylan, Charles and Stefan pick their items, then tap Pay.</span></figcaption>
       <div className="demo-controls">
         <button type="button" onClick={() => setPaused(!paused)} aria-label={paused ? 'Play receipt animation' : 'Pause receipt animation'}>
           <span aria-hidden="true">{paused ? '▷' : 'Ⅱ'}</span> {paused ? 'Play' : 'Pause'}
