@@ -1,6 +1,6 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import { SparklesText } from './components/ui/sparkles-text'
+import { ReceiptTransform } from './components/ReceiptTransform'
 import './index.css'
 
 const STEPS = [
@@ -154,16 +154,20 @@ function InfoPage() {
         }
 
         .hero-inner {
-          width: min(100%, 980px);
+          width: min(100%, 1100px);
           display: grid;
-          justify-items: center;
-          text-align: center;
+          grid-template-columns: 1fr 0.95fr;
+          gap: clamp(40px, 6vw, 84px);
+          align-items: center;
+          text-align: left;
         }
+
+        .hero-pitch { min-width: 0; }
 
         .hero-kicker {
           color: var(--lime-soft);
-          font-size: clamp(0.66rem, 1.7vw, 0.9rem);
-          letter-spacing: clamp(0.22em, 0.9vw, 0.54em);
+          font-size: 0.66rem;
+          letter-spacing: 0.2em;
           text-transform: uppercase;
           margin-bottom: clamp(22px, 4vw, 34px);
           text-shadow: 0 0 20px rgba(166,255,0,0.28);
@@ -173,7 +177,7 @@ function InfoPage() {
         .hero-title {
           font-family: 'Barlow Condensed', sans-serif;
           font-weight: 900;
-          font-size: clamp(6.1rem, 23vw, 13.5rem);
+          font-size: clamp(7rem, 12vw, 10.5rem);
           line-height: 0.82;
           letter-spacing: -0.035em;
           text-transform: uppercase;
@@ -191,18 +195,10 @@ function InfoPage() {
         .hero-title-line.bills { color: var(--lime); text-shadow: 0 0 26px rgba(166,255,0,0.22); }
         .hero-title-line.lah { color: var(--pink); text-shadow: 0 0 28px rgba(255,10,133,0.22); }
 
-        .hero-title .inline-block {
-          display: block !important;
-          font: inherit !important;
-        }
-
-        .hero-title .inline-block > span { display: block; }
-        .hero-title .inline-block strong { color: var(--lime) !important; font: inherit !important; }
-
         .hero-copy {
           max-width: 50ch;
           color: var(--paper-muted);
-          font-size: clamp(0.9rem, 2.45vw, 1.15rem);
+          font-size: clamp(0.85rem, 1.2vw, 1rem);
           line-height: 1.65;
           margin-bottom: clamp(28px, 6vw, 42px);
           text-wrap: balance;
@@ -292,39 +288,7 @@ function InfoPage() {
         .btn-primary:hover .btn-primary-bg-layer-2 { transition-delay: 0.1s; transform: scale(1); }
         .btn-primary:hover .btn-primary-bg-layer-3 { transition-delay: 0.2s; transform: scale(1); }
 
-        .visual-flow {
-          width: min(100%, 760px);
-          display: grid;
-          grid-template-columns: 1fr auto 1fr;
-          align-items: center;
-          justify-items: center;
-          gap: clamp(10px, 4vw, 30px);
-          animation: rise-in 950ms 390ms cubic-bezier(0.32,0.72,0,1) both;
-        }
-
-        .hero-img {
-          width: min(34vw, 220px);
-          max-width: 100%;
-          display: block;
-          filter: drop-shadow(0 24px 44px rgba(0,0,0,0.44));
-        }
-
-        .hero-img-receipt { transform: rotate(-3deg); }
-        .hero-img-result { transform: rotate(8deg); }
-
-        .flow-arrow {
-          width: clamp(54px, 11vw, 78px);
-          height: clamp(54px, 11vw, 78px);
-          border-radius: 50%;
-          display: grid;
-          place-items: center;
-          background: var(--lime);
-          color: var(--ink);
-          box-shadow: 0 0 34px rgba(166,255,0,0.32);
-          animation: arrow-pulse 2400ms cubic-bezier(0.32,0.72,0,1) infinite;
-        }
-
-        .flow-arrow svg { width: 52%; height: 52%; }
+        .hero-pitch .btn-primary { min-width: min(100%, 340px); margin-bottom: 0; }
 
         .section-how {
           position: relative;
@@ -561,21 +525,18 @@ function InfoPage() {
           to { opacity: 1; transform: translateY(0); }
         }
 
-        @keyframes arrow-pulse {
-          0%, 100% { transform: scale(1); }
-          50% { transform: scale(1.08); }
-        }
-
         @media (max-width: 760px) {
           .topbar { padding-left: 18px; padding-right: 18px; }
           .open-app { padding: 0 18px; }
-          .hero { align-items: start; padding-top: max(70px, calc(env(safe-area-inset-top, 0px) + 62px)); padding-bottom: 32px; }
-          .hero-title { font-size: clamp(4.65rem, 22vw, 6.5rem); margin-bottom: 20px; }
+          .hero { align-items: start; padding-top: max(110px, calc(env(safe-area-inset-top, 0px) + 100px)); padding-bottom: 42px; }
+          .hero-inner { grid-template-columns: 1fr; justify-items: center; gap: 44px; text-align: center; }
+          .hero-pitch { width: min(100%, 460px); }
+          .hero-title { font-size: clamp(4.65rem, 19vw, 7rem); margin-bottom: 24px; }
+          .hero-title-line.bills, .hero-title-line.lah { display: inline; }
+          .hero-title-line.lah::before { content: ' '; white-space: pre; font-size: 0.3em; }
           .hero-copy { max-width: 36ch; margin-bottom: 26px; }
           .btn-primary { width: min(100%, 360px); margin-bottom: 32px; }
-          .visual-flow { width: min(100%, 430px); gap: 8px; }
-          .hero-img { width: clamp(118px, 32vw, 150px); }
-          .flow-arrow { width: 54px; height: 54px; }
+          .hero-copy { margin-inline: auto; }
           .steps { grid-template-columns: 1fr; gap: 18px; }
           .step-card { transform: none; min-height: auto; }
           .step-card:nth-child(2) { margin-top: 0; }
@@ -587,9 +548,8 @@ function InfoPage() {
           .brand-mark img { width: 44px; }
           .open-app { font-size: 0.62rem; padding: 0 14px; }
           .hero-kicker { letter-spacing: 0.26em; margin-bottom: 18px; }
-          .hero-title { font-size: clamp(4.25rem, 22vw, 5.65rem); }
+          .hero-title { font-size: clamp(4rem, 19vw, 5rem); }
           .hero-copy { font-size: 0.92rem; }
-          .visual-flow { transform: scale(0.98); }
         }
 
         @media (prefers-reduced-motion: reduce) {
@@ -612,56 +572,34 @@ function InfoPage() {
 
         <section className="hero" aria-labelledby="hero-title">
           <div className="hero-inner">
-            <p className="hero-kicker">Malaysian bill splitting, done right</p>
-            <h1 className="hero-title" id="hero-title">
-              <span className="hero-title-line split">Split</span>
-              <span className="hero-title-line bills">
-                <SparklesText
-                  text="Bills"
-                  colors={{ first: '#F8F0E4', second: '#00FFD1' }}
-                  sparklesCount={9}
-                  className="inline-block"
-                  style={{
-                    fontSize: 'inherit',
-                    fontFamily: 'inherit',
-                    fontWeight: 'inherit',
-                    lineHeight: 'inherit',
-                    letterSpacing: 'inherit',
-                    textTransform: 'inherit',
-                  }}
-                />
-              </span>
-              <span className="hero-title-line lah">Lah.</span>
-            </h1>
+            <div className="hero-pitch">
+              <p className="hero-kicker">Malaysian bill splitting, done right</p>
+              <h1 className="hero-title" id="hero-title">
+                <span className="hero-title-line split">Split</span>
+                <span className="hero-title-line bills">Bills</span>
+                <span className="hero-title-line lah">Lah.</span>
+              </h1>
 
-            <p className="hero-copy">
-              Snap the receipt. Share a code. Everyone picks what they ordered and pays their share — no drama, no calculator, no awkward silence.
-            </p>
+              <p className="hero-copy">
+                Snap the receipt. Share a code. Everyone picks what they ordered and pays their share — no drama, no calculator, no awkward silence.
+              </p>
 
-            <a href="/app" className="btn-primary">
-              <span className="btn-primary-bg">
-                <span className="btn-primary-bg-layers">
-                  <span className="btn-primary-bg-layer btn-primary-bg-layer-1" />
-                  <span className="btn-primary-bg-layer btn-primary-bg-layer-2" />
-                  <span className="btn-primary-bg-layer btn-primary-bg-layer-3" />
+              <a href="/app" className="btn-primary">
+                <span className="btn-primary-bg">
+                  <span className="btn-primary-bg-layers">
+                    <span className="btn-primary-bg-layer btn-primary-bg-layer-1" />
+                    <span className="btn-primary-bg-layer btn-primary-bg-layer-2" />
+                    <span className="btn-primary-bg-layer btn-primary-bg-layer-3" />
+                  </span>
                 </span>
-              </span>
-              <span className="btn-primary-inner">
-                <span className="btn-primary-inner-static">Start splitting</span>
-                <span className="btn-primary-inner-hover">Start splitting</span>
-              </span>
-            </a>
+                <span className="btn-primary-inner">
+                  <span className="btn-primary-inner-static">Start splitting</span>
+                  <span className="btn-primary-inner-hover">Start splitting</span>
+                </span>
+              </a>
 
-            <div className="visual-flow" aria-label="Receipt converted into split bill preview">
-              <img src="/receipt.png" alt="Restaurant receipt photo" className="hero-img hero-img-receipt" />
-              <div className="flow-arrow" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="5" y1="12" x2="19" y2="12" />
-                  <polyline points="12 5 19 12 12 19" />
-                </svg>
-              </div>
-              <img src="/result.png" alt="KakiSplit item selection screen" className="hero-img hero-img-result" />
             </div>
+            <ReceiptTransform />
           </div>
         </section>
 
