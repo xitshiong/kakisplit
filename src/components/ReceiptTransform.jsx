@@ -5,7 +5,7 @@ const ITEMS = [
   { name: 'Chicken tenders', detail: 'Twelve pieces', price: '25.50', kaki: 'Mei', color: 'pink', delay: '0s' },
   { name: 'Iced lemon tea', detail: 'Normal ice', price: '5.10', kaki: 'Afiq', color: 'cyan', delay: '0.9s' },
   { name: 'Onion rings', detail: 'For the table', price: '12.75', kaki: 'Jo', color: 'lime', delay: '1.8s' },
-  { name: 'Cheese sauce', detail: 'The essential extra', price: '4.25', kaki: 'Mei', color: 'pink', delay: '1.4s' },
+  { name: 'Cheese sauce', detail: 'The essential extra', price: '4.25', kaki: 'Mei', color: 'pink', delay: '2s' },
 ]
 
 const KAKIS = [

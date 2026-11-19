@@ -135,7 +135,8 @@
 @keyframes receipt-digital {
   0%, 11% { opacity: 0; clip-path: inset(0 0 100% 0); transform: translateY(0); }
   13% { opacity: 1; clip-path: inset(0 0 100% 0); }
-  30%, 94% { opacity: 1; clip-path: inset(0 0 -45px 0); transform: translateY(0); }
+  30%, 32% { opacity: 1; clip-path: inset(0); transform: translateY(0); }
+  35%, 94% { opacity: 1; clip-path: inset(0 0 -45px 0); transform: translateY(0); }
   98%, 100% { opacity: 0; clip-path: inset(0 0 -45px 0); transform: translateY(-8px); }
 }
 @keyframes receipt-scan {
@@ -155,8 +156,8 @@
   40% { opacity: 1; transform: translate(100px, 15px); }
   44% { opacity: 1; transform: translate(0, 0) scale(1); }
   45% { opacity: 1; transform: translate(0, 0) scale(0.8); }
-  46%, 49% { opacity: 1; transform: translate(0, 0) scale(1); }
-  52%, 100% { opacity: 0; transform: translate(15px, 12px); }
+  46% { opacity: 1; transform: translate(0, 0) scale(1); }
+  48%, 100% { opacity: 0; transform: translate(15px, 12px); }
 }
 @keyframes receipt-pay-cursor {
   0%, 61% { opacity: 0; transform: translate(35px, 24px); }
@@ -170,8 +171,8 @@
 @keyframes receipt-kaki-picking { 0%, 69% { opacity: 1; } 71%, 100% { opacity: 0; } }
 @keyframes receipt-kaki-paid { 0%, 69% { opacity: 0; } 71%, 100% { opacity: 1; } }
 @keyframes receipt-share-pick { 0%, 59% { opacity: 1; } 62%, 100% { opacity: 0; } }
-@keyframes receipt-share-pay { 0%, 59% { opacity: 0; } 62%, 80% { opacity: 1; } 82%, 100% { opacity: 0; } }
-@keyframes receipt-share-paid { 0%, 80% { opacity: 0; } 82%, 100% { opacity: 1; } }
+@keyframes receipt-share-pay { 0%, 59% { opacity: 0; } 62%, 82% { opacity: 1; } 84%, 100% { opacity: 0; } }
+@keyframes receipt-share-paid { 0%, 82% { opacity: 0; } 84%, 100% { opacity: 1; } }
 @keyframes receipt-stamp { 0%, 82% { opacity: 0; transform: rotate(-12deg) scale(1.15); } 85%, 94% { opacity: 1; transform: rotate(-8deg) scale(1); } 98%, 100% { opacity: 0; transform: rotate(-8deg) scale(1); } }
 @keyframes receipt-label-paper { 0%, 10% { opacity: 1; } 13%, 96% { opacity: 0; } 99%, 100% { opacity: 1; } }
 @keyframes receipt-label-scan { 0%, 11% { opacity: 0; } 14%, 29% { opacity: 1; } 32%, 100% { opacity: 0; } }
