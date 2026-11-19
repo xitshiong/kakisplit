@@ -73,7 +73,7 @@ export function ReceiptTransform() {
         </div>
 
         <div className="demo-scan-track"><div className="demo-scan-line"><span>Reading the receipt</span></div></div>
-        <div className="demo-stamp">Same bill.<br /><strong>No drama.</strong></div>
+        <div className="demo-stamp">Same bill. <strong>No drama.</strong></div>
         <div className="demo-stage-labels">
           <span className="demo-label-paper">01 / The dinner evidence</span>
           <span className="demo-label-scan">02 / A little KakiSplit magic</span>
