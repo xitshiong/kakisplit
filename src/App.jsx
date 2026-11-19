@@ -2928,7 +2928,7 @@ function AuthModal({ onClose, onLogin }) {
     return () => dialog.close();
   }, []);
   return (
-    <dialog ref={dialogRef} className="auth-dialog" aria-labelledby="auth-title" onCancel={onClose} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+    <dialog ref={dialogRef} className="auth-dialog" aria-labelledby="auth-title" onClose={onClose} onClick={e => { if (e.target === e.currentTarget) dialogRef.current.close(); }}>
       <div className="qr-modal-inner">
         <div className="qr-modal-top">
           <div id="auth-title" className="qr-modal-title" style={{ fontSize: '1.2rem', marginBottom: 12 }}>Join KakiSplit</div>
@@ -2943,7 +2943,7 @@ function AuthModal({ onClose, onLogin }) {
           </button>
         </div>
         
-        <button className="qr-modal-close" onClick={onClose}>Cancel</button>
+        <button className="qr-modal-close" onClick={() => dialogRef.current.close()}>Cancel</button>
       </div>
     </dialog>
   );
