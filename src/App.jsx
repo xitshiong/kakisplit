@@ -3,6 +3,9 @@ import { QRCodeSVG } from "qrcode.react";
 import { createClient } from "@supabase/supabase-js";
 import { Analytics } from "@vercel/analytics/react"
 import { scanReceipt, scanReceiptBatch } from "./lib/receiptOcr.js";
+import { LOGIN_INTENT_KEY, readLoginIntent, hasAuthError } from "./lib/authFlow.mjs";
+
+const callbackFailed = hasAuthError(new URL(window.location.href));
 
 const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL,
@@ -1688,6 +1691,56 @@ button { touch-action: manipulation; }
 .recent-card { width: 100%; text-align: left; font: inherit; }
 .user-chip { font: inherit; color: var(--paper); cursor: pointer; }
 
+/* The real bill uses the same compact, tear-off receipt as the landing demo. */
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+.guest-nav { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--on-dark-muted); font-size: .75rem; }
+.guest-nav button { background: none; border: none; color: var(--paper); min-height: 44px; padding: 0 8px; cursor: pointer; --focus-ring: var(--neon-lime); }
+.guest-receipt { border: 0; border-radius: 10px 10px 0 0; overflow: visible; margin-bottom: 16px; padding: 26px 22px 18px; font-family: 'DM Mono', monospace; }
+.guest-receipt::before { display: none; }
+.guest-receipt::after { content: ''; position: absolute; top: 100%; left: 0; width: 100%; height: 11px; background: linear-gradient(135deg, var(--paper) 25%, transparent 25%) -11px 0 / 22px 22px, linear-gradient(225deg, var(--paper) 25%, transparent 25%) -11px 0 / 22px 22px; }
+.guest-receipt-header { padding-bottom: 18px; border-bottom: 1px dashed #b7a997; }
+.guest-receipt-brand { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 26px; }
+.guest-receipt-brand img { width: 56px; height: auto; }
+.guest-receipt-status { display: flex; align-items: center; gap: 6px; color: var(--ink-light); font-size: .7rem; }
+.guest-receipt-status > span { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--neon-lime); color: var(--ink); }
+.guest-receipt-meta { color: var(--ink-faint); font-size: .7rem; margin-bottom: 9px; overflow-wrap: anywhere; }
+.guest-table-name { color: var(--ink); font-family: 'Barlow Condensed', sans-serif; font-weight: 900; text-transform: uppercase; font-size: clamp(2.6rem, 11vw, 3.4rem); letter-spacing: -.025em; line-height: .95; overflow-wrap: anywhere; }
+.guest-receipt-intro { padding-block: 18px; color: var(--ink); font-size: .82rem; line-height: 1.6; }
+.guest-receipt-intro > span { display: block; color: var(--ink-faint); font-size: .7rem; margin-top: 3px; }
+.guest-items-label { display: flex; justify-content: space-between; padding-block: 10px; border-block: 1px dashed #b7a997; color: var(--ink); font-size: .75rem; }
+.guest-receipt .guest-item { width: 100%; margin: 0; padding: 16px 0; gap: 10px; min-height: 72px; background: transparent; border: 0; border-bottom: 1px solid #e0d5c6; border-radius: 0; font: inherit; text-align: left; box-shadow: none; transform: none; }
+.guest-receipt button.guest-item { cursor: pointer; }
+.guest-receipt .guest-item:hover, .guest-receipt .guest-item.sel { background: transparent; }
+.guest-receipt .g-check { width: 24px; height: 24px; border: 1px solid #9a8771; border-radius: 6px; flex: 0 0 24px; color: var(--ink); font-size: .9rem; }
+.guest-receipt .guest-item.sel .g-check { background: var(--neon-lime); border-color: var(--neon-lime); box-shadow: none; }
+.guest-item-copy { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 4px; }
+.guest-receipt .g-name { font-family: 'DM Mono', monospace; font-size: .88rem; font-weight: 500; line-height: 1.5; overflow-wrap: anywhere; }
+.guest-receipt .g-price { color: var(--ink); font: 500 .88rem 'DM Mono', monospace; }
+.guest-item-detail { color: var(--ink-faint); font-size: .68rem; line-height: 1.5; }
+.guest-receipt .paid-item { opacity: 1; border-style: solid; }
+.guest-receipt .guest-paid-tag { color: var(--teal-ink); font-size: .7rem; }
+.guest-receipt .split-controls { gap: 8px; padding: 8px 0 12px; font-family: 'DM Sans', sans-serif; font-size: .8rem; }
+.split-adjust { flex: 0 0 44px; width: 44px; height: 44px; border: 0; border-radius: 6px; background: var(--ink); color: var(--paper); cursor: pointer; font-size: 1.1rem; }
+.guest-receipt-summary { padding-top: 20px; }
+.guest-selected-count { color: var(--ink-faint); font-size: .7rem; line-height: 1.5; }
+.guest-share-total { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--ink); padding-top: 10px; font-size: .82rem; }
+.guest-share-total strong { color: var(--accent-ink); font: 800 2.6rem/.95 'Barlow Condensed', sans-serif; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.guest-share-total small { font: 500 .75rem 'DM Mono', monospace; }
+.guest-receipt-note { margin-top: 22px; padding: 14px; border-radius: 999px; background: var(--ink); color: var(--neon-lime); font-size: .7rem; text-align: center; }
+.guest-receipt-body { padding-top: 22px; }
+.guest-sticky .sticky-label { font-size: .65rem; letter-spacing: .04em; text-transform: none; }
+.guest-sticky .sticky-amt { font-family: 'DM Mono', monospace; font-size: 1.3rem; }
+.guest-sticky .sticky-pay-btn { background: var(--neon-lime); color: var(--ink); letter-spacing: .02em; text-transform: none; padding-inline: 20px; }
+.guest-sticky .sticky-pay-btn:not(:disabled):hover { background: #c8ff36; }
+.guest-sticky .sticky-pay-btn:disabled { background: #443a2e; color: var(--on-dark-muted); }
+
+@media (max-width: 360px) {
+  .guest-receipt { padding-inline: 18px; }
+  .guest-receipt .g-name, .guest-receipt .g-price { font-size: .8rem; }
+  .guest-receipt .split-controls { gap: 6px; }
+  .guest-sticky .sticky-amt { font-size: 1.12rem; }
+}
+
 @media (max-width: 380px) {
   .line-item { gap: 6px; }
   .item-price-in { width: 72px; padding-inline: 6px; }
@@ -1929,6 +1982,19 @@ function StepBar({ current, steps }) {
   );
 }
 
+function GuestReceiptHeader({ session, status = "Split the bill" }) {
+  return (
+    <header className="guest-receipt-header">
+      <div className="guest-receipt-brand">
+        <img src={LOGO_SRC} alt="KakiSplit" width="56" height="42" />
+        <span className="guest-receipt-status"><span aria-hidden="true">✓</span> {status}</span>
+      </div>
+      <p className="guest-receipt-meta">Table #{session.code}{session.tableDate ? ` · ${session.tableDate}` : ""}</p>
+      <h1 className="guest-table-name">{session.tableName || "My Table"}</h1>
+    </header>
+  );
+}
+
 // ── GUEST VIEW ────────────────────────────────────────────────
 function GuestView({ session, onBack, currency }) {
   const [named, setNamed] = useState(false);
@@ -1993,8 +2059,9 @@ function GuestView({ session, onBack, currency }) {
   };
 
   if (!named) return (
-    <div className="receipt" style={{ marginTop: 0 }}>
-      <div className="receipt-inner">
+    <div className="receipt guest-receipt">
+      <GuestReceiptHeader session={session} />
+      <div className="guest-receipt-body">
         <div className="section-head">What's your name?</div>
         <div className="section-sub" style={{ marginBottom: 16 }}>So the host knows who's paid</div>
         <label className="field-label" htmlFor="guest-name">Your name</label>
@@ -2010,9 +2077,9 @@ function GuestView({ session, onBack, currency }) {
   );
 
   if (done) return (
-    <div className="receipt">
-      <div className="receipt-inner">
-        <span className="success-mark">✅</span>
+    <div className="receipt guest-receipt">
+      <GuestReceiptHeader session={session} status="Share confirmed" />
+      <div className="guest-receipt-body">
         <div className="section-head" style={{ textAlign: "center" }}>Confirmed, {name}!</div>
         <div className="section-sub" style={{ textAlign: "center", marginBottom: 20 }}>Here's your share of the bill</div>
 
@@ -2039,14 +2106,11 @@ function GuestView({ session, onBack, currency }) {
   );
 
   if (showQR) return (
-    <div className="receipt">
-      <div className="header-receipt" style={{ paddingBottom: 20 }}>
-        <div style={{ fontFamily: "'DM Sans',sans-serif", fontSize: "1.6rem", fontWeight: 900, color: "var(--ink)" }}>
-          Scan & Pay
-        </div>
-        <div style={{ fontSize: "0.75rem", color: "var(--ink-faint)", letterSpacing: 1.5, textTransform: "uppercase", marginTop: 8 }}>
-          Pay exactly this amount
-        </div>
+    <div className="receipt guest-receipt">
+      <GuestReceiptHeader session={session} status="Scan & pay" />
+      <div className="guest-receipt-body">
+        <h2 className="section-head">Scan & pay the host</h2>
+        <p className="section-sub">Open your banking app and pay exactly this amount.</p>
       </div>
       
       <div style={{ textAlign: "center", padding: "30px 24px", borderBottom: "1px dashed var(--ink-faint)" }}>
@@ -2056,7 +2120,7 @@ function GuestView({ session, onBack, currency }) {
       </div>
 
       <div style={{ padding: "30px 24px", display: "flex", justifyContent: "center", background: "white", borderBottom: "1px dashed var(--ink-faint)" }}>
-        <img src={qrImage} alt="QR" style={{ width: "100%", maxWidth: "340px", height: "auto", objectFit: "contain", borderRadius: 8 }} />
+        <img src={qrImage} alt="Host's payment QR code" style={{ width: "100%", maxWidth: "340px", height: "auto", objectFit: "contain", borderRadius: 8 }} />
       </div>
 
       <div style={{ padding: "24px" }}>
@@ -2072,16 +2136,14 @@ function GuestView({ session, onBack, currency }) {
 
   return (
     <>
-      <div className="receipt">
-        <div className="header-receipt" style={{ paddingBottom: 14 }}>
-          <div style={{ fontFamily: "'DM Sans',sans-serif", fontSize: "1.1rem", fontWeight: 700, color: "var(--ink)" }}>
-            Hey {name} 👋
-          </div>
-          <div style={{ fontSize: "0.75rem", color: "var(--ink-faint)", letterSpacing: 1.5, textTransform: "uppercase", marginTop: 4 }}>
-            Tap everything you ordered
-          </div>
+      <div className="receipt guest-receipt">
+        <GuestReceiptHeader session={session} />
+        <div className="guest-receipt-intro">
+          <p>Hey {name}, pick what you had.</p>
+          <span>Sharing a dish? Select it, then adjust the split.</span>
         </div>
-        <div style={{ padding: "4px 24px 90px" }}>
+        <div className="guest-items-label"><span>Your items</span><span>{currency}</span></div>
+        <div className="guest-receipt-items">
           {items.map(item => {
             const paidInfo = paidMap[item.id];
             const paidBy = (paidInfo?.payers || (paidInfo ? [paidInfo] : [])).map(p => typeof p === 'object' ? (p.name || "Host") : p);
@@ -2110,16 +2172,17 @@ function GuestView({ session, onBack, currency }) {
               <div key={item.id}>
                 <button type="button" className={`guest-item ${sel[item.id] ? "sel" : ""}`} aria-pressed={!!sel[item.id]}
                   onClick={() => setSel(s => ({ ...s, [item.id]: !s[item.id] }))}>
-                  <div className="g-check">{sel[item.id] ? "✓" : ""}</div>
-                  <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+                  <div className="g-check" aria-hidden="true">{sel[item.id] ? "✓" : ""}</div>
+                  <div className="guest-item-copy">
                     <span className="g-name">{item.name}</span>
+                    {totalSplit > 1 && <span className="guest-item-detail">Split {totalSplit} ways · your share</span>}
                     {selections[item.id] && selections[item.id].filter(n => n !== name).length > 0 && (
                       <span style={{ fontSize: "0.75rem", color: "var(--accent-ink)", fontWeight: 600 }}>
                         Highlighted by {selections[item.id].filter(n => n !== name).join(", ")}
                       </span>
                     )}
                   </div>
-                  <span className="g-price">{currency} {splitPrice.toFixed(2)}</span>
+                  <span className="g-price"><span className="sr-only">{currency} </span>{splitPrice.toFixed(2)}</span>
                 </button>
                 {paidBy.length > 0 && (
                   <div style={{ padding: "4px 24px 4px 56px", fontSize: "0.75rem", color: "var(--ink-light)" }}>
@@ -2130,29 +2193,34 @@ function GuestView({ session, onBack, currency }) {
                   <div className="split-controls">
                     <span style={{ fontWeight: 500 }}>Split with:</span>
                     <button aria-label={`Split ${item.name} with fewer people`} disabled={(splits[item.id] || totalSplit) <= 1} onClick={() => setSplits(s => ({ ...s, [item.id]: Math.max(1, (s[item.id] || totalSplit) - 1) }))}
-                      style={{ padding: "8px 16px", background: "var(--ink)", color: "var(--paper)", border: "none", borderRadius: 8, cursor: "pointer", fontSize: "1rem", fontWeight: 600, minWidth: 40 }}>−</button>
+                      className="split-adjust">−</button>
 
                     <span className="split-value" aria-live="polite">
                       {(splits[item.id] || totalSplit) === 1 ? "no one" : `${(splits[item.id] || totalSplit) - 1} other${(splits[item.id] || totalSplit) > 2 ? "s" : ""}`}
                     </span>
 
                     <button aria-label={`Split ${item.name} with more people`} onClick={() => setSplits(s => ({ ...s, [item.id]: (s[item.id] || totalSplit) + 1 }))}
-                      style={{ padding: "8px 16px", background: "var(--ink)", color: "var(--paper)", border: "none", borderRadius: 8, cursor: "pointer", fontSize: "1rem", fontWeight: 600, minWidth: 40 }}>+</button>
+                      className="split-adjust">+</button>
                   </div>
                 )}
               </div>
             );
           })}
         </div>
+        <div className="guest-receipt-summary">
+          <p className="guest-selected-count" aria-live="polite">{myItems.length ? `${myItems.length} item${myItems.length === 1 ? "" : "s"} selected` : "Select your items to get started"}</p>
+          <div className="guest-share-total"><span>Your share</span><strong><small>{currency}</small> {myTotal.toFixed(2)}</strong></div>
+          <p className="guest-receipt-note">Just your food. Just your share.</p>
+        </div>
       </div>
 
-      <div className="sticky-total">
+      <div className="sticky-total guest-sticky">
         <div>
-          <div className="sticky-label">Your total</div>
-          <div className="sticky-amt">{myTotal > 0 ? `${currency} ${myTotal.toFixed(2)}` : "— —"}</div>
+          <div className="sticky-label">Your share · {myItems.length} item{myItems.length === 1 ? "" : "s"}</div>
+          <div className="sticky-amt" aria-live="polite">{currency} {myTotal.toFixed(2)}</div>
         </div>
         <button className="sticky-pay-btn" disabled={myTotal === 0} onClick={() => qrImage ? setShowQR(true) : confirmPayment()}>
-          {qrImage ? "Pay Now →" : "Confirm →"}
+          {qrImage ? "Pay host →" : "Confirm →"}
         </button>
       </div>
     </>
@@ -3122,6 +3190,7 @@ export default function KakiSplit() {
   const [initializing, setInitializing] = useState(true);
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
+  const [authError, setAuthError] = useState(callbackFailed ? "Google sign-in didn't finish. Please try again." : "");
 
   const fetchProfile = async (currentUser) => {
     if (!currentUser) return;
@@ -3154,19 +3223,13 @@ export default function KakiSplit() {
   };
 
   const restorePostLoginMode = () => {
-    const stored = localStorage.getItem("ks_post_login_mode");
-    if (!stored) return;
+    const intent = readLoginIntent(localStorage);
+    if (!intent) return;
     try {
-      const { mode: savedMode, ts } = JSON.parse(stored);
-      if (Date.now() - ts < 60000) {
-        localStorage.removeItem("ks_post_login_mode");
-        setMode(savedMode);
-      } else {
-        localStorage.removeItem("ks_post_login_mode");
-      }
-    } catch {
-      localStorage.removeItem("ks_post_login_mode");
-    }
+      localStorage.removeItem(LOGIN_INTENT_KEY);
+    } catch { /* Restoring the screen must not depend on storage writes. */ }
+    setAuthError("");
+    setMode(intent.mode);
   };
 
   useEffect(() => {
@@ -3195,8 +3258,9 @@ export default function KakiSplit() {
       const tableCode = new URLSearchParams(window.location.search).get("table");
 
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         if (!mounted) return;
+        if (sessionError) setAuthError("We couldn't finish signing you in. Please try again.");
 
         setUser(session?.user ?? null);
         if (session?.user) fetchProfile(session.user);
@@ -3223,8 +3287,10 @@ export default function KakiSplit() {
           } else {
             setMode("notfound");
           }
-        } else {
+        } else if (session?.user) {
           restorePostLoginMode();
+        } else if (readLoginIntent(localStorage)) {
+          setAuthError("Sign-in didn't complete. Try Google sign-in again to continue hosting.");
         }
       } catch (e) {
         console.error("Init failed:", e);
@@ -3244,18 +3310,25 @@ export default function KakiSplit() {
   }, []);
 
   const handleLogin = async (provider, intendedMode = "host") => {
+    setAuthError("");
     try {
-      localStorage.setItem("ks_post_login_mode", JSON.stringify({ mode: intendedMode, ts: Date.now() }));
+      try {
+        localStorage.setItem(LOGIN_INTENT_KEY, JSON.stringify({ mode: intendedMode, ts: Date.now() }));
+      } catch {
+        setAuthError("Please allow browser storage so we can return you here after Google sign-in.");
+        setShowAuthModal(false);
+        return;
+      }
       const { error } = await supabase.auth.signInWithOAuth({
         provider: provider,
         options: {
-          redirectTo: window.location.origin + "/app"
+          redirectTo: new URL("/app/", window.location.origin).href
         }
       });
       if (error) throw error;
     } catch (e) {
-      console.error("Login failed:", e);
-      alert("Login failed. Check your Supabase settings.");
+      setAuthError("Google sign-in couldn't start. Please try again.");
+      setShowAuthModal(false);
     }
   };
 
@@ -3274,6 +3347,7 @@ export default function KakiSplit() {
 
   const [showQROnboarding, setShowQROnboarding] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authIntentMode, setAuthIntentMode] = useState("host");
 
   useEffect(() => {
     if (user && profile && !profile.qr_url && !localStorage.getItem("ks_qr_skipped")) {
@@ -3306,6 +3380,7 @@ export default function KakiSplit() {
         )}
 
         {!initializing && <>
+          {authError && <div className="error-strip" role="alert">{authError}</div>}
           {showQROnboarding && (
             <QROnboarding 
               onSkip={handleSkipQR}
@@ -3318,19 +3393,20 @@ export default function KakiSplit() {
           {showAuthModal && (
             <AuthModal 
               onClose={() => setShowAuthModal(false)} 
-              onLogin={handleLogin} 
+              onLogin={provider => handleLogin(provider, authIntentMode)}
             />
           )}
 
           {!showQROnboarding && !mode && (
             <LandingPage
-              onHost={user ? () => setMode("host") : () => setShowAuthModal(true)}
+              onHost={user ? () => setMode("host") : () => { setAuthIntentMode("host"); setShowAuthModal(true); }}
               onGuest={() => setMode("guest-code")}
               onReturnTable={code => {
+                localStorage.setItem("ks_current_code", code);
                 if (user) {
-                  localStorage.setItem("ks_current_code", code);
                   setMode("host-return");
                 } else {
+                  setAuthIntentMode("host-return");
                   setShowAuthModal(true);
                 }
               }}
@@ -3338,7 +3414,7 @@ export default function KakiSplit() {
               onCurrencyChange={changeCurrency}
               user={user}
               profile={profile}
-              onLogin={() => setShowAuthModal(true)}
+              onLogin={() => { setAuthIntentMode("host"); setShowAuthModal(true); }}
               onProfile={() => setMode("profile")}
             />
           )}
@@ -3349,17 +3425,7 @@ export default function KakiSplit() {
 
           {mode === "guest" && guestSession && (
             <>
-              <div className="receipt">
-                <div className="header-receipt">
-                  <button className="home-btn" onClick={() => setMode(null)}>
-                    <span className="home-btn-icon">⌂</span>
-                    <span className="home-btn-label">Home</span>
-                  </button>
-                  <img src={LOGO_SRC} alt="KakiSplit" className="logo-img" />
-                  <div className="logo-tagline">Split bills lah, no drama</div>
-                  <div><span className="badge-strip guest-badge">👥 Guest</span></div>
-                </div>
-              </div>
+              <nav className="guest-nav" aria-label="App"><button onClick={() => setMode(null)}>← Home</button><span>Split bills. No drama.</span></nav>
               <GuestView session={guestSession} onBack={() => setMode(null)} currency={currency} />
             </>
           )}

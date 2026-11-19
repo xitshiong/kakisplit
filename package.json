@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "npm run test:receipt && node src/household/lib/money.test.mjs && node src/household/lib/ocr.test.mjs && node src/household/lib/receiptPrep.test.mjs",
+    "test": "npm run test:receipt && node --test src/lib/authFlow.test.mjs && node src/household/lib/money.test.mjs && node src/household/lib/ocr.test.mjs && node src/household/lib/receiptPrep.test.mjs",
     "test:receipt": "node --test src/lib/receiptOcr.test.mjs"
   },
   "dependencies": {
