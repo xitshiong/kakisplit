@@ -45,7 +45,7 @@ export function ReceiptTransform() {
         <div className="demo-side-note">PAPER IN. PEACE OUT.</div>
 
         <div className="demo-paper">
-          <img src="/receipt.png" width="1080" height="1350" alt="" fetchPriority="high" />
+          <img src="/receipt.png" width="1080" height="1350" alt="" fetchpriority="high" />
         </div>
 
         <div className="demo-digital">
