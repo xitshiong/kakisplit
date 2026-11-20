@@ -1,22 +1,10 @@
-// Run with: node src/household/lib/money.test.mjs
-//
 // Every split in the household flow is done in integer cents. These cover
 // parsing what people and models type, formatting it back, and spreading tax
 // and charges so the shares always add back up to the printed total.
 
 import assert from "node:assert/strict";
+import test from "node:test";
 import { CURRENCIES, allocateCents, bakeExtras, fmt, fmtPlain, toCents } from "./money.js";
-
-let passed = 0;
-function test(name, fn) {
-  try {
-    fn();
-    passed++;
-  } catch (e) {
-    console.error(`FAIL  ${name}\n      ${e.message}`);
-    process.exitCode = 1;
-  }
-}
 
 // ── toCents ───────────────────────────────────────────────────
 
@@ -112,4 +100,19 @@ test("bakeExtras leaves lines alone when the total already matches", () => {
   assert.deepEqual(bakeExtras([], 0), []);
 });
 
-console.log(`${passed} checks passed`);
+test("allocated cents always conserve the total for positive shares and credits", () => {
+  for (const total of [-301, -1, 0, 1, 2, 301]) {
+    for (const weights of [[1, 1, 1], [1, 10, 5], [0, 2, 0], [0, 0], [NaN, -1, 3]]) {
+      const result = allocateCents(total, weights);
+      assert.equal(result.length, weights.length);
+      assert.ok(result.every(Number.isInteger));
+      assert.equal(result.reduce((sum, value) => sum + value, 0), total);
+    }
+  }
+});
+
+test("ties assign leftover cents deterministically and excluded members receive zero", () => {
+  assert.deepEqual(allocateCents(2, [1, 1, 1]), [1, 1, 0]);
+  assert.deepEqual(allocateCents(7, [1, 0, 1]), [4, 0, 3]);
+  assert.deepEqual(allocateCents(7, []), []);
+});

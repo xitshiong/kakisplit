@@ -20,6 +20,14 @@ Split bills lah, no drama.
    npm run dev
    ```
 
+## Tests
+
+Use Node.js 22.13+ (on the 22.x LTS line). Run `npm ci` and then `npm test` for the full suite.
+Use `npm run test:unit` for Node unit tests, `npm run test:receipt` for the
+table receipt OCR and review tests, or `npm run test:ui` for React integration
+tests in jsdom. The suite runs without live credentials or network services.
+GitHub Actions runs the full suite and the production build on pull requests.
+
 ## Deploy to Vercel
 
 1. Push to GitHub

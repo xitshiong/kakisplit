@@ -1,23 +1,11 @@
-// Run with: node src/household/lib/receiptPrep.test.mjs
-
 import assert from "node:assert/strict";
+import test from "node:test";
 import {
   assessTextQuality,
   correctionDegreesFromOsd,
   prepWarningMessage,
   snapOrientationDegrees,
 } from "./receiptPrepCore.js";
-
-let passed = 0;
-function test(name, fn) {
-  try {
-    fn();
-    passed++;
-  } catch (e) {
-    console.error(`FAIL  ${name}\n      ${e.message}`);
-    process.exitCode = 1;
-  }
-}
 
 test("snaps OSD angles to quarter turns", () => {
   assert.equal(snapOrientationDegrees(0), 0);
@@ -66,5 +54,3 @@ test("maps prep codes to user-facing copy", () => {
   assert.match(prepWarningMessage("low_confidence"), /clearer shot/i);
   assert.match(prepWarningMessage("rotated"), /rotated/i);
 });
-
-console.log(`${passed} checks passed`);
