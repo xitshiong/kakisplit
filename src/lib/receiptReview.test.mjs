@@ -48,3 +48,25 @@ test('does not alter item drafts and recovers after correction', () => {
   assert.equal(JSON.stringify(items), before);
   assert.equal(reviewReceiptItems([{ ...items[0], price: '15.00' }]).valid, true);
 });
+
+test('rejects an unsafe grand total even when individual amounts fit in safe cents', () => {
+  const result = reviewReceiptItems([
+    { name: 'A', price: '80000000000000.00' },
+    { name: 'B', price: '80000000000000.00' },
+  ]);
+  assert.deepEqual(result.errors, [{ name: '', price: '' }, { name: '', price: '' }]);
+  assert.equal(result.valid, false);
+});
+
+test('marks errors only on affected lines while keeping the total of valid amounts', () => {
+  const result = reviewReceiptItems([
+    { name: '', price: '3.00' },
+    { name: 'Tea', price: 'invalid' },
+    { name: 'Discount', price: '-1.50' },
+  ]);
+  assert.equal(result.total, 1.5);
+  assert.deepEqual(result.errors.map(({ name, price }) => [Boolean(name), Boolean(price)]), [
+    [true, false], [false, true], [false, false],
+  ]);
+  assert.equal(result.totalError, '');
+});

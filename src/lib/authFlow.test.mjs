@@ -41,3 +41,26 @@ test('callback errors reach the app; ordinary marketing visits stay on marketing
   assert.equal(authReturnPath(new URL('https://kakisplit.com/?code=referral')), null);
   assert.equal(authReturnPath(new URL('https://kakisplit.com/?code=fixture'), true), '/app/?code=fixture');
 });
+
+test('a valid intent survives until just before expiry and is removed at expiry', () => {
+  const intent = { mode: 'profile', ts: 1000 };
+  const session = storage(JSON.stringify(intent));
+  assert.deepEqual(readLoginIntent(session, intent.ts + LOGIN_INTENT_TTL - 1), intent);
+  assert.notEqual(session.getItem(LOGIN_INTENT_KEY), undefined);
+  assert.equal(readLoginIntent(session, intent.ts + LOGIN_INTENT_TTL), null);
+  assert.equal(session.getItem(LOGIN_INTENT_KEY), undefined);
+});
+
+test('restricted browser storage does not break login intent handling', () => {
+  const restricted = () => { throw new Error('Storage denied'); };
+  assert.equal(readLoginIntent({ getItem: restricted }), null);
+  assert.equal(readLoginIntent({ getItem: () => 'null', removeItem: restricted }), null);
+});
+
+test('requires both implicit tokens and preserves query and fragment data for callbacks', () => {
+  assert.equal(authReturnPath(new URL('https://kakisplit.com/#access_token=fixture')), null);
+  const url = new URL('https://kakisplit.com/?error=access_denied&lang=en#error_code=denied');
+  assert.equal(authReturnPath(url), '/app/?error=access_denied&lang=en#error_code=denied');
+  assert.equal(hasAuthError(url), true);
+  assert.equal(hasAuthError(new URL('https://kakisplit.com/app/?code=fixture')), false);
+});

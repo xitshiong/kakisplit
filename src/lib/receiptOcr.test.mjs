@@ -13,6 +13,86 @@ const geminiResponse = (data, finishReason = "STOP") => new Response(JSON.string
   candidates: [{ content: { parts: [{ text: JSON.stringify(data) }] }, finishReason }],
 }));
 
+test("Gemini joins non-thought response parts and reads fenced JSON", async () => {
+  const raw = JSON.stringify(reading([line("Kopi", 1, 2.5)], 2.5));
+  const result = await scanReceipt(photo, { geminiApiKey: "parts-key" }, async () => Response.json({
+    candidates: [{ finishReason: "STOP", content: { parts: [
+      { thought: true, text: "Discard this provider metadata." },
+      { text: "```json\n" + raw.slice(0, 35) },
+      { text: raw.slice(35) + "\n```" },
+    ] } }],
+  }));
+  assert.deepEqual(result.items, [{ name: "Kopi", rawPrice: 2.5, itemTax: 0, price: 2.5 }]);
+  assert.deepEqual(result.warnings, []);
+});
+
+test("a quota error only disables the exhausted Gemini key", async () => {
+  const attempted = [];
+  const fetchReceipt = async (url, { headers }) => {
+    if (url.includes("googleapis")) {
+      const key = headers["x-goog-api-key"];
+      attempted.push(key);
+      return key === "shared-quota" ? Response.json({ error: { status: "RESOURCE_EXHAUSTED" } }) :
+        geminiResponse(reading([line("Kopi", 1, 2)], 2));
+    }
+    attempted.push("OpenRouter");
+    return response(reading([line("Tea", 1, 3)], 3));
+  };
+  const scan = geminiApiKey => scanReceipt(photo, { geminiApiKey, openRouterApiKey: "fallback" }, fetchReceipt);
+  assert.equal((await scan("shared-quota")).items[0].name, "Tea");
+  assert.equal((await scan("healthy")).items[0].name, "Kopi");
+  await scan("shared-quota");
+  assert.deepEqual(attempted, ["shared-quota", "OpenRouter", "healthy", "OpenRouter"]);
+});
+
+test("two malformed readings return a review warning rather than fabricated items", async () => {
+  const responses = [response("not JSON"), response({ items: [] })];
+  const result = await scanReceipt(photo, { openRouterApiKey: "router" }, () => responses.shift());
+  assert.equal(responses.length, 0);
+  assert.deepEqual(result.items, []);
+  assert.match(result.warnings.join(" "), /No priced items could be read/);
+});
+
+test("a service failure on retry is not swallowed if the first response was unusable", async () => {
+  const responses = [response("not JSON"), Response.json({ error: "unavailable" }, { status: 503 })];
+  await assert.rejects(
+    scanReceipt(photo, { openRouterApiKey: "router" }, () => responses.shift()),
+    /receipt service couldn't scan/,
+  );
+  assert.equal(responses.length, 0);
+});
+
+test("invalid rows trigger review while usable names and amounts are retained", () => {
+  const result = reconcileReceipt(reading([
+    line("  Iced \t lemon  tea ", 1, 3),
+    line("", 1, 4),
+    line("Invalid quantity", 0, 9),
+    line("Invalid negative line", 1, -1),
+    line("Unknown price", 1, null),
+  ], 3));
+  assert.deepEqual(result.items, [{ name: "Iced lemon tea", rawPrice: 3, itemTax: 0, price: 3 }]);
+  assert.match(result.warnings.join(" "), /Some rows may be missing/);
+});
+
+test("a large printed quantity stays on one line rather than generating hundreds of rows", () => {
+  const result = reconcileReceipt(reading([line("Catering", 120, 240)], 240));
+  assert.deepEqual(result.items, [{ name: "Catering (×120)", rawPrice: 240, itemTax: 0, price: 240 }]);
+  assert.deepEqual(result.warnings, []);
+});
+
+test("rounding spreads signed adjustments exactly without charging free items", () => {
+  const lines = [line("Drinks", 3, 10), line("Water", 1, 0)];
+  for (const [adjustment, total, prices] of [[0.11, 10.11, [337, 337, 337, 0]], [-0.11, 9.89, [329, 331, 329, 0]]]) {
+    const result = reconcileReceipt(reading(lines, total, [adjustment]));
+    assert.deepEqual(result.warnings, []);
+    assert.deepEqual(result.items.map(item => Math.round(item.price * 100)), prices);
+  }
+});
+
+test("an empty receipt batch finishes without asking the provider to read anything", async () => {
+  assert.deepEqual(await scanReceiptBatch([], () => assert.fail("unexpected read")), { items: [], warnings: [] });
+});
+
 test("Gemini success uses the direct Flash endpoint and JSON schema with inline image data", async () => {
   const result = await scanReceipt(photo, { geminiApiKey: "success-key", openRouterApiKey: "fallback" }, async (url, options) => {
     assert.equal(url, "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent");

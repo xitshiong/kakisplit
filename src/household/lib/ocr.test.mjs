@@ -1,25 +1,13 @@
-// Run with: node src/household/lib/ocr.test.mjs
-//
 // These cover the parts of the scan pipeline that decide whether a receipt is
 // trustworthy: recovering malformed model output, catching arithmetic that
 // doesn't add up, and lining up two readings so a disagreement is pinned to
 // the one line it belongs to.
 
 import assert from "node:assert/strict";
+import test from "node:test";
 import { __test, parseModelJson, verifyArithmetic } from "./ocr.js";
 
 const { alignItems, reconcile, bakeItems, normaliseReading } = __test;
-
-let passed = 0;
-function test(name, fn) {
-  try {
-    fn();
-    passed++;
-  } catch (e) {
-    console.error(`FAIL  ${name}\n      ${e.message}`);
-    process.exitCode = 1;
-  }
-}
 
 const reading = (over = {}) =>
   normaliseReading({
@@ -329,5 +317,3 @@ test("baked item totals always reach the grand total", () => {
   );
   assert.equal(baked.items.reduce((s, i) => s + i.totalCents, 0), 1060);
 });
-
-console.log(`${passed} checks passed`);
