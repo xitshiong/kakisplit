@@ -2281,14 +2281,8 @@ function HostView({ onHome, currency, user, profile }) {
   const [err, setErr] = useState("");
   const [drag, setDrag] = useState(false);
   const [items, setItems] = useState([]);
-  const [qrImg, setQrImg] = useState(null);
-
-  // Pre-fill QR from profile if it exists
-  useEffect(() => {
-    if (profile?.qr_url && !qrImg) {
-      setQrImg(profile.qr_url);
-    }
-  }, [profile, qrImg]);
+  const [qrOverride, setQrOverride] = useState(undefined);
+  const qrImg = qrOverride === undefined ? profile?.qr_url : qrOverride;
   const [code, setCode] = useState("");
   const [paidMap, setPaidMap] = useState({});
   const [tableSelections, setTableSelections] = useState({});
@@ -2343,7 +2337,7 @@ function HostView({ onHome, currency, user, profile }) {
     if (!file) return;
     setErr("");
     try {
-      setQrImg(await readPaymentQr(file));
+      setQrOverride(await readPaymentQr(file));
     } catch {
       setErr("Couldn’t read this QR image. Choose another image and try again.");
     }
@@ -2611,7 +2605,7 @@ function HostView({ onHome, currency, user, profile }) {
           ) : (
             <>
               <img src={qrImg} className="qr-preview" alt="Payment QR code" />
-              <button className="btn btn-outline" onClick={() => setQrImg(null)} style={{ marginBottom: 14 }}>Change QR</button>
+              <button className="btn btn-outline" onClick={() => setQrOverride(null)} style={{ marginBottom: 14 }}>Change QR</button>
             </>
           )}
           <div style={{ marginTop: 16 }}>
@@ -2626,7 +2620,7 @@ function HostView({ onHome, currency, user, profile }) {
         {step === 4 && <div className="section">
           <TableOverview code={code} tableName={tableName} tableDate={tableDate}
             items={items} paidMap={paidMap} selections={tableSelections} currency={currency} />
-          <button className="btn btn-outline" style={{ marginTop: 16 }} onClick={() => { setStep(0); setReceipts([]); setItems([]); setQrImg(null); setCode(""); }}>
+          <button className="btn btn-outline" style={{ marginTop: 16 }} onClick={() => { setStep(0); setReceipts([]); setItems([]); setQrOverride(undefined); setCode(""); }}>
             🔄 Start new table
           </button>
         </div>}

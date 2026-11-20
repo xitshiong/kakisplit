@@ -40,3 +40,25 @@ test('table dates use readable local calendar dates', () => {
   assert.equal(formatTableDate('2026-11-20'), '20 Nov 2026');
   assert.equal(formatTableDate(''), '');
 });
+
+test('positive selections do not count as payments and invalid names are excluded', () => {
+  const value = paymentBreakdown(15, { payers: [], total: 2 }, [null, '', 3, '   ', 'Ali', 'Ali']);
+  assert.deepEqual(value.owing, ['Ali']);
+  assert.equal(value.unnamedShares, 1);
+  assert.equal(value.paidCents, 0);
+  assert.equal(value.complete, false);
+});
+
+test('a partially paid item shows the remaining unnamed shares without going negative', () => {
+  const selections = ['Ali', 'Mei', 'Jo', 'Ana'];
+  const value = paymentBreakdown(15, { payers: ['Ali'], total: 2 }, selections);
+  assert.equal(value.paidCents, 750);
+  assert.equal(value.unnamedShares, 0);
+  assert.equal(value.complete, false);
+});
+
+test('saved tables survive inaccessible storage and dates do not display Invalid Date', () => {
+  assert.deepEqual(savedTables({ getItem: () => { throw new Error('denied'); } }), []);
+  assert.equal(formatTableDate('unknown'), 'unknown');
+  assert.equal(localDate(new Date(2027, 0, 4, 23, 35)), '2027-01-04');
+});
