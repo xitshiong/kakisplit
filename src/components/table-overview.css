@@ -1,5 +1,5 @@
-.table-heading { font-size: clamp(2.6rem, 12vw, 3.25rem); line-height: 1; text-align: center; overflow-wrap: anywhere; }
-.table-date { margin-block: 12px 24px; font-size: 1.05rem; line-height: 1.5; text-align: center; }
+.app .table-heading { font-size: clamp(2.6rem, 12vw, 3.25rem); line-height: 1; text-align: center; overflow-wrap: anywhere; }
+.app .table-date { margin-block: 12px 24px; font-size: 1.05rem; line-height: 1.5; text-align: center; }
 .table-join-qr { display: grid; place-items: center; width: 212px; max-width: 100%; padding: 16px; margin: 14px auto; border-radius: 14px; background: white; }
 .table-join-qr svg { display: block; width: 100%; height: auto; }
 .table-summary { margin-top: 24px; padding-top: 20px; border-top: 1px dashed var(--ink-faint); }
