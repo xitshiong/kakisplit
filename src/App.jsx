@@ -3,6 +3,9 @@ import { QRCodeSVG } from "qrcode.react";
 import { createClient } from "@supabase/supabase-js";
 import { Analytics } from "@vercel/analytics/react"
 import { scanReceipt, scanReceiptBatch } from "./lib/receiptOcr.js";
+import ReceiptItemEditor from "./components/ReceiptItemEditor.jsx";
+import ShareTableLink from "./components/ShareTableLink.jsx";
+import { reviewReceiptItems } from "./lib/receiptReview.mjs";
 
 const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL,
@@ -2103,7 +2106,6 @@ function HostView({ onHome, currency, user, profile }) {
     }
   }, [profile, qrImg]);
   const [code, setCode] = useState("");
-  const [copied, setCopied] = useState(false);
   const [paidMap, setPaidMap] = useState({});
   const fileRef = useRef();
   const qrRef = useRef();
@@ -2206,6 +2208,7 @@ function HostView({ onHome, currency, user, profile }) {
   const [finalising, setFinalising] = useState(false);
   const finalise = async () => {
     if (finalising) return;
+    if (!reviewReceiptItems(items).valid) { setStep(2); return; }
     setFinalising(true);
     setErr("");
     try {
@@ -2294,7 +2297,7 @@ function HostView({ onHome, currency, user, profile }) {
   };
 
   const url = code ? `${window.location.origin}${window.location.pathname}?table=${code}` : "";
-  const subtotal = (items || []).reduce((s, i) => s + parseFloat(i?.price || 0), 0) || 0;
+  const subtotal = reviewReceiptItems(items).total;
   const upd = (id, f, v) => setItems(its => its.map(it => it.id === id ? { ...it, [f]: v } : it));
   const busy = loading || preparing;
   const scanNotices = receipts.map((receipt, index) => {
@@ -2403,64 +2406,14 @@ function HostView({ onHome, currency, user, profile }) {
         </div>}
 
         {/* STEP 2 - CHECK ITEMS */}
-        {step === 2 && <div className="section">
-          <div className="section-head">Check items</div>
-          <div className="section-sub">Review items from all receipts</div>
-          {scanNotices}
-
-          {receipts.map((receipt, idx) => {
-            const receiptItems = items.filter(it => it.receiptId === receipt.id);
-            if (receiptItems.length === 0) return null;
-            return (
-              <div key={receipt.id} style={{ marginBottom: 32, border: "1px solid var(--paper-dark)", borderRadius: 8, overflow: "hidden" }}>
-                <div style={{ background: "var(--paper-dark)", padding: "12px 16px", display: "flex", alignItems: "center", gap: 12 }}>
-                  <img src={receipt.img} style={{ width: 40, height: 54, objectFit: "cover", borderRadius: 2 }} />
-                  <div>
-                    <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--ink)" }}>Receipt #{idx + 1}</div>
-                    <div style={{ fontSize: "0.6rem", color: "var(--ink-faint)", textTransform: "uppercase" }}>{receiptItems.length} items</div>
-                  </div>
-                </div>
-                <div style={{ padding: "0 16px" }}>
-                  {receiptItems.map(it => (
-                    <div key={it.id} className="line-item">
-                      <input className="item-name-in" value={it.name} onChange={e => upd(it.id, "name", e.target.value)} />
-                      <span className="rm-tag">{currency}</span>
-                      <input className="item-price-in" type="number" step="0.01" value={it.price} onChange={e => upd(it.id, "price", e.target.value)} />
-                      <button className="del-btn" onClick={() => deleteItem(it.id)}>×</button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-
-          {items.filter(it => !it.receiptId).length > 0 && (
-            <div style={{ marginBottom: 32 }}>
-              <div style={{ fontSize: "0.65rem", color: "var(--ink-faint)", letterSpacing: 1, textTransform: "uppercase", marginBottom: 8, paddingLeft: 8 }}>Manual Items</div>
-              {items.filter(it => !it.receiptId).map(it => (
-                <div key={it.id} className="line-item">
-                  <input className="item-name-in" value={it.name} onChange={e => upd(it.id, "name", e.target.value)} />
-                  <span className="rm-tag">{currency}</span>
-                  <input className="item-price-in" type="number" step="0.01" value={it.price} onChange={e => upd(it.id, "price", e.target.value)} />
-                  <button className="del-btn" onClick={() => deleteItem(it.id)}>×</button>
-                </div>
-              ))}
-            </div>
-          )}
-          <button className="add-line-btn" onClick={() => setItems(its => [...its, { id: Date.now(), name: "New Item", price: 0 }])}>
-            + Add item
-          </button>
-          <div style={{ marginTop: 16 }}>
-            <div className="total-row grand">
-              <span className="total-label">TOTAL (incl. tax)</span>
-              <span className="total-val">{currency} {subtotal.toFixed(2)}</span>
-            </div>
-          </div>
-          <div style={{ marginTop: 20 }}>
-            <button className="btn btn-ink" disabled={items.length === 0} onClick={() => setStep(3)}>Next: Payment QR →</button>
-            <button className="btn btn-outline" onClick={() => setStep(0)}>← Back</button>
-          </div>
-        </div>}
+        {step === 2 && <ReceiptItemEditor items={items} receipts={receipts} currency={currency}
+          notices={scanNotices} onUpdate={upd} onDelete={deleteItem}
+          onAdd={() => {
+            const id = crypto.randomUUID();
+            setItems(its => [...its, { id, name: "", price: "" }]);
+            return id;
+          }}
+          onNext={() => setStep(3)} onBack={() => setStep(1)} />}
 
         {/* STEP 3 - QR */}
         {step === 3 && <div className="section">
@@ -2498,11 +2451,9 @@ function HostView({ onHome, currency, user, profile }) {
             <div style={{ background: "white", padding: 16, borderRadius: 4, display: "inline-block", margin: "14px 0" }}>
               <QRCodeSVG value={url} size={180} />
             </div>
-            <div className="share-hint">Tap to copy • Share to WhatsApp / Telegram</div>
+            <div className="share-hint">Scan to join, or copy the table link below</div>
           </div>
-          <button className="btn btn-ink" onClick={() => { navigator.clipboard.writeText(url); setCopied(true); setTimeout(() => setCopied(false), 2000); }}>
-            {copied ? "✓ Copied!" : "📋 Copy Link"}
-          </button>
+          <ShareTableLink url={url} />
           <div style={{ marginTop: 16, borderTop: "1px dashed var(--ink-faint)", paddingTop: 16 }}>
             <div style={{ fontSize: "0.7rem", color: "var(--ink-faint)", letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <span>Bill Summary</span>
@@ -2529,7 +2480,7 @@ function HostView({ onHome, currency, user, profile }) {
               <span className="bill-summary-val">{currency} {subtotal.toFixed(2)}</span>
             </div>
           </div>
-          <button className="btn btn-outline" style={{ marginTop: 16 }} onClick={() => { setStep(0); setReceipts([]); setItems([]); setQrImg(null); setCode(""); setCopied(false); }}>
+          <button className="btn btn-outline" style={{ marginTop: 16 }} onClick={() => { setStep(0); setReceipts([]); setItems([]); setQrImg(null); setCode(""); }}>
             🔄 Start new table
           </button>
         </div>}
