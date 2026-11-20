@@ -25,6 +25,7 @@ test('part-paid amounts and known owing names match the guest shares', () => {
   assert.deepEqual(paymentBreakdown(12, undefined, null).owing, []);
   assert.equal(paymentBreakdown(10, { payers: ['Ali', 'Mei'], total: 3 }).paidCents, 666);
   assert.equal(paymentBreakdown(10, { payers: ['Ali', 'Mei', 'Jo'], total: 3 }).paidCents, 1000);
+  assert.equal(paymentBreakdown('10.01', { payers: ['Ali'], total: 2 }).paidCents, 500);
 });
 
 test('saved table corruption does not break home', () => {
