@@ -8,6 +8,7 @@ import TableOverview from "./components/TableOverview.jsx";
 import { reviewReceiptItems } from "./lib/receiptReview.mjs";
 import { savedTables, localDate, formatTableDate } from "./lib/tableUi.mjs";
 import { savePaidWithClient } from "./lib/paidWrite.mjs";
+import { prepareQrForSave, readPaymentQr } from "./lib/paymentQr.mjs";
 
 const callbackFailed = hasAuthError(new URL(window.location.href));
 
@@ -1841,53 +1842,6 @@ async function prepareReceiptImage(file) {
   }
 }
 
-async function readPaymentQr(file) {
-  if (!file?.type.startsWith("image/")) throw new Error("Choose an image of your payment QR code.");
-  const source = URL.createObjectURL(file);
-  try {
-    const image = new Image();
-    image.src = source;
-    await image.decode();
-    const scale = Math.min(1, 400 / Math.max(image.width, image.height));
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.max(1, Math.round(image.width * scale));
-    canvas.height = Math.max(1, Math.round(image.height * scale));
-    const context = canvas.getContext("2d");
-    context.fillStyle = "#fff";
-    context.fillRect(0, 0, canvas.width, canvas.height);
-    context.drawImage(image, 0, 0, canvas.width, canvas.height);
-    return canvas.toDataURL("image/jpeg", 0.7);
-  } finally {
-    URL.revokeObjectURL(source);
-  }
-}
-
-function prepareQrForSave(qr) {
-  if (!qr) return Promise.resolve(null);
-  if (!qr.startsWith("data:")) return Promise.resolve(qr);
-  if (qr.length < 80000) return Promise.resolve(qr);
-
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.onload = () => {
-      const compress = (max, quality) => {
-        const scale = Math.min(1, max / Math.max(img.width, img.height));
-        const canvas = document.createElement("canvas");
-        canvas.width = Math.max(1, Math.round(img.width * scale));
-        canvas.height = Math.max(1, Math.round(img.height * scale));
-        canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
-        return canvas.toDataURL("image/jpeg", quality);
-      };
-      let result = compress(320, 0.65);
-      if (result.length > 80000) result = compress(240, 0.5);
-      if (result.length > 80000) result = compress(180, 0.4);
-      resolve(result);
-    };
-    img.onerror = () => resolve(qr);
-    img.src = qr;
-  });
-}
-
 async function save(d) {
   const { error } = await supabase.from("sessions").upsert({
     code: d.code,
@@ -2134,7 +2088,7 @@ function GuestView({ session, onBack, currency }) {
       </div>
 
       <div style={{ padding: "30px 24px", display: "flex", justifyContent: "center", background: "white", borderBottom: "1px dashed var(--ink-faint)" }}>
-        <img src={qrImage} alt="Host's payment QR code" style={{ width: "100%", maxWidth: "340px", height: "auto", objectFit: "contain", borderRadius: 8 }} />
+        <img src={qrImage} alt="Host's payment QR code" style={{ maxWidth: "min(100%, 340px)", height: "auto", alignSelf: "center" }} />
       </div>
 
       <div style={{ padding: "24px" }}>
@@ -2316,7 +2270,7 @@ function HostView({ onHome, currency, user, profile }) {
     try {
       setQrImg(await readPaymentQr(file));
     } catch {
-      setErr("Couldn’t read this QR image. Choose another image and try again.");
+      setErr("Couldn’t use this QR image. Upload a clear image cropped around the QR code.");
     }
   };
 
@@ -2680,7 +2634,7 @@ function ProfileView({ onHome, user, profile, setProfile, onLogout }) {
       setProfile(previous => ({ ...previous, qr_url: image }));
 
     } catch {
-      setQrError("Couldn’t save your payment QR. Check your connection or choose another image, then try again.");
+      setQrError("Couldn’t save your payment QR. Check your connection or upload a clear image cropped around the QR code.");
     } finally {
       setUploading(false);
       if (fileRef.current) fileRef.current.value = "";
@@ -2937,7 +2891,7 @@ function QROnboarding({ onSkip, user, profile, setProfile }) {
       setProfile(previous => ({ ...previous, qr_url: image }));
       onSkip();
     } catch {
-      setQrError("Couldn’t save your payment QR. Check your connection or choose another image, then try again.");
+      setQrError("Couldn’t save your payment QR. Check your connection or upload a clear image cropped around the QR code.");
     } finally {
       setUploading(false);
       if (fileRef.current) fileRef.current.value = "";
