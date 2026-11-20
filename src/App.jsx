@@ -2283,12 +2283,11 @@ function HostView({ onHome, currency, user, profile }) {
   const [items, setItems] = useState([]);
   const [qrImg, setQrImg] = useState(null);
 
-  // Pre-fill QR from profile if it exists
   useEffect(() => {
-    if (profile?.qr_url && !qrImg) {
-      setQrImg(profile.qr_url);
+    if (profile?.qr_url) {
+      setQrImg(current => current || profile.qr_url);
     }
-  }, [profile, qrImg]);
+  }, [profile?.qr_url]);
   const [code, setCode] = useState("");
   const [paidMap, setPaidMap] = useState({});
   const [tableSelections, setTableSelections] = useState({});
@@ -2626,7 +2625,7 @@ function HostView({ onHome, currency, user, profile }) {
         {step === 4 && <div className="section">
           <TableOverview code={code} tableName={tableName} tableDate={tableDate}
             items={items} paidMap={paidMap} selections={tableSelections} currency={currency} />
-          <button className="btn btn-outline" style={{ marginTop: 16 }} onClick={() => { setStep(0); setReceipts([]); setItems([]); setQrImg(null); setCode(""); }}>
+          <button className="btn btn-outline" style={{ marginTop: 16 }} onClick={() => { setStep(0); setReceipts([]); setItems([]); setQrImg(profile?.qr_url || null); setCode(""); }}>
             🔄 Start new table
           </button>
         </div>}
