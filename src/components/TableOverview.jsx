@@ -61,7 +61,7 @@ export default function TableOverview({ code, tableName, tableDate, items, paidM
         ))}
         <div className="bill-summary-row highlight table-summary-total">
           <span>Total</span>
-          <span className="bill-summary-val">{currency} {total.toFixed(2)}</span>
+          <span className="bill-summary-val">{money(Math.round(total * 100))}</span>
         </div>
       </section>
     </>
