@@ -2493,7 +2493,7 @@ function GuestCode({ onJoin, onBack }) {
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
   const tryJoin = async () => {
-    if (loading || !/^\\d{4}$/.test(code)) return;
+    if (loading || !/^\d{4}$/.test(code)) return;
     setLoading(true);
     setErr("");
     try {
