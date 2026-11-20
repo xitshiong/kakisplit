@@ -533,7 +533,6 @@ function InfoPage() {
           .hero-pitch { width: min(100%, 460px); }
           .hero-title { font-size: clamp(4.65rem, 19vw, 7rem); margin-bottom: 24px; }
           .hero-title-line.bills, .hero-title-line.lah { display: inline; }
-          .hero-title-line.lah::before { content: ' '; white-space: pre; font-size: 0.3em; }
           .hero-copy { max-width: 36ch; margin-bottom: 26px; }
           .btn-primary { width: min(100%, 360px); margin-bottom: 32px; }
           .hero-copy { margin-inline: auto; }
@@ -576,7 +575,7 @@ function InfoPage() {
               <p className="hero-kicker">Malaysian bill splitting, done right</p>
               <h1 className="hero-title" id="hero-title">
                 <span className="hero-title-line split">Split</span>
-                <span className="hero-title-line bills">Bills</span>
+                <span className="hero-title-line bills">Bills</span>{' '}
                 <span className="hero-title-line lah">Lah.</span>
               </h1>
 
