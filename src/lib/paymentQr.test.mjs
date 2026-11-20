@@ -16,6 +16,7 @@ function mockCanvas(t, { width = 960, height = 840, decodeError, encode }) {
   };
   const canvas = {
     getContext: () => context,
+    get width() { return this.bitmapWidth; },
     set width(value) {
       this.bitmapWidth = value;
       drawing = [];
