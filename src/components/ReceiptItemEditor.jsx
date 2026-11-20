@@ -27,12 +27,6 @@ function ItemRow({ item, index, currency, error, showErrors, autoFocus, onUpdate
           onChange={event => onUpdate(item.id, 'price', event.target.value)}
           onBlur={() => setTouched(value => ({ ...value, price: true }))} />
         {priceError && <p id={`${id}-price-error`} className="field-error">{priceError}</p>}
-        <button type="button" className="discount-toggle"
-          disabled={!Number.isFinite(Number(item.price)) || Number(item.price) === 0}
-          aria-label={`${Number(item.price) < 0 ? 'Make charge' : 'Make discount'} for ${item.name || `item ${index + 1}`}`}
-          onClick={() => onUpdate(item.id, 'price', String(-Number(item.price)))}>
-          {Number(item.price) < 0 ? 'Make charge' : 'Make discount'}
-        </button>
       </div>
       <button type="button" className="del-btn" aria-label={`Remove ${item.name || `item ${index + 1}`}`}
         onClick={() => onDelete(item.id)}>×</button>
@@ -67,7 +61,7 @@ export default function ReceiptItemEditor({ items, receipts, currency, notices, 
   return (
     <form className="section receipt-editor" noValidate onSubmit={submit}>
       <h2 className="section-head">Check items</h2>
-      <p className="section-sub">Edit each name and line total. Include tax or service charges as separate items. For a discount, enter the amount, then tap Make discount.</p>
+      <p className="section-sub">Edit each name and line total. Include tax or service charges as separate items.</p>
       {notices}
       {!items.length && <div className="editor-empty">
         <strong>No items yet</strong>
