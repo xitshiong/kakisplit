@@ -1,4 +1,5 @@
 .receipt-demo {
+  --demo-duration: 18s;
   width: 100%;
   max-width: 480px;
   margin: 0;
@@ -33,7 +34,7 @@
   transform-origin: 50% 60%;
 }
 
-.demo-paper { animation: receipt-paper 9s infinite both; }
+.demo-paper { animation: receipt-paper var(--demo-duration) infinite both; }
 .demo-paper img { position: absolute; width: 150%; max-width: none; height: auto; left: -25%; top: -9%; filter: drop-shadow(0 18px 16px rgba(0, 0, 0, 0.3)); }
 .demo-digital {
   color: var(--receipt-ink);
@@ -41,7 +42,7 @@
   padding: 20px;
   border-radius: 12px 12px 0 0;
   box-shadow: 0 22px 60px rgba(0, 0, 0, 0.3);
-  animation: receipt-digital 9s infinite both;
+  animation: receipt-digital var(--demo-duration) infinite both;
 }
 .demo-digital::after {
   content: '';
@@ -60,11 +61,17 @@
 .demo-table > span { display: block; font-size: 0.55rem; color: #6e5a46; margin-bottom: 7px; }
 .demo-table > strong { display: block; font-family: 'Barlow Condensed', sans-serif; font-size: 2rem; line-height: 0.85; text-transform: uppercase; letter-spacing: -0.02em; }
 .demo-items-label { display: flex; justify-content: space-between; border-block: 1px dashed #b7a997; padding-block: 7px; font-size: 0.55rem; }
-.demo-item { display: flex; align-items: center; gap: 8px; min-height: 42px; border-bottom: 1px solid #e6ddcf; animation: receipt-item 9s infinite both; }
-.demo-item-check { display: grid; place-items: center; flex-shrink: 0; width: 19px; height: 19px; background: var(--lime); color: var(--ink); border-radius: 5px; font-size: 0.65rem; }
+.demo-selection { position: relative; }
+.demo-item { position: relative; display: flex; align-items: center; gap: 8px; min-height: 42px; border-bottom: 1px solid #e6ddcf; animation: receipt-item var(--demo-duration) infinite both; }
+.demo-item-check { display: grid; place-items: center; flex-shrink: 0; width: 19px; height: 19px; border: 1px solid #b7a997; color: var(--ink); border-radius: 5px; font-size: 0.65rem; }
+.demo-item-check > span { display: grid; place-items: center; width: 19px; height: 19px; border-radius: inherit; background: var(--lime); animation: receipt-claimed var(--demo-duration) var(--claim-delay) infinite both; }
 .demo-item > div { flex: 1; min-width: 0; }
 .demo-item strong { display: block; font-size: 0.62rem; font-weight: 500; }
 .demo-item div > span { display: block; margin-top: 3px; color: #79634f; font-size: 0.5rem; }
+.demo-item-description { position: relative; height: 12px; }
+.demo-item-detail, .demo-item-owner { position: absolute; inset: 0; }
+.demo-item-detail { animation: receipt-detail var(--demo-duration) var(--claim-delay) infinite both; }
+.demo-item-owner { color: var(--receipt-ink); animation: receipt-claimed var(--demo-duration) var(--claim-delay) infinite both; }
 .demo-item b { font-size: 0.64rem; font-weight: 500; font-variant-numeric: tabular-nums; }
 .demo-item-1 { animation-name: receipt-item-two; }
 .demo-item-2 { animation-name: receipt-item-three; }
@@ -74,19 +81,32 @@
 .demo-total > span { font-size: 0.6rem; }
 .demo-total > strong { font-family: 'Barlow Condensed', sans-serif; color: var(--pink); font-size: 1.8rem; line-height: 1; }
 .demo-total small { font-family: 'DM Mono', monospace; font-size: 0.65rem; }
-.demo-share { display: flex; justify-content: space-between; background: var(--ink); color: var(--lime); font-size: 0.6rem; border-radius: 999px; padding: 11px 14px; margin-top: 12px; }
+.demo-share { position: relative; height: 36px; background: var(--ink); color: var(--lime); font-size: 0.6rem; border-radius: 999px; margin-top: 12px; }
+.demo-share > span { position: absolute; inset: 0; display: flex; align-items: center; justify-content: space-between; padding: 0 14px; }
+.demo-share-pick { animation: receipt-share-pick var(--demo-duration) infinite both; }
+.demo-share-pay { animation: receipt-share-pay var(--demo-duration) infinite both; }
+
+.demo-person-pink { --person-color: var(--pink); --person-ink: var(--paper); }
+.demo-person-cyan { --person-color: var(--cyan); --person-ink: var(--ink); }
+.demo-person-lime { --person-color: var(--lime); --person-ink: var(--ink); }
+.demo-cursors { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.demo-cursor { position: absolute; top: 18px; left: 8px; width: 0; height: 100%; display: block; color: var(--person-color); transform-origin: 2px 2px; animation: receipt-cursor-dylan var(--demo-duration) cubic-bezier(0.45, 0, 0.55, 1) infinite both; }
+.demo-cursor.demo-person-cyan { animation-name: receipt-cursor-charles; }
+.demo-cursor.demo-person-lime { animation-name: receipt-cursor-stefan; }
+.demo-cursor svg { display: block; overflow: visible; }
+.demo-cursor > span { position: absolute; top: -18px; left: 12px; padding: 3px 6px; border-radius: 6px 6px 6px 2px; background: var(--person-color); color: var(--person-ink); font-size: 0.55rem; line-height: 1.2; box-shadow: 0 2px 5px rgba(0, 0, 0, 0.12); }
 
 .demo-scan-track { position: absolute; width: 314px; height: 448px; top: 28px; left: calc(50% - 157px); pointer-events: none; }
-.demo-scan-line { position: absolute; top: 0; width: 100%; height: 2px; background: var(--lime); box-shadow: 0 0 16px rgba(166, 255, 0, 0.65); animation: receipt-scan 9s infinite both; }
+.demo-scan-line { position: absolute; top: 0; width: 100%; height: 2px; background: var(--lime); box-shadow: 0 0 16px rgba(166, 255, 0, 0.65); animation: receipt-scan var(--demo-duration) infinite both; }
 .demo-scan-line::after { content: ''; position: absolute; height: 28px; bottom: 100%; width: 100%; background: linear-gradient(transparent, rgba(166, 255, 0, 0.13)); }
 .demo-scan-line > span { position: absolute; right: 0; bottom: 6px; padding: 5px 7px; font-size: 0.5rem; color: var(--ink); background: var(--lime); }
-.demo-stamp { position: absolute; right: 18px; bottom: 46px; padding: 10px 14px; font-size: 0.65rem; line-height: 1.5; color: var(--ink); background: var(--lime); transform: rotate(-8deg); box-shadow: 3px 4px 0 var(--ink); animation: receipt-stamp 9s infinite both; }
-.demo-stamp strong { font-weight: 500; }
 .demo-stage-labels { position: absolute; bottom: 8px; inset-inline: 0; height: 18px; text-align: center; color: var(--lime-soft); font-size: 0.6rem; }
 .demo-stage-labels > span { position: absolute; inset: 0; }
-.demo-label-paper { animation: receipt-label-paper 9s infinite both; }
-.demo-label-scan { animation: receipt-label-scan 9s infinite both; }
-.demo-label-digital { animation: receipt-label-digital 9s infinite both; }
+.demo-label-paper { animation: receipt-label-paper var(--demo-duration) infinite both; }
+.demo-label-scan { animation: receipt-label-scan var(--demo-duration) infinite both; }
+.demo-label-digital { animation: receipt-label-digital var(--demo-duration) infinite both; }
+.demo-label-pick { animation: receipt-label-pick var(--demo-duration) infinite both; }
+.demo-label-pay { animation: receipt-label-pay var(--demo-duration) infinite both; }
 .receipt-demo figcaption { margin-top: 12px; text-align: center; font-size: 0.72rem; line-height: 1.75; }
 .receipt-demo figcaption > span { color: var(--paper-muted); font-size: 0.63rem; }
 .demo-controls { display: flex; justify-content: center; gap: 10px; margin-top: 12px; }
@@ -98,31 +118,81 @@
 .demo-scene[data-running='false'] *, .demo-scene[data-running='false'] *::after { animation-play-state: paused !important; }
 
 @keyframes receipt-paper {
-  0%, 14% { opacity: 1; transform: rotate(-7deg) translateY(5px); }
-  23% { opacity: 1; transform: rotate(0) translateY(0); }
-  48%, 88% { opacity: 0; transform: rotate(0) translateY(0); }
-  97%, 100% { opacity: 1; transform: rotate(-7deg) translateY(5px); }
+  0%, 8% { opacity: 1; transform: rotate(-7deg) translateY(5px); }
+  13% { opacity: 1; transform: rotate(0) translateY(0); }
+  30%, 95% { opacity: 0; transform: rotate(0) translateY(0); }
+  99%, 100% { opacity: 1; transform: rotate(-7deg) translateY(5px); }
 }
 @keyframes receipt-digital {
-  0%, 20% { opacity: 0; clip-path: inset(0 0 100% 0); transform: translateY(0); }
-  23% { opacity: 1; clip-path: inset(0 0 100% 0); }
-  50%, 85% { opacity: 1; clip-path: inset(0 0 -10px 0); transform: translateY(0); }
-  92%, 100% { opacity: 0; clip-path: inset(0 0 -10px 0); transform: translateY(-8px); }
+  0%, 11% { opacity: 0; clip-path: inset(0 0 100% 0); transform: translateY(0); }
+  13% { opacity: 1; clip-path: inset(0 0 100% 0); }
+  30%, 32% { opacity: 1; clip-path: inset(0); transform: translateY(0); }
+  35%, 94% { opacity: 1; clip-path: inset(0 0 -45px 0); transform: translateY(0); }
+  98%, 100% { opacity: 0; clip-path: inset(0 0 -45px 0); transform: translateY(-8px); }
 }
 @keyframes receipt-scan {
-  0%, 20% { opacity: 0; transform: translateY(0); }
-  23% { opacity: 1; transform: translateY(0); }
-  50% { opacity: 1; transform: translateY(448px); }
-  53%, 100% { opacity: 0; transform: translateY(448px); }
+  0%, 11% { opacity: 0; transform: translateY(0); }
+  13% { opacity: 1; transform: translateY(0); }
+  30% { opacity: 1; transform: translateY(448px); }
+  33%, 100% { opacity: 0; transform: translateY(448px); }
 }
-@keyframes receipt-item { 0%, 30% { opacity: 0; transform: translateY(8px); } 36%, 100% { opacity: 1; transform: translateY(0); } }
-@keyframes receipt-item-two { 0%, 33% { opacity: 0; transform: translateY(8px); } 39%, 100% { opacity: 1; transform: translateY(0); } }
-@keyframes receipt-item-three { 0%, 36% { opacity: 0; transform: translateY(8px); } 42%, 100% { opacity: 1; transform: translateY(0); } }
-@keyframes receipt-item-four { 0%, 39% { opacity: 0; transform: translateY(8px); } 45%, 100% { opacity: 1; transform: translateY(0); } }
-@keyframes receipt-stamp { 0%, 49% { opacity: 0; transform: rotate(-12deg) scale(1.15); } 55%, 85% { opacity: 1; transform: rotate(-8deg) scale(1); } 91%, 100% { opacity: 0; transform: rotate(-8deg) scale(1); } }
-@keyframes receipt-label-paper { 0%, 18% { opacity: 1; } 23%, 93% { opacity: 0; } 98%, 100% { opacity: 1; } }
-@keyframes receipt-label-scan { 0%, 19% { opacity: 0; } 24%, 48% { opacity: 1; } 53%, 100% { opacity: 0; } }
-@keyframes receipt-label-digital { 0%, 49% { opacity: 0; } 54%, 85% { opacity: 1; } 91%, 100% { opacity: 0; } }
+@keyframes receipt-item { 0%, 18% { opacity: 0; transform: translateY(8px); } 22%, 100% { opacity: 1; transform: translateY(0); } }
+@keyframes receipt-item-two { 0%, 20% { opacity: 0; transform: translateY(8px); } 24%, 100% { opacity: 1; transform: translateY(0); } }
+@keyframes receipt-item-three { 0%, 22% { opacity: 0; transform: translateY(8px); } 26%, 100% { opacity: 1; transform: translateY(0); } }
+@keyframes receipt-item-four { 0%, 24% { opacity: 0; transform: translateY(8px); } 28%, 100% { opacity: 1; transform: translateY(0); } }
+@keyframes receipt-claimed { 0%, 44% { opacity: 0; transform: scale(0.8); } 46%, 94% { opacity: 1; transform: scale(1); } 97%, 100% { opacity: 0; transform: scale(1); } }
+@keyframes receipt-detail { 0%, 44% { opacity: 1; } 46%, 94% { opacity: 0; } 97%, 100% { opacity: 1; } }
+@keyframes receipt-cursor-dylan {
+  0%, 32% { opacity: 0; transform: translate(160px, 60px); }
+  35% { opacity: 1; transform: translate(160px, 60px); }
+  40% { opacity: 1; transform: translate(75px, 30px); }
+  44% { opacity: 1; transform: translate(0, 0) scale(1); }
+  45% { opacity: 1; transform: translate(0, 0) scale(0.8); }
+  46% { opacity: 1; transform: translate(0, 0) scale(1); }
+  52% { opacity: 1; transform: translate(120px, 85px); }
+  58% { opacity: 1; transform: translate(0, 126px) scale(1); }
+  59% { opacity: 1; transform: translate(0, 126px) scale(0.8); }
+  60% { opacity: 1; transform: translate(0, 126px) scale(1); }
+  65% { opacity: 1; transform: translate(10px, 170px); }
+  71% { opacity: 1; transform: translate(10px, calc(100% - 36px)) scale(1); }
+  72% { opacity: 1; transform: translate(10px, calc(100% - 36px)) scale(0.8); }
+  73%, 100% { opacity: 0; transform: translate(10px, calc(100% - 36px)) scale(1); }
+}
+@keyframes receipt-cursor-charles {
+  0%, 32% { opacity: 0; transform: translate(45px, 120px); }
+  35% { opacity: 1; transform: translate(45px, 120px); }
+  42% { opacity: 1; transform: translate(125px, 95px); }
+  49% { opacity: 1; transform: translate(0, 42px) scale(1); }
+  50% { opacity: 1; transform: translate(0, 42px) scale(0.8); }
+  51% { opacity: 1; transform: translate(0, 42px) scale(1); }
+  59% { opacity: 1; transform: translate(85px, 155px); }
+  65% { opacity: 1; transform: translate(70px, 190px); }
+  75% { opacity: 1; transform: translate(90px, calc(100% - 36px)) scale(1); }
+  76% { opacity: 1; transform: translate(90px, calc(100% - 36px)) scale(0.8); }
+  77%, 100% { opacity: 0; transform: translate(90px, calc(100% - 36px)) scale(1); }
+}
+@keyframes receipt-cursor-stefan {
+  0%, 32% { opacity: 0; transform: translate(165px, 145px); }
+  35% { opacity: 1; transform: translate(165px, 145px); }
+  43% { opacity: 1; transform: translate(105px, 120px); }
+  50% { opacity: 1; transform: translate(55px, 65px); }
+  54% { opacity: 1; transform: translate(0, 84px) scale(1); }
+  55% { opacity: 1; transform: translate(0, 84px) scale(0.8); }
+  56% { opacity: 1; transform: translate(0, 84px) scale(1); }
+  61% { opacity: 1; transform: translate(90px, 120px); }
+  69% { opacity: 1; transform: translate(25px, 170px); }
+  75%, 77% { opacity: 1; transform: translate(25px, calc(100% - 36px)); }
+  83% { opacity: 1; transform: translate(170px, calc(100% - 36px)) scale(1); }
+  84% { opacity: 1; transform: translate(170px, calc(100% - 36px)) scale(0.8); }
+  85%, 100% { opacity: 0; transform: translate(170px, calc(100% - 36px)) scale(1); }
+}
+@keyframes receipt-share-pick { 0%, 59% { opacity: 1; } 62%, 100% { opacity: 0; } }
+@keyframes receipt-share-pay { 0%, 59% { opacity: 0; } 62%, 100% { opacity: 1; } }
+@keyframes receipt-label-paper { 0%, 10% { opacity: 1; } 13%, 96% { opacity: 0; } 99%, 100% { opacity: 1; } }
+@keyframes receipt-label-scan { 0%, 11% { opacity: 0; } 14%, 29% { opacity: 1; } 32%, 100% { opacity: 0; } }
+@keyframes receipt-label-digital { 0%, 30% { opacity: 0; } 33%, 38% { opacity: 1; } 41%, 100% { opacity: 0; } }
+@keyframes receipt-label-pick { 0%, 39% { opacity: 0; } 42%, 59% { opacity: 1; } 62%, 100% { opacity: 0; } }
+@keyframes receipt-label-pay { 0%, 60% { opacity: 0; } 63%, 94% { opacity: 1; } 98%, 100% { opacity: 0; } }
 
 @media (max-width: 760px) {
   .receipt-demo { max-width: 400px; }
@@ -136,8 +206,8 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .demo-scene *, .demo-scene *::after { animation: none !important; }
-  .demo-paper, .demo-scan-track, .demo-label-paper, .demo-label-scan, .demo-controls { display: none; }
-  .demo-digital, .demo-item, .demo-stamp, .demo-label-digital { opacity: 1; }
+  .demo-paper, .demo-scan-track, .demo-label-paper, .demo-label-scan, .demo-label-digital, .demo-label-pick, .demo-controls, .demo-cursors, .demo-item-detail, .demo-share-pick { display: none !important; }
+  .demo-digital, .demo-item, .demo-label-pay, .demo-item-check > span, .demo-item-owner, .demo-share-pay { opacity: 1; }
   .demo-digital { clip-path: none; }
   .demo-reduced-note { display: block; text-align: center; margin-top: 16px; font-size: 0.6rem; color: var(--paper-muted); }
 }
