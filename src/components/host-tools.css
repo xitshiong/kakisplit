@@ -1,0 +1,25 @@
+.receipt-editor .section-head { font-weight: 900; }
+.receipt-edit-group { min-width: 0; border: 0; padding: 0; margin: 24px 0; }
+.receipt-edit-group legend { font-size: .75rem; color: var(--ink-light); margin-bottom: 12px; }
+.receipt-edit-thumb { width: 44px; height: 58px; object-fit: cover; border-radius: 4px; margin-bottom: 8px; }
+.receipt-edit-row { display: grid; grid-template-columns: minmax(0, 1fr) 112px 44px; gap: 10px; align-items: start; padding: 16px 0; border-bottom: 1px dashed var(--ink-faint); }
+.receipt-edit-row label, .share-link-label { display: block; margin-bottom: 8px; color: var(--ink-light); font-size: .7rem; }
+.receipt-edit-row .name-in { width: 100%; min-width: 0; margin: 0; padding: 12px 10px; font-size: 1rem; min-height: 48px; }
+.receipt-edit-price input { text-align: right; font-variant-numeric: tabular-nums; }
+.receipt-edit-row .del-btn { margin-top: 25px; }
+.receipt-editor .field-error { font-size: .7rem; color: var(--ink-light); margin-top: 8px; line-height: 1.5; }
+.receipt-editor [aria-invalid="true"] { border: 2px solid var(--neon-pink); }
+.receipt-editor input:focus-visible, .receipt-editor button:focus-visible, .table-share input:focus-visible, .table-share button:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+.editor-empty { padding: 20px; margin-bottom: 16px; border: 1px dashed var(--ink-faint); border-radius: 14px; color: var(--ink-light); font-size: .8rem; line-height: 1.6; }
+.editor-empty strong { display: block; color: var(--ink); margin-bottom: 6px; }
+.receipt-editor .add-line-btn { width: 100%; min-height: 48px; color: var(--ink-light); }
+.editor-total { margin: 20px 0; }
+.receipt-editor .error-strip { margin-bottom: 16px; }
+.editor-help, .share-link-status { font-size: .75rem; line-height: 1.5; color: var(--ink-light); margin: 8px 0 16px; }
+.share-link-input { width: 100%; min-width: 0; font: inherit; font-size: 1rem; padding: 12px; border: 1px solid var(--ink-faint); border-radius: 14px; color: var(--ink); background: var(--paper-dark); margin-bottom: 12px; }
+@media (max-width: 380px) {
+  .receipt-edit-row { grid-template-columns: minmax(0, 1fr) 44px; }
+  .receipt-edit-name { grid-column: 1; }
+  .receipt-edit-price { grid-column: 1; }
+  .receipt-edit-row .del-btn { grid-column: 2; grid-row: 1; }
+}
