@@ -1157,10 +1157,8 @@ body {
   font-family: 'DM Mono', monospace;
   font-size: 1.3rem; font-weight: 900; line-height: 1;
   flex-shrink: 0; width: 36px; padding-top: 2px;
+  color: var(--ink);
 }
-.how-step:nth-child(1) .how-step-num { color: var(--accent-ink); }
-.how-step:nth-child(2) .how-step-num { color: var(--ink); }
-.how-step:nth-child(3) .how-step-num { color: var(--ink); background: var(--neon-cyan); }
 
 .how-step-title {
   font-family: 'DM Sans', sans-serif;
@@ -2012,7 +2010,7 @@ function GuestReceiptHeader({ session, status = "Split the bill" }) {
         <img src={LOGO_SRC} alt="KakiSplit" width="56" height="42" />
         <span className="guest-receipt-status"><span aria-hidden="true">✓</span> {status}</span>
       </div>
-      <p className="guest-receipt-meta">Table #{session.code}{session.tableDate ? ` · ${session.tableDate}` : ""}</p>
+      <p className="guest-receipt-meta">Table #{session.code}{session.tableDate ? ` · ${formatTableDate(session.tableDate)}` : ""}</p>
       <h1 className="guest-table-name">{session.tableName || "My Table"}</h1>
     </header>
   );
