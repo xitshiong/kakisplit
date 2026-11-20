@@ -2,10 +2,13 @@ import { useState, useRef, useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { Analytics } from "@vercel/analytics/react"
 import { scanReceipt, scanReceiptBatch } from "./lib/receiptOcr.js";
+import { LOGIN_INTENT_KEY, readLoginIntent, hasAuthError } from "./lib/authFlow.mjs";
 import ReceiptItemEditor from "./components/ReceiptItemEditor.jsx";
 import TableOverview from "./components/TableOverview.jsx";
 import { reviewReceiptItems } from "./lib/receiptReview.mjs";
 import { savedTables, localDate, formatTableDate } from "./lib/tableUi.mjs";
+
+const callbackFailed = hasAuthError(new URL(window.location.href));
 
 const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL,
@@ -22,10 +25,10 @@ const LOGO_SRC = "/kakisplit-logo.png";
 // ── DESIGN SYSTEM ─────────────────────────────────────────────
 // Thermal Receipt × Night Market Neon
 // Cream paper bg, dark ink type, electric neon accents
-// Fonts: Playfair Display (display) + DM Mono (body/numbers)
+// Fonts: Barlow Condensed (display), DM Sans (reading), DM Mono (data)
 
 const css = `
-@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;800;900&family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=DM+Mono:wght@400;500;600&family=Unbounded:wght@700;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;800;900&family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
 
 :root {
   --paper: #F5F0E8;
@@ -43,7 +46,7 @@ const css = `
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  font-family: 'DM Mono', monospace;
+  font-family: 'DM Sans', sans-serif;
   background: var(--ink);
   min-height: 100vh;
   overflow-x: hidden;
@@ -112,16 +115,16 @@ body {
 .user-name { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.5px; }
 .profile-hero { text-align: center; padding: 40px 20px 20px; border-bottom: 1px dashed var(--ink-faint); margin-bottom: 24px; }
 .profile-large-avatar { width: 100px; height: 100px; border-radius: 50%; border: 3px solid var(--neon-lime); margin-bottom: 16px; box-shadow: 0 8px 30px rgba(0,0,0,0.4); object-fit: cover; background: var(--paper-dark); color: transparent; }
-.profile-name { font-family: 'Unbounded', sans-serif; font-size: 1.3rem; font-weight: 900; color: var(--ink); margin-bottom: 4px; letter-spacing: -0.5px; }
+.profile-name { font-family: 'DM Mono', monospace; font-size: 1.3rem; font-weight: 900; color: var(--ink); margin-bottom: 4px; letter-spacing: -0.5px; }
 .profile-email { font-size: 0.7rem; color: var(--ink-faint); letter-spacing: 1px; text-transform: uppercase; }
 .vault-card { background: var(--paper-dark); border: 2px dashed var(--ink-faint); border-radius: 12px; padding: 24px; margin-top: 10px; }
-.vault-title { font-family: 'Unbounded', sans-serif; font-size: 0.9rem; font-weight: 800; color: var(--ink); margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+.vault-title { font-family: 'DM Mono', monospace; font-size: 0.9rem; font-weight: 800; color: var(--ink); margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
 .vault-desc { font-size: 0.68rem; color: var(--ink-light); line-height: 1.5; margin-bottom: 20px; opacity: 0.8; }
 .vault-qr-area { width: 100%; aspect-ratio: 1; border: 1.5px solid var(--ink); border-radius: 12px; overflow: hidden; position: relative; cursor: pointer; background: white; box-shadow: inset 0 2px 10px rgba(0,0,0,0.05); }
 .vault-qr-placeholder { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--ink-faint); gap: 12px; }
 .vault-qr-placeholder span { font-size: 2.5rem; filter: grayscale(1); }
 .vault-qr-preview { width: 100%; height: 100%; object-fit: contain; padding: 20px; }
-.welcome-tag { font-family: 'Playfair Display', serif; font-size: 1.2rem; font-weight: 700; color: var(--ink-light); margin-top: 16px; animation: slideUp 0.6s cubic-bezier(0.23, 1, 0.32, 1); }
+.welcome-tag { font-family: 'DM Sans', sans-serif; font-size: 1.2rem; font-weight: 700; color: var(--ink-light); margin-top: 16px; animation: slideUp 0.6s cubic-bezier(0.23, 1, 0.32, 1); }
 @keyframes slideUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
 
 /* ── HEADER ── */
@@ -229,7 +232,7 @@ body {
 .section:last-child { border-bottom: none; }
 
 .section-head {
-  font-family: 'Playfair Display', serif;
+  font-family: 'DM Sans', sans-serif;
   font-size: 1.6rem;
   font-weight: 900;
   color: var(--ink);
@@ -239,10 +242,9 @@ body {
 }
 
 .section-sub {
-  font-size: 0.75rem;
+  font-size: 0.94rem;
   color: var(--ink-faint);
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
+  line-height: 1.55;
   margin-bottom: 20px;
 }
 
@@ -269,7 +271,7 @@ body {
 .upload-emoji { font-size: 3rem; display: block; margin-bottom: 12px; }
 
 .upload-label {
-  font-family: 'Playfair Display', serif;
+  font-family: 'DM Sans', sans-serif;
   font-size: 1.2rem;
   font-weight: 700;
   color: var(--ink);
@@ -284,7 +286,7 @@ body {
 .currency-chip:hover { border-color: var(--ink); color: var(--ink); }
 .currency-chip.active { background: var(--ink); color: var(--neon-lime); border-color: var(--ink); transform: scale(1.05); font-weight: 600; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
 
-.upload-hint { font-size: 0.75rem; color: var(--ink-faint); letter-spacing: 0.5px; text-transform: uppercase; }
+.upload-hint { font-size: 0.875rem; color: var(--ink-faint); line-height: 1.5; }
 
 .preview-img {
   width: 100%;
@@ -312,7 +314,7 @@ body {
 @keyframes spin { to { transform: rotate(360deg); } }
 
 .loading-label {
-  font-family: 'Playfair Display', serif;
+  font-family: 'DM Sans', sans-serif;
   font-size: 1.1rem;
   font-style: italic;
   color: var(--ink);
@@ -327,7 +329,7 @@ body {
   border-radius: 0 4px 4px 0;
   padding: 14px 16px;
   font-size: 0.82rem;
-  color: var(--neon-pink);
+  color: var(--accent-ink);
   margin-bottom: 16px;
   line-height: 1.6;
 }
@@ -338,7 +340,7 @@ body {
   padding: 18px 20px;
   border: none;
   border-radius: 3px;
-  font-family: 'DM Mono', monospace;
+  font-family: 'DM Sans', sans-serif;
   font-size: 0.85rem;
   font-weight: 500;
   letter-spacing: 1.5px;
@@ -404,25 +406,26 @@ body {
 }
 
 .line-item.host-unselected {
-  opacity: 0.7;
+  opacity: 1;
 }
 
 .item-name-in {
   flex: 1;
-  font-family: 'DM Mono', monospace;
-  font-size: 0.9rem;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 1rem;
   color: var(--ink);
   background: transparent;
   border: none;
   outline: none;
   font-weight: 500;
   min-height: 44px;
+  min-width: 0;
   padding: 4px 0;
 }
 
 .item-price-in {
   font-family: 'DM Mono', monospace;
-  font-size: 0.9rem;
+  font-size: 1rem;
   font-weight: 500;
   color: var(--ink);
   background: rgba(26,18,8,0.06);
@@ -495,13 +498,13 @@ body {
   border-bottom: none;
 }
 .total-row.grand .total-label {
-  font-family: 'Playfair Display', serif;
+  font-family: 'DM Sans', sans-serif;
   font-size: 1.1rem;
   font-weight: 700;
   color: var(--ink);
 }
 .total-row.grand .total-val {
-  font-family: 'Playfair Display', serif;
+  font-family: 'DM Sans', sans-serif;
   font-size: 1.3rem;
   font-weight: 900;
   color: var(--ink);
@@ -558,7 +561,7 @@ body {
 }
 
 .share-code {
-  font-family: 'Unbounded', sans-serif;
+  font-family: 'DM Mono', monospace;
   font-size: 2.4rem;
   font-weight: 900;
   color: var(--neon-lime);
@@ -568,8 +571,8 @@ body {
 }
 
 .share-code-label {
-  font-size: 0.65rem;
-  color: rgba(245,240,232,0.4);
+  font-size: 0.75rem;
+  color: var(--on-dark-muted);
   letter-spacing: 3px;
   text-transform: uppercase;
 }
@@ -578,8 +581,8 @@ body {
   background: rgba(245,240,232,0.06);
   border-radius: 3px;
   padding: 14px;
-  font-size: 0.7rem;
-  color: rgba(245,240,232,0.5);
+  font-size: 0.875rem;
+  color: var(--on-dark-muted);
   word-break: break-all;
   margin: 14px 0 6px;
   cursor: pointer;
@@ -589,7 +592,7 @@ body {
   display: flex; align-items: center; justify-content: center;
 }
 .share-url-box:hover { background: rgba(245,240,232,0.1); }
-.share-hint { font-size: 0.65rem; color: rgba(245,240,232,0.3); letter-spacing: 1px; text-transform: uppercase; }
+.share-hint { font-size: 0.8rem; color: var(--on-dark-muted); line-height: 1.5; }
 
 /* ── MODE SELECT ── */
 .mode-grid { display: flex; gap: 12px; }
@@ -612,7 +615,7 @@ body {
 .mode-emoji { font-size: 2.4rem; display: block; margin-bottom: 12px; }
 
 .mode-title {
-  font-family: 'Playfair Display', serif;
+  font-family: 'DM Sans', sans-serif;
   font-size: 1.1rem;
   font-weight: 700;
   color: var(--ink);
@@ -630,10 +633,14 @@ body {
   cursor: pointer;
   transition: all 0.15s;
   min-height: 60px;
-  opacity: 0.7;
+  opacity: 1;
+  width: 100%;
+  font: inherit;
+  text-align: left;
+  color: var(--ink);
 }
 .guest-item:last-of-type { border-bottom: none; }
-.guest-item:active { opacity: 0.7; }
+.guest-item:active { opacity: 1; }
 .guest-item:hover { background: rgba(184, 255, 0, 0.1); }
 
 .g-check {
@@ -661,11 +668,12 @@ body {
 
 .g-name {
   flex: 1;
-  font-family: 'DM Mono', monospace;
-  font-size: 0.9rem;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 1rem;
   color: var(--ink);
   font-weight: 500;
   line-height: 1.4;
+  overflow-wrap: anywhere;
 }
 
 .g-price {
@@ -673,6 +681,7 @@ body {
   font-size: 0.9rem;
   color: var(--ink-light);
   font-weight: 500;
+  white-space: nowrap;
 }
 
 .guest-item.sel .g-name { color: var(--ink); }
@@ -698,9 +707,9 @@ body {
   background: linear-gradient(90deg, transparent, var(--neon-pink), transparent);
 }
 
-.sticky-label { font-size: 0.65rem; color: rgba(245,240,232,0.4); letter-spacing: 2px; text-transform: uppercase; }
+.sticky-label { font-size: 0.75rem; color: var(--on-dark-muted); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 6px; }
 .sticky-amt {
-  font-family: 'Playfair Display', serif;
+  font-family: 'DM Sans', sans-serif;
   font-size: 1.7rem;
   font-weight: 900;
   color: var(--neon-lime);
@@ -708,10 +717,10 @@ body {
 }
 
 .sticky-pay-btn {
-  background: var(--neon-pink);
-  color: var(--paper);
+  background: var(--accent-fill);
+  color: white;
   border: none;
-  border-radius: 3px;
+  border-radius: 999px;
   padding: 16px 22px;
   font-family: 'DM Mono', monospace;
   font-size: 0.8rem;
@@ -724,7 +733,7 @@ body {
   min-height: 52px;
 }
 .sticky-pay-btn:disabled { background: var(--ink-faint); color: var(--paper-dark); cursor: not-allowed; }
-.sticky-pay-btn:not(:disabled):hover { background: #e02068; }
+.sticky-pay-btn:not(:disabled):hover { background: var(--accent-ink); }
 
 /* ── QR MODAL ── */
 .qr-modal {
@@ -737,7 +746,9 @@ body {
 
 .qr-modal-inner {
   background: var(--paper);
-  border-radius: 4px;
+  border-radius: 18px;
+  max-height: calc(100dvh - 48px);
+  overflow-y: auto;
   width: 100%; max-width: 340px;
   text-align: center;
   overflow: hidden;
@@ -749,7 +760,7 @@ body {
 }
 
 .qr-modal-title {
-  font-family: 'Playfair Display', serif;
+  font-family: 'DM Sans', sans-serif;
   font-size: 1.4rem;
   font-weight: 900;
   color: var(--ink);
@@ -759,10 +770,10 @@ body {
 .qr-modal-sub { font-size: 0.75rem; color: var(--ink-faint); letter-spacing: 1px; text-transform: uppercase; }
 
 .qr-modal-amt {
-  font-family: 'Unbounded', sans-serif;
+  font-family: 'DM Mono', monospace;
   font-size: 2.2rem;
   font-weight: 900;
-  color: var(--neon-pink);
+  color: var(--accent-ink);
   padding: 20px 16px;
   border-bottom: 1px dashed var(--ink-faint);
 }
@@ -789,7 +800,7 @@ body {
   border: 1.5px solid var(--ink-faint);
   border-radius: 3px;
   padding: 18px 16px;
-  font-family: 'DM Mono', monospace;
+  font-family: 'DM Sans', sans-serif;
   font-size: 1rem;
   color: var(--ink);
   outline: none;
@@ -824,7 +835,7 @@ body {
 
 /* ── PAID ITEM STYLES ── */
 .line-item.paid {
-  opacity: 0.45;
+  opacity: 1;
 }
 .paid-tag {
   font-size: 0.62rem;
@@ -838,7 +849,7 @@ body {
   flex-shrink: 0;
 }
 .guest-item.paid-item {
-  opacity: 0.4;
+  opacity: 1;
   pointer-events: none;
 }
 .guest-paid-tag {
@@ -878,7 +889,7 @@ body {
 }
 
 .pending-title {
-  color: var(--neon-orange);
+  color: var(--warning-ink);
   font-size: 0.75rem;
   font-weight: 700;
   text-transform: uppercase;
@@ -1053,7 +1064,7 @@ body {
 }
 
 .hero-headline {
-  font-family: 'Playfair Display', serif;
+  font-family: 'DM Sans', sans-serif;
   font-size: 2.8rem;
   font-weight: 900;
   color: var(--ink);
@@ -1065,7 +1076,7 @@ body {
 
 .hero-headline em {
   font-style: italic;
-  color: var(--neon-pink);
+  color: var(--accent-ink);
 }
 
 @keyframes hero-up {
@@ -1074,10 +1085,9 @@ body {
 }
 
 .hero-sub {
-  font-family: 'DM Mono', monospace;
-  font-size: 0.78rem;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 1rem;
   color: var(--ink-faint);
-  letter-spacing: 0.5px;
   line-height: 1.8;
   margin-bottom: 28px;
   animation: hero-up 0.5s 0.2s ease both;
@@ -1144,24 +1154,24 @@ body {
 .how-step:hover { background: rgba(26,18,8,0.04); border-color: rgba(26,18,8,0.18); }
 
 .how-step-num {
-  font-family: 'Unbounded', sans-serif;
+  font-family: 'DM Mono', monospace;
   font-size: 1.3rem; font-weight: 900; line-height: 1;
   flex-shrink: 0; width: 36px; padding-top: 2px;
 }
-.how-step:nth-child(1) .how-step-num { color: var(--neon-pink); }
+.how-step:nth-child(1) .how-step-num { color: var(--accent-ink); }
 .how-step:nth-child(2) .how-step-num { color: var(--ink); }
-.how-step:nth-child(3) .how-step-num { color: var(--neon-cyan); }
+.how-step:nth-child(3) .how-step-num { color: var(--ink); background: var(--neon-cyan); }
 
 .how-step-title {
-  font-family: 'Playfair Display', serif;
+  font-family: 'DM Sans', sans-serif;
   font-size: 1rem; font-weight: 700;
   color: var(--ink); margin-bottom: 3px;
 }
 
 .how-step-desc {
-  font-family: 'DM Mono', monospace;
-  font-size: 0.72rem; color: var(--ink-faint);
-  line-height: 1.6; letter-spacing: 0.3px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.9rem; color: var(--ink-faint);
+  line-height: 1.6;
 }
 
 .recent-tables {
@@ -1185,7 +1195,7 @@ body {
 .recent-card:hover { background: rgba(26,18,8,0.04); border-color: var(--ink); }
 
 .recent-name {
-  font-family: 'Playfair Display', serif;
+  font-family: 'DM Sans', sans-serif;
   font-size: 0.95rem; font-weight: 700; color: var(--ink); margin-bottom: 2px;
 }
 
@@ -1195,7 +1205,7 @@ body {
 }
 
 .recent-code {
-  font-family: 'Unbounded', sans-serif;
+  font-family: 'DM Mono', monospace;
   font-size: 0.85rem; font-weight: 700;
   color: var(--ink); letter-spacing: 2px;
   background: var(--neon-lime); padding: 4px 8px; border-radius: 2px;
@@ -1230,11 +1240,16 @@ body {
   --paper-dark: #EFE6D8;
   --ink: #120A04;
   --ink-light: #3F2A18;
-  --ink-faint: #907B63;
+  --ink-faint: var(--ink-light);
   --neon-pink: #FF0A85;
   --neon-lime: #A6FF00;
   --neon-cyan: #00FFD1;
   --neon-orange: #FF6B1A;
+  --accent-ink: var(--neon-pink);
+  --accent-fill: var(--neon-pink);
+  --warning-ink: var(--neon-orange);
+  --on-dark-muted: #C4B8AA;
+  --focus-ring: #006354;
   --receipt-shadow: 0 22px 70px rgba(0,0,0,0.26), 0 2px 0 rgba(26,18,8,0.06);
 }
 
@@ -1265,6 +1280,7 @@ body {
 
 .receipt {
   border-radius: 18px;
+  color: var(--ink);
   box-shadow: var(--receipt-shadow);
   border: 1px solid rgba(248,240,228,0.08);
 }
@@ -1332,8 +1348,7 @@ body {
 .hero-headline em {
   font-family: inherit;
   font-style: normal;
-  color: var(--neon-pink);
-  text-shadow: 0 0 22px rgba(255,10,133,0.2);
+  color: var(--accent-ink);
 }
 
 .hero-sub,
@@ -1343,7 +1358,7 @@ body {
 .mode-desc,
 .tool-chip-label,
 .recent-meta {
-  color: rgba(63,42,24,0.62);
+  color: var(--ink-faint);
 }
 
 .section {
@@ -1364,8 +1379,8 @@ body {
 }
 
 .section-head {
-  font-size: 2.05rem;
-  line-height: 0.95;
+  font-size: 2rem;
+  line-height: 1.1;
 }
 
 .step-bar {
@@ -1455,15 +1470,15 @@ body {
 
 .btn-neon,
 .btn-hero-host {
-  background: var(--neon-pink);
-  color: white;
-  box-shadow: 0 12px 34px rgba(255,10,133,0.24);
+  background: var(--accent-fill);
+  color: var(--ink);
+  box-shadow: 0 12px 30px rgba(255,10,133,0.25);
 }
 
 .btn-neon:hover,
 .btn-hero-host:hover {
-  background: #ee0077;
-  box-shadow: 0 16px 42px rgba(255,10,133,0.32);
+  background: var(--neon-pink);
+  box-shadow: 0 0 28px rgba(255,10,133,0.3);
 }
 
 .btn-outline {
@@ -1561,7 +1576,7 @@ body {
 }
 
 .line-item.host-selected,
-.guest-item.selected {
+.guest-item.sel {
   background: var(--neon-lime);
   border-color: var(--ink);
   color: var(--ink);
@@ -1629,6 +1644,117 @@ body {
   border: 1px solid rgba(255,10,133,0.24);
   border-radius: 16px;
   background: rgba(255,10,133,0.08);
+}
+
+/* Original night-market palette with readable ink for small cyan labels. */
+button, input { font-family: inherit; }
+button { touch-action: manipulation; }
+:is(button, input, a, [tabindex]):focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+.sticky-total { --focus-ring: var(--neon-lime); }
+.section-head { text-wrap: balance; }
+.hero-sub, .section-sub, .how-step-desc, .vault-desc { text-wrap: pretty; }
+.how-steps { gap: 10px; }
+.how-step-title { font-size: 1.2rem; line-height: 1.2; }
+.how-label, .recent-label, .step-label { font-size: 0.7rem; }
+.how-step-num, .share-code { font-family: 'DM Mono', monospace; }
+.total-val, .g-price, .item-price-in, .sticky-amt, .share-code,
+.bill-summary-val, .qr-modal-amt { font-variant-numeric: tabular-nums; }
+.total-row.grand .total-label, .total-row.grand .total-val {
+  font-family: 'DM Sans', sans-serif;
+}
+.hero-cta-row button { font-family: 'DM Sans', sans-serif; font-size: 0.94rem; }
+.hero-cta-row button, .btn { letter-spacing: 0.05em; }
+.btn-ink, .btn-hero-guest, .currency-chip.active, .step-num.active,
+.step-num.done, .guest-item.sel, .share-code { box-shadow: none; text-shadow: none; }
+.guest-item.sel { background: var(--neon-lime); border-color: var(--ink); }
+.guest-item.paid-item { background: var(--paper-dark); border-style: dashed; }
+.guest-paid-tag { white-space: normal; max-width: 35%; font-size: 0.8rem; }
+.bill-summary-row { gap: 16px; }
+.bill-summary-val { flex-shrink: 0; }
+.item-price-in, .del-btn, .g-price { flex-shrink: 0; }
+.home-btn { color: var(--ink); }
+.date-chip { font: inherit; min-width: 60px; min-height: 64px; }
+.split-controls { display: flex; align-items: center; justify-content: flex-end; gap: 10px; padding: 4px 0 16px; color: var(--ink); font-size: 0.875rem; flex-wrap: wrap; }
+.split-controls button { min-width: 44px; min-height: 44px; }
+.split-controls .split-value { min-width: 64px; text-align: center; font-weight: 600; }
+.field-label { display: block; margin-bottom: 8px; color: var(--ink-light); font-size: 0.875rem; font-weight: 600; }
+.table-code-input { font-family: 'DM Mono', monospace; }
+.qr-modal-sub, .vault-desc, .pending-desc { font-size: 0.9rem; line-height: 1.6; }
+.auth-dialog { margin: auto; padding: 0; border: none; border-radius: 18px; width: min(340px, calc(100% - 32px)); background: var(--paper); color: var(--ink); max-height: calc(100dvh - 48px); }
+.auth-dialog::backdrop { background: rgba(18,10,4,0.88); }
+.auth-dialog .qr-modal-inner { max-height: none; }
+.vault-qr-area { display: block; font: inherit; padding: 0; }
+.split-controls button:disabled { opacity: 0.5; cursor: not-allowed; }
+.upload-zone, .qr-zone { width: 100%; font: inherit; color: var(--ink); display: block; }
+.upload-label, .upload-hint { display: block; }
+.recent-card { width: 100%; text-align: left; font: inherit; }
+.user-chip { font: inherit; color: var(--paper); cursor: pointer; }
+
+/* The real bill uses the same compact, tear-off receipt as the landing demo. */
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+.guest-nav { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: env(safe-area-inset-top, 0px); color: var(--on-dark-muted); font-size: .75rem; }
+.guest-nav button { background: none; border: none; color: var(--paper); min-height: 44px; padding: 0 8px; cursor: pointer; --focus-ring: var(--neon-lime); }
+.guest-receipt { border: 0; border-radius: 10px 10px 0 0; overflow: visible; margin-bottom: 16px; padding: 26px 22px 18px; font-family: 'DM Mono', monospace; }
+.guest-receipt::before { display: none; }
+.guest-receipt::after { content: ''; position: absolute; top: 100%; left: 0; width: 100%; height: 11px; background: linear-gradient(135deg, var(--paper) 25%, transparent 25%) -11px 0 / 22px 22px, linear-gradient(225deg, var(--paper) 25%, transparent 25%) -11px 0 / 22px 22px; }
+.guest-receipt-header { padding-bottom: 18px; border-bottom: 1px dashed #b7a997; }
+.guest-receipt-brand { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 26px; }
+.guest-receipt-brand img { width: 56px; height: auto; }
+.guest-receipt-status { display: flex; align-items: center; gap: 6px; color: var(--ink-light); font-size: .7rem; }
+.guest-receipt-status > span { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--neon-lime); color: var(--ink); }
+.guest-receipt-meta { color: var(--ink-faint); font-size: .7rem; margin-bottom: 9px; overflow-wrap: anywhere; }
+.guest-table-name { color: var(--ink); font-family: 'Barlow Condensed', sans-serif; font-weight: 900; text-transform: uppercase; font-size: clamp(2.6rem, 11vw, 3.4rem); letter-spacing: -.025em; line-height: .95; overflow-wrap: anywhere; }
+.guest-receipt-intro { padding-block: 18px; color: var(--ink); font-size: .82rem; line-height: 1.6; }
+.guest-receipt-intro > span { display: block; color: var(--ink-faint); font-size: .7rem; margin-top: 3px; }
+.guest-items-label { display: flex; justify-content: space-between; padding-block: 10px; border-block: 1px dashed #b7a997; color: var(--ink); font-size: .75rem; }
+.guest-receipt .guest-item { width: 100%; margin: 0; padding: 16px 0; gap: 10px; min-height: 72px; background: transparent; border: 0; border-bottom: 1px solid #e0d5c6; border-radius: 0 !important; font: inherit; text-align: left; box-shadow: none; transform: none; }
+.guest-receipt button.guest-item { cursor: pointer; }
+.guest-receipt .guest-item:hover, .guest-receipt .guest-item.sel { background: transparent; }
+.guest-receipt .g-check { width: 24px; height: 24px; border: 1px solid #9a8771; border-radius: 6px !important; flex: 0 0 24px; color: var(--ink); font-size: .9rem; }
+.guest-receipt .guest-item.sel .g-check { background: var(--neon-lime); border-color: var(--neon-lime); color: var(--ink); box-shadow: none; }
+.guest-item-copy { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 4px; }
+.guest-receipt .g-name { font-family: 'DM Mono', monospace; font-size: .88rem; font-weight: 500; line-height: 1.5; overflow-wrap: anywhere; }
+.guest-receipt .g-price { color: var(--ink); font: 500 .88rem 'DM Mono', monospace; }
+.guest-item-detail { color: var(--ink-faint); font-size: .68rem; line-height: 1.5; }
+.guest-receipt .paid-item { opacity: 1; border-style: solid; }
+.guest-receipt .guest-paid-tag { color: var(--ink); background: var(--neon-cyan); font-size: .7rem; }
+.guest-receipt .split-controls { gap: 8px; padding: 8px 0 12px; font-family: 'DM Sans', sans-serif; font-size: .8rem; }
+.split-adjust { flex: 0 0 44px; width: 44px; height: 44px; border: 0; border-radius: 6px; background: var(--ink); color: var(--paper); cursor: pointer; font-size: 1.1rem; }
+.guest-receipt-summary { padding-top: 20px; }
+.guest-selected-count { color: var(--ink-faint); font-size: .7rem; line-height: 1.5; }
+.guest-share-total { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--ink); padding-top: 10px; font-size: .82rem; }
+.guest-share-total strong { color: var(--accent-ink); font: 800 2.6rem/.95 'Barlow Condensed', sans-serif; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.guest-share-total small { font: 500 .75rem 'DM Mono', monospace; }
+.guest-receipt-note { margin-top: 22px; padding: 14px; border-radius: 999px; background: var(--ink); color: var(--neon-lime); font-size: .7rem; text-align: center; }
+.guest-receipt-body { padding-top: 22px; }
+.guest-sticky .sticky-label { font-size: .65rem; letter-spacing: .04em; text-transform: none; }
+.guest-sticky .sticky-amt { font-family: 'DM Mono', monospace; font-size: 1.3rem; }
+.guest-sticky .sticky-pay-btn { background: var(--neon-pink); color: var(--ink); letter-spacing: .02em; text-transform: none; padding-inline: 20px; }
+.guest-sticky .sticky-pay-btn:not(:disabled):hover { background: var(--neon-pink); box-shadow: 0 0 20px rgba(255,10,133,0.3); }
+.guest-sticky .sticky-pay-btn:disabled { background: #443a2e; color: var(--on-dark-muted); }
+
+@media (max-width: 360px) {
+  .guest-receipt { padding-inline: 18px; }
+  .guest-receipt .g-name, .guest-receipt .g-price { font-size: .8rem; }
+  .guest-receipt .split-controls { gap: 6px; }
+  .guest-sticky .sticky-amt { font-size: 1.12rem; }
+}
+
+@media (max-width: 380px) {
+  .line-item { gap: 6px; }
+  .item-price-in { width: 72px; padding-inline: 6px; }
+  .guest-item { gap: 8px; padding-inline: 10px; }
+  .g-price { font-size: 0.8rem; }
+  .sticky-total { padding-inline: 14px; gap: 10px; }
+  .sticky-amt { font-size: 1.5rem; }
+  .sticky-pay-btn { padding-inline: 16px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }
 
 @media (max-width: 380px) {
@@ -1866,9 +1992,9 @@ async function updateGuestSelection(code, name, sel) {
 // ── STEP BAR ──────────────────────────────────────────────────
 function StepBar({ current, steps }) {
   return (
-    <div className="step-bar">
+    <div className="step-bar" aria-label="Table setup progress">
       {steps.map((s, i) => (
-        <div key={s} className="step-item">
+        <div key={s} className="step-item" aria-current={i === current ? "step" : undefined}>
           <div className={`step-num ${i < current ? "done" : i === current ? "active" : ""}`}>
             {i < current ? "✓" : i + 1}
           </div>
@@ -1876,6 +2002,19 @@ function StepBar({ current, steps }) {
         </div>
       ))}
     </div>
+  );
+}
+
+function GuestReceiptHeader({ session, status = "Split the bill" }) {
+  return (
+    <header className="guest-receipt-header">
+      <div className="guest-receipt-brand">
+        <img src={LOGO_SRC} alt="KakiSplit" width="56" height="42" />
+        <span className="guest-receipt-status"><span aria-hidden="true">✓</span> {status}</span>
+      </div>
+      <p className="guest-receipt-meta">Table #{session.code}{session.tableDate ? ` · ${session.tableDate}` : ""}</p>
+      <h1 className="guest-table-name">{session.tableName || "My Table"}</h1>
+    </header>
   );
 }
 
@@ -1893,6 +2032,11 @@ function GuestView({ session, onBack, currency }) {
   const { items = [], qrImage } = session;
 
   const [selections, setSelections] = useState({});
+
+  useEffect(() => {
+    // Preserve the browser's scroll-to-focus while the guest is entering a name.
+    if (named) window.scrollTo({ top: 0, behavior: "instant" });
+  }, [named, showQR, done]);
 
   // Reload session state (paid + selections) periodically
   useEffect(() => {
@@ -1955,8 +2099,9 @@ function GuestView({ session, onBack, currency }) {
   };
 
   if (!named) return (
-    <div className="receipt" style={{ marginTop: 0 }}>
-      <div className="receipt-inner">
+    <div className="receipt guest-receipt">
+      <GuestReceiptHeader session={session} />
+      <div className="guest-receipt-body">
         <div className="section-head">What's your name?</div>
         <div className="section-sub" style={{ marginBottom: 16 }}>So the host knows who's paid</div>
         <label className="field-label" htmlFor="guest-name">Your name</label>
@@ -1972,15 +2117,15 @@ function GuestView({ session, onBack, currency }) {
   );
 
   if (done) return (
-    <div className="receipt">
-      <div className="receipt-inner">
-        <span className="success-mark">✅</span>
+    <div className="receipt guest-receipt">
+      <GuestReceiptHeader session={session} status="Share confirmed" />
+      <div className="guest-receipt-body">
         <div className="section-head" style={{ textAlign: "center" }}>Confirmed, {name}!</div>
         <div className="section-sub" style={{ textAlign: "center", marginBottom: 20 }}>Here's your share of the bill</div>
 
         <div style={{ background: "var(--ink)", borderRadius: 4, padding: "16px 20px", marginBottom: 16, textAlign: "center" }}>
-          <div style={{ fontSize: "0.55rem", color: "rgba(245,240,232,0.4)", letterSpacing: 3, textTransform: "uppercase", marginBottom: 6 }}>You paid</div>
-          <div style={{ fontFamily: "Unbounded,sans-serif", fontSize: "2.4rem", fontWeight: 900, color: "var(--neon-lime)", letterSpacing: -1 }}>
+          <div style={{ fontSize: "0.75rem", color: "var(--on-dark-muted)", letterSpacing: 3, textTransform: "uppercase", marginBottom: 6 }}>You paid</div>
+          <div style={{ fontFamily: "'DM Mono',monospace", fontSize: "2.4rem", fontWeight: 900, color: "var(--neon-lime)", letterSpacing: -1 }}>
             {currency} {myTotal.toFixed(2)}
           </div>
         </div>
@@ -2002,24 +2147,21 @@ function GuestView({ session, onBack, currency }) {
   );
 
   if (showQR) return (
-    <div className="receipt">
-      <div className="header-receipt" style={{ paddingBottom: 20 }}>
-        <div style={{ fontFamily: "'Playfair Display',serif", fontSize: "1.6rem", fontWeight: 900, color: "var(--ink)" }}>
-          Scan & Pay
-        </div>
-        <div style={{ fontSize: "0.75rem", color: "var(--ink-faint)", letterSpacing: 1.5, textTransform: "uppercase", marginTop: 8 }}>
-          Pay exactly this amount
-        </div>
+    <div className="receipt guest-receipt">
+      <GuestReceiptHeader session={session} status="Scan & pay" />
+      <div className="guest-receipt-body">
+        <h2 className="section-head">Scan & pay the host</h2>
+        <p className="section-sub">Open your banking app and pay exactly this amount.</p>
       </div>
 
       <div style={{ textAlign: "center", padding: "30px 24px", borderBottom: "1px dashed var(--ink-faint)" }}>
-        <div style={{ fontFamily: "'Unbounded', sans-serif", fontSize: "2.8rem", fontWeight: 900, color: "var(--neon-pink)" }}>
+        <div style={{ fontFamily: "'DM Mono', monospace", fontSize: "clamp(1.6rem, 7vw, 2.4rem)", fontWeight: 900, color: "var(--accent-ink)" }}>
           {currency} {myTotal.toFixed(2)}
         </div>
       </div>
 
       <div style={{ padding: "30px 24px", display: "flex", justifyContent: "center", background: "white", borderBottom: "1px dashed var(--ink-faint)" }}>
-        <img src={qrImage} alt="Payment QR code" style={{ width: "100%", maxWidth: "340px", height: "auto", objectFit: "contain", borderRadius: 8 }} />
+        <img src={qrImage} alt="Host's payment QR code" style={{ width: "100%", maxWidth: "340px", height: "auto", objectFit: "contain", borderRadius: 8 }} />
       </div>
 
       <div style={{ padding: "24px" }}>
@@ -2036,16 +2178,14 @@ function GuestView({ session, onBack, currency }) {
 
   return (
     <>
-      <div className="receipt">
-        <div className="header-receipt" style={{ paddingBottom: 14 }}>
-          <div style={{ fontFamily: "'Playfair Display',serif", fontSize: "1.1rem", fontWeight: 700, color: "var(--ink)" }}>
-            Hey {name} 👋
-          </div>
-          <div style={{ fontSize: "0.62rem", color: "var(--ink-faint)", letterSpacing: 1.5, textTransform: "uppercase", marginTop: 4 }}>
-            Tap everything you ordered
-          </div>
+      <div className="receipt guest-receipt">
+        <GuestReceiptHeader session={session} />
+        <div className="guest-receipt-intro">
+          <p>Hey {name}, pick what you had.</p>
+          <span>Sharing a dish? Select it, then adjust the split.</span>
         </div>
-        <div style={{ padding: "4px 24px 90px" }}>
+        <div className="guest-items-label"><span>Your items</span><span>{currency}</span></div>
+        <div className="guest-receipt-items">
           {items.map(item => {
             const paidInfo = paidMap[item.id];
             const paidBy = (paidInfo?.payers || (paidInfo ? [paidInfo] : [])).map(p => typeof p === 'object' ? (p.name || "Host") : p);
@@ -2074,50 +2214,56 @@ function GuestView({ session, onBack, currency }) {
               <div key={item.id}>
                 <button type="button" className={`guest-item ${sel[item.id] ? "sel" : ""}`} aria-pressed={!!sel[item.id]}
                   onClick={() => setSel(s => ({ ...s, [item.id]: !s[item.id] }))}>
-                  <span className="g-check" aria-hidden="true">{sel[item.id] ? "✓" : ""}</span>
-                  <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
+                  <div className="g-check" aria-hidden="true">{sel[item.id] ? "✓" : ""}</div>
+                  <div className="guest-item-copy">
                     <span className="g-name">{item.name}</span>
+                    {totalSplit > 1 && <span className="guest-item-detail">Split {totalSplit} ways · your share</span>}
                     {selections[item.id] && selections[item.id].filter(n => n !== name).length > 0 && (
-                      <span style={{ fontSize: "0.6rem", color: "var(--neon-pink)", fontWeight: 600 }}>
+                      <span style={{ fontSize: "0.75rem", color: "var(--accent-ink)", fontWeight: 600 }}>
                         Highlighted by {selections[item.id].filter(n => n !== name).join(", ")}
                       </span>
                     )}
-                  </span>
-                  <span className="g-price">{currency} {splitPrice.toFixed(2)}</span>
+                  </div>
+                  <span className="g-price"><span className="sr-only">{currency} </span>{splitPrice.toFixed(2)}</span>
                 </button>
                 {paidBy.length > 0 && (
-                  <div style={{ padding: "4px 24px 4px 56px", fontSize: "0.65rem", color: "var(--ink-light)" }}>
+                  <div style={{ padding: "4px 24px 4px 56px", fontSize: "0.75rem", color: "var(--ink-light)" }}>
                     {paidBy.length}/{totalSplit} paid by {paidBy.join(", ")}
                   </div>
                 )}
                 {sel[item.id] && paidBy.length === 0 && (
                   <div className="split-controls">
                     <span style={{ fontWeight: 500 }}>Split with:</span>
-                    <button type="button" disabled={(splits[item.id] || totalSplit) === 1} aria-label={`Fewer people sharing ${item.name}`} onClick={() => setSplits(s => ({ ...s, [item.id]: Math.max(1, (s[item.id] || totalSplit) - 1) }))}
-                      style={{ padding: "8px 16px", background: "var(--ink)", color: "var(--paper)", border: "none", borderRadius: 8, cursor: "pointer", fontSize: "1rem", fontWeight: 600, minWidth: 40 }}>−</button>
+                    <button aria-label={`Split ${item.name} with fewer people`} disabled={(splits[item.id] || totalSplit) <= 1} onClick={() => setSplits(s => ({ ...s, [item.id]: Math.max(1, (s[item.id] || totalSplit) - 1) }))}
+                      className="split-adjust">−</button>
 
-                    <span style={{ minWidth: 80, textAlign: "center", fontWeight: 600, fontSize: "0.8rem" }}>
+                    <span className="split-value" aria-live="polite">
                       {(splits[item.id] || totalSplit) === 1 ? "no one" : `${(splits[item.id] || totalSplit) - 1} other${(splits[item.id] || totalSplit) > 2 ? "s" : ""}`}
                     </span>
 
-                    <button type="button" aria-label={`More people sharing ${item.name}`} onClick={() => setSplits(s => ({ ...s, [item.id]: (s[item.id] || totalSplit) + 1 }))}
-                      style={{ padding: "8px 16px", background: "var(--ink)", color: "var(--paper)", border: "none", borderRadius: 8, cursor: "pointer", fontSize: "1rem", fontWeight: 600, minWidth: 40 }}>+</button>
+                    <button aria-label={`Split ${item.name} with more people`} onClick={() => setSplits(s => ({ ...s, [item.id]: (s[item.id] || totalSplit) + 1 }))}
+                      className="split-adjust">+</button>
                   </div>
                 )}
               </div>
             );
           })}
         </div>
+        <div className="guest-receipt-summary">
+          <p className="guest-selected-count" aria-live="polite">{myItems.length ? `${myItems.length} item${myItems.length === 1 ? "" : "s"} selected` : "Select your items to get started"}</p>
+          <div className="guest-share-total"><span>Your share</span><strong><small>{currency}</small> {myTotal.toFixed(2)}</strong></div>
+          <p className="guest-receipt-note">Just your food. Just your share.</p>
+        </div>
       </div>
 
       {paymentError && <div className="receipt"><p className="error-strip" role="alert">{paymentError}</p></div>}
-      <div className="sticky-total">
+      <div className="sticky-total guest-sticky">
         <div>
-          <div className="sticky-label">Your total</div>
-          <div className="sticky-amt">{myTotal > 0 ? `${currency} ${myTotal.toFixed(2)}` : "— —"}</div>
+          <div className="sticky-label">Your share · {myItems.length} item{myItems.length === 1 ? "" : "s"}</div>
+          <div className="sticky-amt" aria-live="polite">{currency} {myTotal.toFixed(2)}</div>
         </div>
         <button className="sticky-pay-btn" disabled={myTotal <= 0 || paying} onClick={() => qrImage ? setShowQR(true) : confirmPayment()}>
-          {paying ? "Saving…" : qrImage ? "Pay now →" : "Mark as paid →"}
+          {paying ? "Saving…" : qrImage ? "Pay host →" : "Confirm →"}
         </button>
       </div>
     </>
@@ -2423,7 +2569,7 @@ function HostView({ onHome, currency, user, profile }) {
                     background: tableDate === val ? "var(--ink)" : "var(--paper-dark)",
                     border: tableDate === val ? "1.5px solid var(--ink)" : "1.5px solid var(--ink-faint)",
                   }}>
-                  <div style={{ fontSize: "0.55rem", color: tableDate === val ? "var(--neon-lime)" : "var(--ink-faint)", letterSpacing: 1, textTransform: "uppercase", marginBottom: 3 }}>{label}</div>
+                  <div style={{ fontSize: "0.75rem", color: tableDate === val ? "var(--neon-lime)" : "var(--ink-faint)", letterSpacing: 1, textTransform: "uppercase", marginBottom: 3 }}>{label}</div>
                   <div style={{ fontSize: "0.85rem", fontWeight: 500, color: tableDate === val ? "var(--neon-lime)" : "var(--ink)" }}>{dayNum}</div>
                 </button>
               );
@@ -2598,7 +2744,7 @@ function ProfileView({ onHome, user, profile, setProfile, onLogout }) {
           {qrError && <p className="error-strip" role="alert">{qrError}</p>}
         </div>
 
-        <button className="btn btn-outline" style={{ marginTop: 40, color: "var(--neon-pink)", borderColor: "var(--neon-pink)" }} onClick={onLogout}>
+        <button className="btn btn-outline" style={{ marginTop: 40, color: "var(--accent-ink)", borderColor: "var(--neon-pink)" }} onClick={onLogout}>
           Sign Out
         </button>
       </div>
@@ -2965,6 +3111,7 @@ export default function KakiSplit() {
   const [initializing, setInitializing] = useState(true);
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
+  const [authError, setAuthError] = useState(callbackFailed ? "Google sign-in didn't finish. Please try again." : "");
 
   const fetchProfile = async (currentUser) => {
     if (!currentUser) return;
@@ -2997,19 +3144,14 @@ export default function KakiSplit() {
   };
 
   const restorePostLoginMode = () => {
-    const stored = localStorage.getItem("ks_post_login_mode");
-    if (!stored) return;
+    const intent = readLoginIntent(localStorage);
+    if (!intent) return;
     try {
-      const { mode: savedMode, ts } = JSON.parse(stored);
-      if (Date.now() - ts < 60000) {
-        localStorage.removeItem("ks_post_login_mode");
-        setMode(savedMode);
-      } else {
-        localStorage.removeItem("ks_post_login_mode");
-      }
-    } catch {
-      localStorage.removeItem("ks_post_login_mode");
-    }
+      localStorage.removeItem(LOGIN_INTENT_KEY);
+      if (intent.mode === "host-return") localStorage.setItem("ks_current_code", intent.code);
+    } catch { /* Restoring the screen must not depend on storage writes. */ }
+    setAuthError("");
+    setMode(intent.mode);
   };
 
   useEffect(() => {
@@ -3038,8 +3180,9 @@ export default function KakiSplit() {
       const tableCode = new URLSearchParams(window.location.search).get("table");
 
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         if (!mounted) return;
+        if (sessionError) setAuthError("We couldn't finish signing you in. Please try again.");
 
         setUser(session?.user ?? null);
         if (session?.user) fetchProfile(session.user);
@@ -3066,8 +3209,10 @@ export default function KakiSplit() {
           } else {
             setMode("notfound");
           }
-        } else {
+        } else if (session?.user) {
           restorePostLoginMode();
+        } else if (readLoginIntent(localStorage)) {
+          setAuthError("Sign-in didn't complete. Try Google sign-in again to continue hosting.");
         }
       } catch (e) {
         console.error("Init failed:", e);
@@ -3086,19 +3231,26 @@ export default function KakiSplit() {
     };
   }, []);
 
-  const handleLogin = async (provider, intendedMode = "host") => {
+  const handleLogin = async (provider, intendedMode = "host", intendedCode) => {
+    setAuthError("");
     try {
-      localStorage.setItem("ks_post_login_mode", JSON.stringify({ mode: intendedMode, ts: Date.now() }));
+      try {
+        localStorage.setItem(LOGIN_INTENT_KEY, JSON.stringify({ mode: intendedMode, code: intendedCode, ts: Date.now() }));
+      } catch {
+        setAuthError("Please allow browser storage so we can return you here after Google sign-in.");
+        setShowAuthModal(false);
+        return;
+      }
       const { error } = await supabase.auth.signInWithOAuth({
         provider: provider,
         options: {
-          redirectTo: window.location.origin + "/app"
+          redirectTo: new URL("/app/", window.location.origin).href
         }
       });
       if (error) throw error;
     } catch (e) {
-      console.error("Login failed:", e);
-      alert("Login failed. Check your Supabase settings.");
+      setAuthError("Google sign-in couldn't start. Please try again.");
+      setShowAuthModal(false);
     }
   };
 
@@ -3116,6 +3268,8 @@ export default function KakiSplit() {
 
   const [showQROnboarding, setShowQROnboarding] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authIntentMode, setAuthIntentMode] = useState("host");
+  const [authIntentCode, setAuthIntentCode] = useState(null);
 
   useEffect(() => {
     if (user && profile && !profile.qr_url && !localStorage.getItem("ks_qr_skipped")) {
@@ -3159,6 +3313,7 @@ export default function KakiSplit() {
         )}
 
         {!initializing && <>
+          {authError && <div className="error-strip" role="alert">{authError}</div>}
           {showQROnboarding && (
             <QROnboarding
               onSkip={handleSkipQR}
@@ -3171,19 +3326,21 @@ export default function KakiSplit() {
           {showAuthModal && (
             <AuthModal
               onClose={() => setShowAuthModal(false)}
-              onLogin={handleLogin}
+              onLogin={provider => handleLogin(provider, authIntentMode, authIntentCode)}
             />
           )}
 
           {!showQROnboarding && !mode && (
             <LandingPage
-              onHost={user ? () => setMode("host") : () => setShowAuthModal(true)}
+              onHost={user ? () => setMode("host") : () => { setAuthIntentMode("host"); setShowAuthModal(true); }}
               onGuest={() => setMode("guest-code")}
               onReturnTable={code => {
                 if (user) {
                   localStorage.setItem("ks_current_code", code);
                   setMode("host-return");
                 } else {
+                  setAuthIntentMode("host-return");
+                  setAuthIntentCode(code);
                   setShowAuthModal(true);
                 }
               }}
@@ -3191,7 +3348,7 @@ export default function KakiSplit() {
               onCurrencyChange={changeCurrency}
               user={user}
               profile={profile}
-              onLogin={() => setShowAuthModal(true)}
+              onLogin={() => { setAuthIntentMode("host"); setShowAuthModal(true); }}
               onProfile={() => setMode("profile")}
             />
           )}
@@ -3202,17 +3359,7 @@ export default function KakiSplit() {
 
           {mode === "guest" && guestSession && (
             <>
-              <div className="receipt">
-                <div className="header-receipt">
-                  <button className="home-btn" onClick={goHome}>
-                    <span className="home-btn-icon">⌂</span>
-                    <span className="home-btn-label">Home</span>
-                  </button>
-                  <img src={LOGO_SRC} alt="KakiSplit" className="logo-img" />
-                  <div className="logo-tagline">Split bills lah, no drama</div>
-                  <div><span className="badge-strip guest-badge">👥 Guest</span></div>
-                </div>
-              </div>
+              <nav className="guest-nav" aria-label="App"><button onClick={goHome}>← Home</button><span>Split bills. No drama.</span></nav>
               <GuestView session={guestSession} onBack={goHome} currency={currency} />
             </>
           )}
