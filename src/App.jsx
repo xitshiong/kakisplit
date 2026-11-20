@@ -7,6 +7,7 @@ import ReceiptItemEditor from "./components/ReceiptItemEditor.jsx";
 import TableOverview from "./components/TableOverview.jsx";
 import { reviewReceiptItems } from "./lib/receiptReview.mjs";
 import { savedTables, localDate, formatTableDate } from "./lib/tableUi.mjs";
+import { savePaidWithClient } from "./lib/paidWrite.mjs";
 
 const callbackFailed = hasAuthError(new URL(window.location.href));
 
@@ -1921,36 +1922,7 @@ async function savePaid(itemId, name, code, splitCount = 1) {
   if (!code) code = new URLSearchParams(window.location.search).get("table") || localStorage.getItem("ks_current_code");
   if (!code) return { success: false };
 
-  // Optimistic concurrency: retry up to 4 times if update races
-  for (let attempt = 0; attempt < 4; attempt++) {
-    const { data, error } = await supabase.from("sessions").select("paid").eq("code", code).single();
-    if (error) return { success: false };
-
-    const paid = data?.paid || {};
-    if (!paid[itemId]) paid[itemId] = { payers: [], total: splitCount };
-    if (!paid[itemId].payers) paid[itemId] = { payers: [paid[itemId]], total: 1 };
-
-    const payers = paid[itemId].payers;
-    const total = paid[itemId].total || splitCount;
-
-    // Already paid by this user
-    if (payers.includes(name)) return { success: true, alreadyPaid: true };
-
-    // Item already full
-    if (payers.length >= total) return { success: false, full: true };
-
-    payers.push(name);
-
-    const { error: updateError } = await supabase
-      .from("sessions")
-      .update({ paid })
-      .eq("code", code);
-
-    if (!updateError) return { success: true };
-    // If update failed (race), wait briefly and retry
-    await new Promise(r => setTimeout(r, 100 + Math.random() * 200));
-  }
-  return { success: false };
+  return savePaidWithClient(supabase, itemId, name, code, splitCount);
 }
 
 async function loadSessionState(code) {
