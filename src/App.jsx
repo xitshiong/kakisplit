@@ -1703,6 +1703,7 @@ button { touch-action: manipulation; }
 .guest-receipt-brand img { width: 56px; height: auto; }
 .guest-receipt-status { display: flex; align-items: center; gap: 6px; color: var(--ink-light); font-size: .7rem; }
 .guest-receipt-status > span { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--neon-lime); color: var(--ink); }
+.guest-receipt-home { min-height: 48px; min-width: 104px; padding: 10px 18px; border: 2px solid var(--ink); border-radius: 8px; background: var(--neon-lime); color: var(--ink); font: 700 1rem 'DM Sans', sans-serif; cursor: pointer; }
 .guest-receipt-meta { color: var(--ink-faint); font-size: .7rem; margin-bottom: 9px; overflow-wrap: anywhere; }
 .guest-table-name { color: var(--ink); font-family: 'Barlow Condensed', sans-serif; font-weight: 900; text-transform: uppercase; font-size: clamp(2.6rem, 11vw, 3.4rem); letter-spacing: -.025em; line-height: .95; overflow-wrap: anywhere; }
 .guest-receipt-intro { padding-block: 18px; color: var(--ink); font-size: .82rem; line-height: 1.6; }
@@ -1912,6 +1913,7 @@ async function load(code) {
     items: row.items,
     qrImage: row.qr_image || qrImage,
     paid: row.paid,
+    selections: row.selections || {},
     tableName: row.table_name,
     tableDate: row.table_date
   };
@@ -2003,12 +2005,13 @@ function StepBar({ current, steps }) {
   );
 }
 
-function GuestReceiptHeader({ session, status = "Split the bill" }) {
+function GuestReceiptHeader({ session, status = "Split the bill", onHome }) {
   return (
     <header className="guest-receipt-header">
       <div className="guest-receipt-brand">
         <img src={LOGO_SRC} alt="KakiSplit" width="56" height="42" />
-        <span className="guest-receipt-status"><span aria-hidden="true">✓</span> {status}</span>
+        {onHome ? <button type="button" className="guest-receipt-home" onClick={onHome}>← Home</button>
+          : <span className="guest-receipt-status"><span aria-hidden="true">✓</span> {status}</span>}
       </div>
       <p className="guest-receipt-meta">Table #{session.code}{session.tableDate ? ` · ${formatTableDate(session.tableDate)}` : ""}</p>
       <h1 className="guest-table-name">{session.tableName || "My Table"}</h1>
@@ -2116,7 +2119,7 @@ function GuestView({ session, onBack, currency }) {
 
   if (done) return (
     <div className="receipt guest-receipt">
-      <GuestReceiptHeader session={session} status="Share confirmed" />
+      <GuestReceiptHeader session={session} onHome={onBack} />
       <div className="guest-receipt-body">
         <div className="section-head" style={{ textAlign: "center" }}>Confirmed, {name}!</div>
         <div className="section-sub" style={{ textAlign: "center", marginBottom: 20 }}>Here's your share of the bill</div>
@@ -2288,6 +2291,7 @@ function HostView({ onHome, currency, user, profile }) {
   }, [profile, qrImg]);
   const [code, setCode] = useState("");
   const [paidMap, setPaidMap] = useState({});
+  const [tableSelections, setTableSelections] = useState({});
   const fileRef = useRef();
   const qrRef = useRef();
   const STEPS = ["Receipt", "Details", "Items", "QR", "Share"];
@@ -2434,6 +2438,7 @@ function HostView({ onHome, currency, user, profile }) {
 
       setCode(c);
       setPaidMap(initialPaid);
+      setTableSelections({});
       setStep(4);
     } catch (e) {
       setErr("Failed to create table: " + e.message);
@@ -2445,7 +2450,10 @@ function HostView({ onHome, currency, user, profile }) {
   useEffect(() => {
     if (step !== 4) return;
     const t = setInterval(() => {
-      loadSessionState(code).then(s => setPaidMap(s.paid));
+      loadSessionState(code).then(s => {
+        setPaidMap(s.paid);
+        setTableSelections(s.selections);
+      });
     }, 2000);
     return () => clearInterval(t);
   }, [step, code]);
@@ -2617,7 +2625,7 @@ function HostView({ onHome, currency, user, profile }) {
         {/* STEP 4 - SHARE */}
         {step === 4 && <div className="section">
           <TableOverview code={code} tableName={tableName} tableDate={tableDate}
-            items={items} paidMap={paidMap} currency={currency} />
+            items={items} paidMap={paidMap} selections={tableSelections} currency={currency} />
           <button className="btn btn-outline" style={{ marginTop: 16 }} onClick={() => { setStep(0); setReceipts([]); setItems([]); setQrImg(null); setCode(""); }}>
             🔄 Start new table
           </button>
@@ -2752,6 +2760,7 @@ function ProfileView({ onHome, user, profile, setProfile, onLogout }) {
 function HostReturn({ onHome, currency, user, profile }) {
   const [session, setSession] = useState(null);
   const [paidMap, setPaidMap] = useState({});
+  const [tableSelections, setTableSelections] = useState({});
   const [copiedExcel, setCopiedExcel] = useState(false);
   const [code] = useState(() => localStorage.getItem("ks_current_code"));
   const [loading, setLoading] = useState(true);
@@ -2770,6 +2779,7 @@ function HostReturn({ onHome, currency, user, profile }) {
         if (table) {
           setSession(table);
           setPaidMap(table.paid || {});
+          setTableSelections(table.selections);
         } else {
           setError("This table couldn’t be opened. Check your connection and try again, or return home to choose another table.");
         }
@@ -2818,7 +2828,10 @@ function HostReturn({ onHome, currency, user, profile }) {
   useEffect(() => {
     if (!code) return;
     const t = setInterval(() => {
-      loadSessionState(code).then(s => setPaidMap(s.paid));
+      loadSessionState(code).then(s => {
+        setPaidMap(s.paid);
+        setTableSelections(s.selections);
+      });
     }, 2000);
     return () => clearInterval(t);
   }, [code]);
@@ -2856,7 +2869,7 @@ function HostReturn({ onHome, currency, user, profile }) {
 
       <div className="section">
         <TableOverview code={code} tableName={session.tableName} tableDate={session.tableDate}
-          items={session.items} paidMap={paidMap} currency={currency} />
+          items={session.items} paidMap={paidMap} selections={tableSelections} currency={currency} />
         {error && <p className="error-strip" role="alert">{error}</p>}
         <button className="btn btn-outline" style={{ marginTop: 10 }} onClick={async () => {
           setError("");

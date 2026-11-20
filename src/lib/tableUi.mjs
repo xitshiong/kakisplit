@@ -5,6 +5,16 @@ export function paymentStatus(value) {
   return { payers, total, complete: payers.length >= total };
 }
 
+export function paymentBreakdown(price, value, selected = []) {
+  const status = paymentStatus(value);
+  const totalCents = Math.round((Number(price) || 0) * 100);
+  const paidCents = status.complete ? totalCents : Math.round(totalCents / status.total) * status.payers.length;
+  const owing = [...new Set(Array.isArray(selected) ? selected : [])]
+    .filter(name => typeof name === 'string' && name.trim() && !status.payers.includes(name));
+  const unnamedShares = Math.max(0, status.total - status.payers.length - owing.length);
+  return { ...status, totalCents, paidCents, owing, unnamedShares };
+}
+
 export function savedTables(storage = localStorage) {
   try {
     const tables = JSON.parse(storage.getItem('ks_tables') || '[]');

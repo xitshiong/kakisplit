@@ -6,12 +6,16 @@
 .table-summary-heading { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; align-items: baseline; margin-bottom: 8px; color: var(--ink-light); }
 .table-summary-heading h2 { font: 500 .8rem 'DM Mono', monospace; text-transform: uppercase; letter-spacing: .06em; }
 .table-summary-heading > span { font-size: .75rem; }
+.table-payment-group { margin-top: 20px; }
+.table-group-heading { font: 500 .8rem 'DM Mono', monospace; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-light); }
+.table-payment-chip { align-self: flex-start; padding: 3px 7px; border-radius: 4px; background: var(--neon-orange); color: var(--ink); font: 500 .7rem/1.4 'DM Mono', monospace; text-transform: uppercase; }
+.table-payment-chip.is-complete { background: var(--neon-lime); }
 .table-summary-item { display: flex; align-items: flex-start; gap: 14px; padding-block: 14px; border-bottom: 1px dotted var(--ink-faint); color: var(--ink); }
 .table-item-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
 .table-item-name { font: 500 .875rem/1.5 'DM Mono', monospace; overflow-wrap: anywhere; }
 .table-item-status { font-size: .75rem; line-height: 1.5; color: var(--ink-light); overflow-wrap: anywhere; }
 .is-paid .table-item-name { text-decoration: line-through; }
-.table-item-price { flex-shrink: 0; padding-top: 2px; font: 500 .8rem/1.5 'DM Mono', monospace; font-variant-numeric: tabular-nums; }
+.table-item-price { max-width: 48%; padding-top: 2px; font: 500 .8rem/1.5 'DM Mono', monospace; font-variant-numeric: tabular-nums; text-align: right; }
 .table-summary-total { gap: 12px; margin-top: 8px; padding-top: 16px; border-top: 2px solid var(--ink); color: var(--ink); }
 .table-summary-total .bill-summary-val { flex-shrink: 0; }
 .recent-card > :first-child { min-width: 0; }
