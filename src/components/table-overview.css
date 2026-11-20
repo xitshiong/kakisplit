@@ -1,7 +1,7 @@
 .table-heading { overflow-wrap: anywhere; }
 .table-date { margin-block: 8px 20px; }
-.table-join-qr { display: inline-flex; padding: 16px; margin: 14px 0; border-radius: 14px; background: white; }
-.table-join-qr svg { display: block; width: min(180px, 100%); height: auto; }
+.table-join-qr { display: grid; place-items: center; width: 212px; max-width: 100%; padding: 16px; margin: 14px auto; border-radius: 14px; background: white; }
+.table-join-qr svg { display: block; width: 100%; height: auto; }
 .table-summary { margin-top: 24px; padding-top: 20px; border-top: 1px dashed var(--ink-faint); }
 .table-summary-heading { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; align-items: baseline; margin-bottom: 8px; color: var(--ink-light); }
 .table-summary-heading h2 { font: 500 .8rem 'DM Mono', monospace; text-transform: uppercase; letter-spacing: .06em; }
