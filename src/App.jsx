@@ -7,6 +7,7 @@ import ReceiptItemEditor from "./components/ReceiptItemEditor.jsx";
 import TableOverview from "./components/TableOverview.jsx";
 import { reviewReceiptItems } from "./lib/receiptReview.mjs";
 import { savedTables, localDate, formatTableDate } from "./lib/tableUi.mjs";
+import { savePaidWithClient } from "./lib/paidWrite.mjs";
 
 const callbackFailed = hasAuthError(new URL(window.location.href));
 
@@ -1923,36 +1924,7 @@ async function savePaid(itemId, name, code, splitCount = 1) {
   if (!code) code = new URLSearchParams(window.location.search).get("table") || localStorage.getItem("ks_current_code");
   if (!code) return { success: false };
 
-  // Optimistic concurrency: retry up to 4 times if update races
-  for (let attempt = 0; attempt < 4; attempt++) {
-    const { data, error } = await supabase.from("sessions").select("paid").eq("code", code).single();
-    if (error) return { success: false };
-
-    const paid = data?.paid || {};
-    if (!paid[itemId]) paid[itemId] = { payers: [], total: splitCount };
-    if (!paid[itemId].payers) paid[itemId] = { payers: [paid[itemId]], total: 1 };
-
-    const payers = paid[itemId].payers;
-    const total = paid[itemId].total || splitCount;
-
-    // Already paid by this user
-    if (payers.includes(name)) return { success: true, alreadyPaid: true };
-
-    // Item already full
-    if (payers.length >= total) return { success: false, full: true };
-
-    payers.push(name);
-
-    const { error: updateError } = await supabase
-      .from("sessions")
-      .update({ paid })
-      .eq("code", code);
-
-    if (!updateError) return { success: true };
-    // If update failed (race), wait briefly and retry
-    await new Promise(r => setTimeout(r, 100 + Math.random() * 200));
-  }
-  return { success: false };
+  return savePaidWithClient(supabase, itemId, name, code, splitCount);
 }
 
 async function loadSessionState(code) {
@@ -2281,8 +2253,13 @@ function HostView({ onHome, currency, user, profile }) {
   const [err, setErr] = useState("");
   const [drag, setDrag] = useState(false);
   const [items, setItems] = useState([]);
-  const [qrOverride, setQrOverride] = useState(undefined);
-  const qrImg = qrOverride === undefined ? profile?.qr_url : qrOverride;
+  const [qrImg, setQrImg] = useState(null);
+
+  useEffect(() => {
+    if (profile?.qr_url) {
+      setQrImg(current => current || profile.qr_url);
+    }
+  }, [profile?.qr_url]);
   const [code, setCode] = useState("");
   const [paidMap, setPaidMap] = useState({});
   const [tableSelections, setTableSelections] = useState({});
@@ -2337,7 +2314,7 @@ function HostView({ onHome, currency, user, profile }) {
     if (!file) return;
     setErr("");
     try {
-      setQrOverride(await readPaymentQr(file));
+      setQrImg(await readPaymentQr(file));
     } catch {
       setErr("Couldn’t read this QR image. Choose another image and try again.");
     }
@@ -2605,7 +2582,7 @@ function HostView({ onHome, currency, user, profile }) {
           ) : (
             <>
               <img src={qrImg} className="qr-preview" alt="Payment QR code" />
-              <button className="btn btn-outline" onClick={() => setQrOverride(null)} style={{ marginBottom: 14 }}>Change QR</button>
+              <button className="btn btn-outline" onClick={() => setQrImg(null)} style={{ marginBottom: 14 }}>Change QR</button>
             </>
           )}
           <div style={{ marginTop: 16 }}>
@@ -2620,7 +2597,7 @@ function HostView({ onHome, currency, user, profile }) {
         {step === 4 && <div className="section">
           <TableOverview code={code} tableName={tableName} tableDate={tableDate}
             items={items} paidMap={paidMap} selections={tableSelections} currency={currency} />
-          <button className="btn btn-outline" style={{ marginTop: 16 }} onClick={() => { setStep(0); setReceipts([]); setItems([]); setQrOverride(undefined); setCode(""); }}>
+          <button className="btn btn-outline" style={{ marginTop: 16 }} onClick={() => { setStep(0); setReceipts([]); setItems([]); setQrImg(profile?.qr_url || null); setCode(""); }}>
             🔄 Start new table
           </button>
         </div>}
