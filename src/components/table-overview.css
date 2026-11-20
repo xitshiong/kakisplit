@@ -1,0 +1,53 @@
+.table-heading { overflow-wrap: anywhere; }
+.table-date { margin-block: 8px 20px; }
+.table-join-qr { display: inline-flex; padding: 16px; margin: 14px 0; border-radius: 14px; background: white; }
+.table-join-qr svg { display: block; width: min(180px, 100%); height: auto; }
+.table-summary { margin-top: 24px; padding-top: 20px; border-top: 1px dashed var(--ink-faint); }
+.table-summary-heading { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; align-items: baseline; margin-bottom: 8px; color: var(--ink-light); }
+.table-summary-heading h2 { font: 500 .8rem 'DM Mono', monospace; text-transform: uppercase; letter-spacing: .06em; }
+.table-summary-heading > span { font-size: .75rem; }
+.table-payment-group { margin-top: 20px; }
+.table-group-heading { font: 500 .8rem 'DM Mono', monospace; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-light); }
+.table-payment-chip { align-self: flex-start; padding: 3px 7px; border-radius: 4px; background: var(--neon-orange); color: var(--ink); font: 500 .7rem/1.4 'DM Mono', monospace; text-transform: uppercase; }
+.table-payment-chip.is-complete { background: var(--neon-lime); }
+.table-summary-item { display: flex; align-items: flex-start; gap: 14px; padding-block: 14px; border-bottom: 1px dotted var(--ink-faint); color: var(--ink); }
+.table-item-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+.table-item-name { font: 500 .875rem/1.5 'DM Mono', monospace; overflow-wrap: anywhere; }
+.table-item-status { font-size: .75rem; line-height: 1.5; color: var(--ink-light); overflow-wrap: anywhere; }
+.is-paid .table-item-name { text-decoration: line-through; }
+.table-item-price { max-width: 48%; padding-top: 2px; font: 500 .8rem/1.5 'DM Mono', monospace; font-variant-numeric: tabular-nums; text-align: right; }
+.table-summary-total { gap: 12px; margin-top: 8px; padding-top: 16px; border-top: 2px solid var(--ink); color: var(--ink); }
+.table-summary-total .bill-summary-val { flex-shrink: 0; }
+.recent-card > :first-child { min-width: 0; }
+.recent-name, .profile-name, .profile-email { overflow-wrap: anywhere; }
+.recent-card .recent-code { flex-shrink: 0; }
+.recent-card { width: 100%; text-align: left; font: inherit; cursor: pointer; }
+.user-chip { font: inherit; cursor: pointer; color: var(--paper); }
+.app :is(button, input, a):focus-visible { outline: 3px solid var(--ink-light); outline-offset: 3px; }
+.app .top-nav :is(button, a):focus-visible { outline-color: var(--neon-lime); }
+.app button { touch-action: manipulation; }
+.app .upload-zone, .app .qr-zone { display: block; width: 100%; font: inherit; color: var(--ink); }
+.app .upload-label, .app .upload-hint { display: block; }
+.app .vault-qr-area { display: block; font: inherit; padding: 0; }
+.app .vault-qr-placeholder > :last-child { font-size: .8rem; }
+.app .date-chip { font: inherit; min-width: 44px; min-height: 64px; }
+.app .avatar-fallback { display: inline-grid; place-items: center; color: var(--ink); font: 700 1rem 'DM Mono', monospace; flex-shrink: 0; }
+.app .profile-large-avatar.avatar-fallback { font-size: 2rem; }
+.app .guest-item { width: 100%; font: inherit; text-align: left; }
+.app .guest-item .g-name { min-width: 0; overflow-wrap: anywhere; }
+.app .guest-item .g-price { flex-shrink: 0; }
+.app .guest-item .guest-paid-tag { white-space: normal; overflow-wrap: anywhere; max-width: 40%; }
+.app .split-controls { display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding: 8px 0 16px; flex-wrap: wrap; color: var(--ink); font-size: .8rem; }
+.app .split-controls button { min-width: 44px; min-height: 44px; }
+.app .split-controls button:disabled { opacity: .5; }
+.app .field-label { display: block; color: var(--ink-light); margin-bottom: 8px; font-size: .8rem; }
+.auth-dialog { margin: auto; padding: 0; border: none; border-radius: 18px; width: min(340px, calc(100% - 32px)); background: var(--paper); color: var(--ink); max-height: calc(100dvh - 48px); overscroll-behavior: contain; }
+.auth-dialog::backdrop { background: rgba(18,10,4,.88); }
+.auth-dialog .qr-modal-inner { max-height: none; }
+.app .share-hint { font-size: .75rem; line-height: 1.6; color: var(--paper); }
+.app .share-code-label { font-size: .75rem; color: var(--paper); }
+.app .receipt:has(.table-summary) .share-code { font-family: 'DM Mono', monospace; font-size: clamp(2.5rem, 12vw, 3.5rem); }
+.app .table-summary-total .bill-summary-val { font-family: 'DM Mono', monospace; font-size: 1.15rem; }
+@media (prefers-reduced-motion: reduce) {
+  .app *, .app *::before, .app *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}

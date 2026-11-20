@@ -1,12 +1,12 @@
 import { useState, useRef, useEffect } from "react";
-import { QRCodeSVG } from "qrcode.react";
 import { createClient } from "@supabase/supabase-js";
 import { Analytics } from "@vercel/analytics/react"
 import { scanReceipt, scanReceiptBatch } from "./lib/receiptOcr.js";
 import { LOGIN_INTENT_KEY, readLoginIntent, hasAuthError } from "./lib/authFlow.mjs";
 import ReceiptItemEditor from "./components/ReceiptItemEditor.jsx";
-import ShareTableLink from "./components/ShareTableLink.jsx";
+import TableOverview from "./components/TableOverview.jsx";
 import { reviewReceiptItems } from "./lib/receiptReview.mjs";
+import { savedTables, localDate, formatTableDate } from "./lib/tableUi.mjs";
 
 const callbackFailed = hasAuthError(new URL(window.location.href));
 
@@ -279,7 +279,7 @@ body {
 }
 
 .currency-selector-row { display: flex; gap: 8px; justify-content: center; margin-bottom: 24px; flex-wrap: wrap; }
-.currency-chip { 
+.currency-chip {
   background: var(--paper-dark); border: 1.5px solid var(--ink-faint); padding: 8px 16px; border-radius: 6px;
   font-family: 'DM Mono', monospace; font-size: 0.8rem; color: var(--ink-light); cursor: pointer; transition: 0.2s;
 }
@@ -1157,10 +1157,8 @@ body {
   font-family: 'DM Mono', monospace;
   font-size: 1.3rem; font-weight: 900; line-height: 1;
   flex-shrink: 0; width: 36px; padding-top: 2px;
+  color: var(--ink);
 }
-.how-step:nth-child(1) .how-step-num { color: var(--accent-ink); }
-.how-step:nth-child(2) .how-step-num { color: var(--ink); }
-.how-step:nth-child(3) .how-step-num { color: var(--ink); background: var(--neon-cyan); }
 
 .how-step-title {
   font-family: 'DM Sans', sans-serif;
@@ -1705,6 +1703,7 @@ button { touch-action: manipulation; }
 .guest-receipt-brand img { width: 56px; height: auto; }
 .guest-receipt-status { display: flex; align-items: center; gap: 6px; color: var(--ink-light); font-size: .7rem; }
 .guest-receipt-status > span { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--neon-lime); color: var(--ink); }
+.guest-receipt-home { min-height: 48px; min-width: 104px; padding: 10px 18px; border: 2px solid var(--ink); border-radius: 8px; background: var(--neon-lime); color: var(--ink); font: 700 1rem 'DM Sans', sans-serif; cursor: pointer; }
 .guest-receipt-meta { color: var(--ink-faint); font-size: .7rem; margin-bottom: 9px; overflow-wrap: anywhere; }
 .guest-table-name { color: var(--ink); font-family: 'Barlow Condensed', sans-serif; font-weight: 900; text-transform: uppercase; font-size: clamp(2.6rem, 11vw, 3.4rem); letter-spacing: -.025em; line-height: .95; overflow-wrap: anywhere; }
 .guest-receipt-intro { padding-block: 18px; color: var(--ink); font-size: .82rem; line-height: 1.6; }
@@ -1841,6 +1840,27 @@ async function prepareReceiptImage(file) {
   }
 }
 
+async function readPaymentQr(file) {
+  if (!file?.type.startsWith("image/")) throw new Error("Choose an image of your payment QR code.");
+  const source = URL.createObjectURL(file);
+  try {
+    const image = new Image();
+    image.src = source;
+    await image.decode();
+    const scale = Math.min(1, 400 / Math.max(image.width, image.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(image.width * scale));
+    canvas.height = Math.max(1, Math.round(image.height * scale));
+    const context = canvas.getContext("2d");
+    context.fillStyle = "#fff";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL("image/jpeg", 0.7);
+  } finally {
+    URL.revokeObjectURL(source);
+  }
+}
+
 function prepareQrForSave(qr) {
   if (!qr) return Promise.resolve(null);
   if (!qr.startsWith("data:")) return Promise.resolve(qr);
@@ -1893,6 +1913,7 @@ async function load(code) {
     items: row.items,
     qrImage: row.qr_image || qrImage,
     paid: row.paid,
+    selections: row.selections || {},
     tableName: row.table_name,
     tableDate: row.table_date
   };
@@ -1984,14 +2005,15 @@ function StepBar({ current, steps }) {
   );
 }
 
-function GuestReceiptHeader({ session, status = "Split the bill" }) {
+function GuestReceiptHeader({ session, status = "Split the bill", onHome }) {
   return (
     <header className="guest-receipt-header">
       <div className="guest-receipt-brand">
         <img src={LOGO_SRC} alt="KakiSplit" width="56" height="42" />
-        <span className="guest-receipt-status"><span aria-hidden="true">✓</span> {status}</span>
+        {onHome ? <button type="button" className="guest-receipt-home" onClick={onHome}>← Home</button>
+          : <span className="guest-receipt-status"><span aria-hidden="true">✓</span> {status}</span>}
       </div>
-      <p className="guest-receipt-meta">Table #{session.code}{session.tableDate ? ` · ${session.tableDate}` : ""}</p>
+      <p className="guest-receipt-meta">Table #{session.code}{session.tableDate ? ` · ${formatTableDate(session.tableDate)}` : ""}</p>
       <h1 className="guest-table-name">{session.tableName || "My Table"}</h1>
     </header>
   );
@@ -2005,7 +2027,9 @@ function GuestView({ session, onBack, currency }) {
   const [splits, setSplits] = useState({});
   const [done, setDone] = useState(false);
   const [showQR, setShowQR] = useState(false);
-  const [paidMap, setPaidMap] = useState({});
+  const [paidMap, setPaidMap] = useState(session.paid || {});
+  const [paying, setPaying] = useState(false);
+  const [paymentError, setPaymentError] = useState("");
   const { items = [], qrImage } = session;
 
   const [selections, setSelections] = useState({});
@@ -2041,27 +2065,37 @@ function GuestView({ session, onBack, currency }) {
   }, 0);
 
   const confirmPayment = async () => {
-    const failures = [];
-    const failedIds = [];
-    for (const i of myItems) {
-      const paidInfo = paidMap[i.id];
-      const totalSplit = paidInfo?.total || splits[i.id] || 1;
-      const result = await savePaid(i.id, name, session.code, totalSplit);
-      if (result?.full) { failures.push(i.name); failedIds.push(i.id); }
-    }
-    const { paid } = await loadSessionState(session.code);
-    setPaidMap(paid);
-    if (failures.length > 0) {
-      // Deselect items that were already taken
-      setSel(s => {
-        const next = { ...s };
-        failedIds.forEach(id => { delete next[id]; });
-        return next;
-      });
-      alert(`Someone else just paid for: ${failures.join(", ")}. Removed from your total.`);
-    } else {
-      setDone(true);
-      setShowQR(false);
+    if (paying || !myItems.length) return;
+    setPaying(true);
+    setPaymentError("");
+    try {
+      const full = [];
+      const failed = [];
+      for (const item of myItems) {
+        const totalSplit = paidMap[item.id]?.total || splits[item.id] || 1;
+        const result = await savePaid(item.id, name, session.code, totalSplit);
+        if (result?.full) full.push(item);
+        else if (!result?.success) failed.push(item);
+      }
+      const { paid } = await loadSessionState(session.code);
+      setPaidMap(paid);
+      if (full.length) {
+        setSel(selected => {
+          const next = { ...selected };
+          full.forEach(item => { delete next[item.id]; });
+          return next;
+        });
+        setPaymentError(`Already paid by someone else: ${full.map(item => item.name).join(", ")}. Go back to check your items before confirming again.`);
+      } else if (failed.length) {
+        setPaymentError("Couldn’t save your payment status. Check your connection and try again. If you already transferred, don’t pay again.");
+      } else {
+        setDone(true);
+        setShowQR(false);
+      }
+    } catch {
+      setPaymentError("Couldn’t save your payment status. Check your connection and try again. If you already transferred, don’t pay again.");
+    } finally {
+      setPaying(false);
     }
   };
 
@@ -2072,9 +2106,9 @@ function GuestView({ session, onBack, currency }) {
         <div className="section-head">What's your name?</div>
         <div className="section-sub" style={{ marginBottom: 16 }}>So the host knows who's paid</div>
         <label className="field-label" htmlFor="guest-name">Your name</label>
-        <input id="guest-name" className="name-in" placeholder="e.g. Yagiz, Dylan, Sabry..." autoComplete="given-name"
+        <input id="guest-name" autoComplete="given-name" className="name-in" placeholder="e.g. Ali"
           value={name} onChange={e => setName(e.target.value)}
-          onKeyDown={e => e.key === "Enter" && name.trim() && setNamed(true)} autoFocus />
+          onKeyDown={e => e.key === "Enter" && name.trim() && setNamed(true)} />
         <button className="btn btn-ink" disabled={!name.trim()} onClick={() => setNamed(true)}>
           Continue →
         </button>
@@ -2085,7 +2119,7 @@ function GuestView({ session, onBack, currency }) {
 
   if (done) return (
     <div className="receipt guest-receipt">
-      <GuestReceiptHeader session={session} status="Share confirmed" />
+      <GuestReceiptHeader session={session} onHome={onBack} />
       <div className="guest-receipt-body">
         <div className="section-head" style={{ textAlign: "center" }}>Confirmed, {name}!</div>
         <div className="section-sub" style={{ textAlign: "center", marginBottom: 20 }}>Here's your share of the bill</div>
@@ -2108,6 +2142,7 @@ function GuestView({ session, onBack, currency }) {
             </div>
           );
         })}
+        <button className="btn btn-outline" onClick={onBack}>Back to home</button>
       </div>
     </div>
   );
@@ -2119,7 +2154,7 @@ function GuestView({ session, onBack, currency }) {
         <h2 className="section-head">Scan & pay the host</h2>
         <p className="section-sub">Open your banking app and pay exactly this amount.</p>
       </div>
-      
+
       <div style={{ textAlign: "center", padding: "30px 24px", borderBottom: "1px dashed var(--ink-faint)" }}>
         <div style={{ fontFamily: "'DM Mono', monospace", fontSize: "clamp(1.6rem, 7vw, 2.4rem)", fontWeight: 900, color: "var(--accent-ink)" }}>
           {currency} {myTotal.toFixed(2)}
@@ -2131,10 +2166,11 @@ function GuestView({ session, onBack, currency }) {
       </div>
 
       <div style={{ padding: "24px" }}>
-        <button className="btn btn-neon" style={{ width: "100%", marginBottom: 12, padding: "20px", fontSize: "1rem" }} onClick={confirmPayment}>
-          ✅ I HAVE PAID
+        {paymentError && <p className="error-strip" role="alert">{paymentError}</p>}
+        <button className="btn btn-neon" disabled={paying || !myItems.length} style={{ width: "100%", marginBottom: 12, padding: "20px", fontSize: "1rem" }} onClick={confirmPayment}>
+          {paying ? "Saving…" : "I have paid"}
         </button>
-        <button className="btn btn-outline" style={{ width: "100%", border: "none" }} onClick={() => setShowQR(false)}>
+        <button className="btn btn-outline" disabled={paying} style={{ width: "100%", border: "none" }} onClick={() => setShowQR(false)}>
           ← BACK
         </button>
       </div>
@@ -2221,13 +2257,14 @@ function GuestView({ session, onBack, currency }) {
         </div>
       </div>
 
+      {paymentError && <div className="receipt"><p className="error-strip" role="alert">{paymentError}</p></div>}
       <div className="sticky-total guest-sticky">
         <div>
           <div className="sticky-label">Your share · {myItems.length} item{myItems.length === 1 ? "" : "s"}</div>
           <div className="sticky-amt" aria-live="polite">{currency} {myTotal.toFixed(2)}</div>
         </div>
-        <button className="sticky-pay-btn" disabled={myTotal === 0} onClick={() => qrImage ? setShowQR(true) : confirmPayment()}>
-          {qrImage ? "Pay host →" : "Confirm →"}
+        <button className="sticky-pay-btn" disabled={myTotal <= 0 || paying} onClick={() => qrImage ? setShowQR(true) : confirmPayment()}>
+          {paying ? "Saving…" : qrImage ? "Pay host →" : "Confirm →"}
         </button>
       </div>
     </>
@@ -2254,11 +2291,12 @@ function HostView({ onHome, currency, user, profile }) {
   }, [profile, qrImg]);
   const [code, setCode] = useState("");
   const [paidMap, setPaidMap] = useState({});
+  const [tableSelections, setTableSelections] = useState({});
   const fileRef = useRef();
   const qrRef = useRef();
   const STEPS = ["Receipt", "Details", "Items", "QR", "Share"];
   const [tableName, setTableName] = useState("");
-  const [tableDate, setTableDate] = useState(new Date().toISOString().split("T")[0]);
+  const [tableDate, setTableDate] = useState(() => localDate());
 
   const handleFile = async (files) => {
     if (preparing || loading) return;
@@ -2301,23 +2339,14 @@ function HostView({ onHome, currency, user, profile }) {
     setStep(1);
   };
 
-  const handleQR = f => {
-    if (!f?.type.startsWith("image/")) return;
-    const r = new FileReader();
-    r.onload = e => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement("canvas");
-        const max = 400;
-        const scale = Math.min(1, max / Math.max(img.width, img.height));
-        canvas.width = img.width * scale;
-        canvas.height = img.height * scale;
-        canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
-        setQrImg(canvas.toDataURL("image/jpeg", 0.7));
-      };
-      img.src = e.target.result;
-    };
-    r.readAsDataURL(f);
+  const handleQR = async file => {
+    if (!file) return;
+    setErr("");
+    try {
+      setQrImg(await readPaymentQr(file));
+    } catch {
+      setErr("Couldn’t read this QR image. Choose another image and try again.");
+    }
   };
 
   const notifiedRef = useRef(new Set());
@@ -2400,7 +2429,7 @@ function HostView({ onHome, currency, user, profile }) {
         }
       }
 
-      const existing = JSON.parse(localStorage.getItem("ks_tables") || "[]");
+      const existing = savedTables();
       existing.unshift({ code: c, name: tableName || "My Table", date: tableDate });
       localStorage.setItem("ks_tables", JSON.stringify(existing));
       localStorage.setItem("ks_current_code", c);
@@ -2409,6 +2438,7 @@ function HostView({ onHome, currency, user, profile }) {
 
       setCode(c);
       setPaidMap(initialPaid);
+      setTableSelections({});
       setStep(4);
     } catch (e) {
       setErr("Failed to create table: " + e.message);
@@ -2420,7 +2450,10 @@ function HostView({ onHome, currency, user, profile }) {
   useEffect(() => {
     if (step !== 4) return;
     const t = setInterval(() => {
-      loadSessionState(code).then(s => setPaidMap(s.paid));
+      loadSessionState(code).then(s => {
+        setPaidMap(s.paid);
+        setTableSelections(s.selections);
+      });
     }, 2000);
     return () => clearInterval(t);
   }, [step, code]);
@@ -2443,8 +2476,6 @@ function HostView({ onHome, currency, user, profile }) {
     setToast(null);
   };
 
-  const url = code ? `${window.location.origin}${window.location.pathname}?table=${code}` : "";
-  const subtotal = reviewReceiptItems(items).total;
   const upd = (id, f, v) => setItems(its => its.map(it => it.id === id ? { ...it, [f]: v } : it));
   const busy = loading || preparing;
   const scanNotices = receipts.map((receipt, index) => {
@@ -2464,9 +2495,9 @@ function HostView({ onHome, currency, user, profile }) {
           </button>
           <img src={LOGO_SRC} alt="KakiSplit" className="logo-img" />
           <div className="logo-tagline">Split bills lah, no drama</div>
-          <div><span className="badge-strip">🧾 Host Mode</span></div>
+          <div><span className="badge-strip">🧾 {step === 4 ? "Your table" : "Host"}</span></div>
         </div>
-        <StepBar current={step} steps={STEPS} />
+        {step < 4 && <StepBar current={step} steps={STEPS} />}
 
         {/* STEP 0 */}
         {step === 0 && <div className="section">
@@ -2478,6 +2509,7 @@ function HostView({ onHome, currency, user, profile }) {
             onDragOver={e => { e.preventDefault(); setDrag(true); }}
             onDragLeave={() => setDrag(false)}
             onDrop={e => { e.preventDefault(); setDrag(false); handleFile(e.dataTransfer.files); }}>
+
             <span className="upload-emoji">📸</span>
             <span className="upload-label">Tap to snap or upload</span>
             <span className="upload-hint">Upload one or more receipts</span>
@@ -2502,7 +2534,7 @@ function HostView({ onHome, currency, user, profile }) {
               {loading ? (
                 <div className="loading-receipt">
                   <div className="spinner" />
-                  <div className="loading-label">Extracting items...</div>
+                  <div className="loading-label">Extracting items…</div>
                   <div className="loading-sub">Processing {receipts.length} receipt{receipts.length > 1 ? "s" : ""}</div>
                 </div>
               ) : (
@@ -2523,7 +2555,7 @@ function HostView({ onHome, currency, user, profile }) {
           <div className="section-head">Name your table</div>
           <div className="section-sub">So you can find it later</div>
           <label className="field-label" htmlFor="table-name">Table name</label>
-          <input id="table-name" className="name-in" placeholder="e.g. Jalan Alor dinner, KLCC lunch..."
+          <input id="table-name" className="name-in" placeholder="e.g. Jalan Alor dinner"
             value={tableName} onChange={e => setTableName(e.target.value)}
             style={{ marginBottom: 12 }} />
           <div style={{ fontSize: "0.7rem", color: "var(--ink-faint)", letterSpacing: 1, textTransform: "uppercase", marginBottom: 8 }}>Date</div>
@@ -2531,7 +2563,7 @@ function HostView({ onHome, currency, user, profile }) {
             {[0, 1, 2, 3, 4, 5, 6].map(d => {
               const date = new Date();
               date.setDate(date.getDate() - d);
-              const val = date.toISOString().split("T")[0];
+              const val = localDate(date);
 
               const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
               const label = d === 0 ? "Today" : d === 1 ? "Yesterday" : dayNames[date.getDay()];
@@ -2569,21 +2601,21 @@ function HostView({ onHome, currency, user, profile }) {
           <div className="section-sub">Guests scan this to pay you directly</div>
           {!qrImg ? (
             <>
-            <button type="button" className="qr-zone" onClick={() => qrRef.current.click()}>
-              <span className="upload-emoji">💳</span>
-              <span className="upload-label">Upload your QR code</span>
-              <span className="upload-hint">DuitNow • TNG • Maybank2u • Any QR</span>
-            </button>
-            <input ref={qrRef} type="file" accept="image/*" hidden aria-label="Upload payment QR" onChange={e => handleQR(e.target.files[0])} />
+              <button type="button" className="qr-zone" onClick={() => qrRef.current.click()}>
+                <span className="upload-emoji">💳</span>
+                <span className="upload-label">Upload your QR code</span>
+                <span className="upload-hint">DuitNow • TNG • Maybank2u • Any QR</span>
+              </button>
+              <input ref={qrRef} type="file" accept="image/*" hidden aria-label="Upload payment QR" onChange={e => handleQR(e.target.files[0])} />
             </>
           ) : (
             <>
-              <img src={qrImg} className="qr-preview" alt="QR" />
+              <img src={qrImg} className="qr-preview" alt="Payment QR code" />
               <button className="btn btn-outline" onClick={() => setQrImg(null)} style={{ marginBottom: 14 }}>Change QR</button>
             </>
           )}
           <div style={{ marginTop: 16 }}>
-            <button className="btn btn-ink" disabled={!qrImg || finalising} onClick={finalise}>🔗 {finalising ? "Generating..." : "Generate Table Link →"}</button>
+            <button className="btn btn-ink" disabled={!qrImg || finalising} onClick={finalise}>🔗 {finalising ? "Generating…" : "Generate Table Link →"}</button>
             {err && <div className="error-strip" style={{ marginTop: 12 }}>{err}</div>}
             {!qrImg && !err && <div className="error-strip" style={{ marginTop: 12 }}>Upload your payment QR to continue — guests need it to pay you.</div>}
             <button className="btn btn-outline" onClick={() => setStep(2)}>← Back</button>
@@ -2592,44 +2624,8 @@ function HostView({ onHome, currency, user, profile }) {
 
         {/* STEP 4 - SHARE */}
         {step === 4 && <div className="section">
-          <div className="section-head">Table is live!</div>
-          <div className="section-sub">Share with everyone at the table</div>
-          <div className="share-receipt">
-            <div className="share-code-label">Table Code</div>
-            <div className="share-code">{code}</div>
-            <div className="neon-divider" />
-            <div style={{ background: "white", padding: 16, borderRadius: 4, display: "inline-block", margin: "14px 0" }}>
-              <QRCodeSVG value={url} size={180} />
-            </div>
-            <div className="share-hint">Scan to join, or copy the table link below</div>
-          </div>
-          <ShareTableLink url={url} />
-          <div style={{ marginTop: 16, borderTop: "1px dashed var(--ink-faint)", paddingTop: 16 }}>
-            <div style={{ fontSize: "0.7rem", color: "var(--ink-faint)", letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span>Bill Summary</span>
-              <span style={{ color: "var(--ink-light)", fontSize: "0.75rem" }}>{Object.keys(paidMap).length}/{items.length} paid</span>
-            </div>
-            {items.map(i => {
-              const paidInfo = paidMap[i.id];
-              const payers = (paidInfo?.payers || (paidInfo ? [paidInfo] : [])).map(p => typeof p === 'object' ? (p.name || "Host") : p);
-              const isPaid = payers.length > 0;
-              return (
-                <div key={i.id} className={`line-item ${isPaid ? "paid" : ""}`} style={{ borderBottom: "1px dotted var(--ink-faint)" }}>
-                  <span style={{ flex: 1, fontSize: "0.85rem", color: "var(--ink)", fontFamily: "'DM Mono',monospace", textDecoration: isPaid ? "line-through" : "none" }}>
-                    {i.name}
-                  </span>
-                  {isPaid
-                    ? <span className="paid-tag">✓ {payers.join(", ")}</span>
-                    : <span style={{ fontFamily: "'DM Mono',monospace", fontSize: "0.85rem", color: "var(--ink-light)", fontWeight: 500 }}>{currency} {parseFloat(i.price).toFixed(2)}</span>
-                  }
-                </div>
-              );
-            })}
-            <div className="bill-summary-row highlight" style={{ marginTop: 8, paddingTop: 8, borderTop: "2px solid var(--ink)" }}>
-              <span style={{ fontWeight: 500, color: "var(--ink)" }}>Total</span>
-              <span className="bill-summary-val">{currency} {subtotal.toFixed(2)}</span>
-            </div>
-          </div>
+          <TableOverview code={code} tableName={tableName} tableDate={tableDate}
+            items={items} paidMap={paidMap} selections={tableSelections} currency={currency} />
           <button className="btn btn-outline" style={{ marginTop: 16 }} onClick={() => { setStep(0); setReceipts([]); setItems([]); setQrImg(null); setCode(""); }}>
             🔄 Start new table
           </button>
@@ -2652,12 +2648,18 @@ function GuestCode({ onJoin, onBack }) {
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
   const tryJoin = async () => {
+    if (loading || !/^\d{4}$/.test(code)) return;
     setLoading(true);
     setErr("");
-    const s = await load(code.trim());
-    if (s) { onJoin(s); }
-    else setErr("Table not found. Ask the host for the correct code.");
-    setLoading(false);
+    try {
+      const session = await load(code);
+      if (session) onJoin(session);
+      else setErr("Table not found. Check the code with your host and try again.");
+    } catch {
+      setErr("Couldn’t join the table. Check your connection and try again.");
+    } finally {
+      setLoading(false);
+    }
   };
   return (
     <div className="receipt">
@@ -2665,17 +2667,15 @@ function GuestCode({ onJoin, onBack }) {
         <div className="section-head">Join a table</div>
         <div className="section-sub" id="table-code-hint" style={{ marginBottom: 16 }}>Ask your host for the 4-digit table code.</div>
         <label className="field-label" htmlFor="table-code">Table code</label>
-        <input id="table-code" className="name-in table-code-input" placeholder="e.g. 1234" value={code} aria-describedby="table-code-hint" aria-invalid={!!err}
-          onChange={e => {
-            const digits = e.target.value.replace(/\D/g, "");
-            if (digits.length <= 4) setCode(digits);
-          }}
-          onKeyDown={e => e.key === "Enter" && code.length === 4 && !loading && tryJoin()} autoFocus
-          inputMode="numeric" pattern="[0-9]{4}"
+        <input id="table-code" className="name-in table-code-input" placeholder="e.g. 1234" value={code}
+          aria-describedby={err ? "table-code-hint table-code-error" : "table-code-hint"} aria-invalid={!!err}
+          onChange={e => { setCode(e.target.value.replace(/\D/g, "").slice(0, 4)); setErr(""); }}
+          onKeyDown={e => e.key === "Enter" && tryJoin()}
+          inputMode="numeric" pattern="[0-9]{4}" autoComplete="off"
           style={{ textAlign: "center", letterSpacing: 6, fontSize: "1.2rem" }} />
-        {err && <div className="error-strip" role="alert">⚠ {err}</div>}
+        {err && <div id="table-code-error" className="error-strip" role="alert">⚠ {err}</div>}
         <button className="btn btn-ink" disabled={code.length !== 4 || loading} onClick={tryJoin}>
-          {loading ? "Looking up..." : "Join Table →"}
+          {loading ? "Looking up…" : "Join Table →"}
         </button>
         <button className="btn btn-outline" onClick={onBack}>← Back</button>
       </div>
@@ -2683,38 +2683,36 @@ function GuestCode({ onJoin, onBack }) {
   );
 }
 
+function ProfileAvatar({ user, profile, large = false }) {
+  const [failed, setFailed] = useState(false);
+  const source = user?.user_metadata?.picture || user?.user_metadata?.avatar_url || profile?.avatar_url;
+  const className = large ? "profile-large-avatar" : "user-avatar";
+  return source && !failed
+    ? <img src={source} alt="" className={className} onError={() => setFailed(true)} />
+    : <span className={`${className} avatar-fallback`} aria-hidden="true">{(profile?.full_name || user?.email || "K").slice(0, 1).toUpperCase()}</span>;
+}
+
 // ── PROFILE VIEW ─────────────────────────────────────────────
 function ProfileView({ onHome, user, profile, setProfile, onLogout }) {
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef();
 
-  const handleQR = async (f) => {
-    if (!f?.type.startsWith("image/")) return;
+  const [qrError, setQrError] = useState("");
+  const handleQR = async file => {
+    if (!file || uploading) return;
     setUploading(true);
-
+    setQrError("");
     try {
-      const reader = new FileReader();
-      reader.onload = e => {
-        const img = new Image();
-        img.onload = async () => {
-          const max = 400;
-          const scale = Math.min(1, max / Math.max(img.width, img.height));
-          const canvas = document.createElement("canvas");
-          canvas.width = img.width * scale;
-          canvas.height = img.height * scale;
-          canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
-          const b64 = canvas.toDataURL("image/jpeg", 0.7);
+      const image = await readPaymentQr(file);
+      const { error } = await supabase.from("profiles").update({ qr_url: image }).eq("id", user.id);
+      if (error) throw error;
+      setProfile(previous => ({ ...previous, qr_url: image }));
 
-          const { error } = await supabase.from('profiles').update({ qr_url: b64 }).eq('id', user.id);
-          if (!error) setProfile(prev => ({ ...prev, qr_url: b64 }));
-          setUploading(false);
-        };
-        img.src = e.target.result;
-      };
-      reader.readAsDataURL(f);
-    } catch (e) {
-      console.error(e);
+    } catch {
+      setQrError("Couldn’t save your payment QR. Check your connection or choose another image, then try again.");
+    } finally {
       setUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
     }
   };
 
@@ -2726,29 +2724,30 @@ function ProfileView({ onHome, user, profile, setProfile, onLogout }) {
           <span className="home-btn-label">Back</span>
         </button>
         <div className="profile-hero">
-          <img src={user?.user_metadata?.picture || user?.user_metadata?.avatar_url || profile?.avatar_url} alt="User" className="profile-large-avatar" />
-          <div className="profile-name">{profile?.full_name}</div>
+          <ProfileAvatar user={user} profile={profile} large />
+          <div className="profile-name">{profile?.full_name || user?.user_metadata?.full_name || "Your profile"}</div>
           <div className="profile-email">{user.email}</div>
         </div>
       </div>
 
       <div className="section" style={{ paddingTop: 0 }}>
         <div className="vault-card">
-          <div className="vault-title">🛡️ Personal QR</div>
+          <div className="vault-title">Your payment QR</div>
           <p className="vault-desc">Save your default payment QR code here. It will be pre-filled every time you start a table.</p>
 
-          <button type="button" className="vault-qr-area" onClick={() => fileRef.current.click()} aria-label="Change your default payment QR">
+          <button type="button" disabled={uploading} className="vault-qr-area" aria-label="Choose payment QR image" onClick={() => fileRef.current.click()}>
             {profile?.qr_url ? (
               <img src={profile.qr_url} alt="Default QR" className="vault-qr-preview" />
             ) : (
               <span className="vault-qr-placeholder">
                 <span>➕</span>
-                <span>Upload Payment QR</span>
+                <span>Upload payment QR</span>
               </span>
             )}
           </button>
           <input type="file" ref={fileRef} hidden accept="image/*" aria-label="Default payment QR image" onChange={e => handleQR(e.target.files[0])} />
-          {uploading && <div className="spinner" style={{ margin: "10px auto" }} />}
+          {uploading && <p className="section-sub" role="status">Saving payment QR…</p>}
+          {qrError && <p className="error-strip" role="alert">{qrError}</p>}
         </div>
 
         <button className="btn btn-outline" style={{ marginTop: 40, color: "var(--accent-ink)", borderColor: "var(--neon-pink)" }} onClick={onLogout}>
@@ -2761,16 +2760,38 @@ function ProfileView({ onHome, user, profile, setProfile, onLogout }) {
 function HostReturn({ onHome, currency, user, profile }) {
   const [session, setSession] = useState(null);
   const [paidMap, setPaidMap] = useState({});
-  const [copiedLink, setCopiedLink] = useState(false);
+  const [tableSelections, setTableSelections] = useState({});
   const [copiedExcel, setCopiedExcel] = useState(false);
   const [code] = useState(() => localStorage.getItem("ks_current_code"));
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [retry, setRetry] = useState(0);
+  const [concluding, setConcluding] = useState(false);
 
   useEffect(() => {
-    if (!code) return;
-    load(code).then(s => {
-      if (s) setSession(s);
-    });
-  }, []);
+    let active = true;
+    setLoading(true);
+    setError("");
+    const open = async () => {
+      try {
+        const table = code ? await load(code) : null;
+        if (!active) return;
+        if (table) {
+          setSession(table);
+          setPaidMap(table.paid || {});
+          setTableSelections(table.selections);
+        } else {
+          setError("This table couldn’t be opened. Check your connection and try again, or return home to choose another table.");
+        }
+      } catch {
+        if (active) setError("Couldn’t load your table. Check your connection and try again.");
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+    open();
+    return () => { active = false; };
+  }, [code, retry]);
 
   const notifiedRef = useRef(new Set());
   useEffect(() => {
@@ -2807,7 +2828,10 @@ function HostReturn({ onHome, currency, user, profile }) {
   useEffect(() => {
     if (!code) return;
     const t = setInterval(() => {
-      loadSessionState(code).then(s => setPaidMap(s.paid));
+      loadSessionState(code).then(s => {
+        setPaidMap(s.paid);
+        setTableSelections(s.selections);
+      });
     }, 2000);
     return () => clearInterval(t);
   }, [code]);
@@ -2815,14 +2839,20 @@ function HostReturn({ onHome, currency, user, profile }) {
 
   if (!session) return (
     <div className="receipt">
-      <div className="receipt-inner" style={{ textAlign: "center", padding: "40px 24px" }}>
-        <div className="spinner" style={{ margin: "0 auto 16px" }} />
-        <div className="section-sub">Loading your table...</div>
+      <div className="receipt-inner" style={{ textAlign: "center" }}>
+        {loading ? <div role="status">
+          <div className="spinner" style={{ margin: "0 auto 16px" }} />
+          <p className="section-sub">Loading your table…</p>
+        </div> : <>
+          <h1 className="section-head">Table unavailable</h1>
+          <p className="error-strip" role="alert">{error}</p>
+          <button className="btn btn-ink" onClick={() => setRetry(value => value + 1)}>Try again</button>
+        </>}
+        <button className="btn btn-outline" onClick={onHome}>← Back to home</button>
       </div>
     </div>
   );
 
-  const url = `${window.location.origin}${window.location.pathname}?table=${code}`;
   const subtotal = session.items.reduce((s, i) => s + parseFloat(i.price || 0), 0);
 
   return (
@@ -2834,110 +2864,54 @@ function HostReturn({ onHome, currency, user, profile }) {
         </button>
         <img src={LOGO_SRC} alt="KakiSplit" className="logo-img" />
         <div className="logo-tagline">Split bills lah, no drama</div>
-        <div><span className="badge-strip">🧾 Your Table</span></div>
+        <div><span className="badge-strip">🧾 Your table</span></div>
       </div>
 
       <div className="section">
-        <div style={{ background: "var(--ink)", borderRadius: 4, padding: "16px 20px", marginBottom: 16, textAlign: "center" }}>
-          <div style={{ fontSize: "0.75rem", color: "var(--on-dark-muted)", letterSpacing: 3, textTransform: "uppercase", marginBottom: 6 }}>Table Code</div>
-          <div style={{ fontFamily: "'DM Mono',monospace", fontSize: "2.4rem", fontWeight: 900, color: "var(--neon-lime)", letterSpacing: 8 }}>{code}</div>
-          <div style={{ fontSize: "0.75rem", color: "var(--on-dark-muted)", marginTop: 8, letterSpacing: 1 }}>
-            {session.tableName} · {session.tableDate}
-          </div>
-        </div>
-
-        <div style={{ fontSize: "0.7rem", color: "var(--ink-faint)", letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <span>Bill Summary</span>
-          <span style={{ color: "var(--ink-light)", fontSize: "0.75rem" }}>{Object.keys(paidMap).length}/{session.items.length} paid</span>
-        </div>
-
-        {/* UNPAID ITEMS */}
-        {session.items.filter(i => !paidMap[i.id]).length > 0 && (
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: "0.75rem", color: "var(--accent-ink)", letterSpacing: 2, textTransform: "uppercase", marginBottom: 8, fontWeight: 500 }}>
-              ⏳ Unpaid ({session.items.filter(i => !paidMap[i.id]).length})
-            </div>
-            {session.items.filter(i => !paidMap[i.id]).map(i => (
-              <div key={i.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 0", borderBottom: "1px dotted var(--ink-faint)" }}>
-                <span style={{ flex: 1, fontSize: "0.85rem", color: "var(--ink)", fontFamily: "'DM Mono',monospace" }}>
-                  {i.name}
-                </span>
-                <span style={{ fontFamily: "'DM Mono',monospace", fontSize: "0.85rem", color: "var(--accent-ink)", fontWeight: 500 }}>
-                  {currency} {parseFloat(i.price).toFixed(2)}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* PAID ITEMS */}
-        {session.items.filter(i => paidMap[i.id]).length > 0 && (
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: "0.75rem", color: "var(--ink-light)", letterSpacing: 2, textTransform: "uppercase", marginBottom: 8, fontWeight: 500 }}>
-              ✓ Paid ({session.items.filter(i => paidMap[i.id]).length})
-            </div>
-            {session.items.filter(i => paidMap[i.id]).map(i => {
-              const paidInfo = paidMap[i.id];
-              const payers = (paidInfo?.payers || [paidInfo]).map(p => typeof p === 'object' ? (p.name || "Host") : p);
-              return (
-                <div key={i.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 0", borderBottom: "1px dotted var(--ink-faint)", opacity: 0.5 }}>
-                  <div style={{ flex: 1 }}>
-                    <span style={{ fontSize: "0.85rem", color: "var(--ink)", fontFamily: "'DM Mono',monospace", textDecoration: "line-through" }}>
-                      {i.name}
-                    </span>
-                    <div style={{ fontSize: "0.75rem", color: "var(--ink-faint)", marginTop: 2 }}>
-                      paid by {payers.join(", ")}
-                    </div>
-                  </div>
-                  <span className="paid-tag">✓ {payers.join(", ")}</span>
-                </div>
-              )
-            })}
-          </div>
-        )}
-
-        <div className="bill-summary-row highlight" style={{ marginTop: 8, paddingTop: 8, borderTop: "2px solid var(--ink)" }}>
-          <span style={{ fontWeight: 500, color: "var(--ink)" }}>Total</span>
-          <span className="bill-summary-val">{currency} {subtotal.toFixed(2)}</span>
-        </div>
-
-        <button className="btn btn-ink" style={{ marginTop: 16 }} onClick={() => {
-          navigator.clipboard.writeText(url);
-          setCopiedLink(true);
-          setTimeout(() => setCopiedLink(false), 2000);
-        }}>
-          {copiedLink ? "✓ Copied!" : "📋 Copy Table Link"}
-        </button>
-        <button className="btn btn-outline" style={{ marginTop: 10 }} onClick={() => {
+        <TableOverview code={code} tableName={session.tableName} tableDate={session.tableDate}
+          items={session.items} paidMap={paidMap} selections={tableSelections} currency={currency} />
+        {error && <p className="error-strip" role="alert">{error}</p>}
+        <button className="btn btn-outline" style={{ marginTop: 10 }} onClick={async () => {
+          setError("");
           const rows = ["Item\tPrice\tTax\tTotal\tPaid By"];
           session.items.forEach(i => {
             const paidInfo = paidMap[i.id];
             const payersArray = (paidInfo?.payers || (paidInfo ? [paidInfo] : [])).map(p => typeof p === 'object' ? (p.name || "Host") : p);
             const payers = payersArray.join(", ");
-            const originalPrice = i.rawPrice || i.price;
-            const itemTax = i.itemTax || 0;
+            const originalPrice = Number(i.rawPrice ?? i.price) || 0;
+            const itemTax = Number(i.itemTax) || 0;
             rows.push(`${i.name}\t${originalPrice.toFixed(2)}\t${itemTax.toFixed(2)}\t${parseFloat(i.price).toFixed(2)}\t${payers}`);
           });
           rows.push(`\t\t\t\t`);
           rows.push(`Total\t\t\t${subtotal.toFixed(2)}\t`);
-          navigator.clipboard.writeText(rows.join("\n"));
-          setCopiedExcel(true);
-          setTimeout(() => setCopiedExcel(false), 2000);
+          try {
+            await navigator.clipboard.writeText(rows.join("\n"));
+            setCopiedExcel(true);
+            setTimeout(() => setCopiedExcel(false), 2000);
+          } catch {
+            setError("Couldn’t copy the bill. Allow clipboard access and try again.");
+          }
         }}>
-          {copiedExcel ? "✓ Copied!" : "📊 Copy to Excel"}
+          {copiedExcel ? "✓ Bill copied" : "Copy to Excel"}
         </button>
-        <button className="btn btn-outline" style={{ marginTop: 10, borderColor: "var(--neon-pink)", color: "var(--accent-ink)" }}
+        <button className="btn btn-outline" disabled={concluding} style={{ marginTop: 10 }}
           onClick={async () => {
-            await supabase.from("sessions").update({ concluded: true }).eq("code", code);
-            const tables = JSON.parse(localStorage.getItem("ks_tables") || "[]");
-            const updated = tables.filter(t => t.code !== code);
-            localStorage.setItem("ks_tables", JSON.stringify(updated));
-            localStorage.removeItem("ks_current_code");
-            localStorage.removeItem("ks_current_name");
-            localStorage.removeItem("ks_current_date");
-            onHome();
+            if (!window.confirm("Conclude this table? It will be removed from Your tables on this device. Copy your bill first if you need a record.")) return;
+            setConcluding(true);
+            setError("");
+            try {
+              const { error: saveError } = await supabase.from("sessions").update({ concluded: true }).eq("code", code);
+              if (saveError) throw saveError;
+              localStorage.setItem("ks_tables", JSON.stringify(savedTables().filter(table => table.code !== code)));
+              ["ks_current_code", "ks_current_name", "ks_current_date"].forEach(key => localStorage.removeItem(key));
+              onHome();
+            } catch {
+              setError("Couldn’t conclude this table. Check your connection and try again.");
+            } finally {
+              setConcluding(false);
+            }
           }}>
-          🏁 Conclude Table
+          {concluding ? "Concluding…" : "Conclude table"}
         </button>
         <button className="btn btn-outline" onClick={onHome}>← Home</button>
       </div>
@@ -2957,18 +2931,18 @@ function AuthModal({ onClose, onLogin }) {
     <dialog ref={dialogRef} className="auth-dialog" aria-labelledby="auth-title" onClose={e => { if (!e.currentTarget.open) onClose(); }} onClick={e => { if (e.target === e.currentTarget) dialogRef.current.close(); }}>
       <div className="qr-modal-inner">
         <div className="qr-modal-top">
-          <div id="auth-title" className="qr-modal-title" style={{ fontSize: '1.2rem', marginBottom: 12 }}>Join KakiSplit</div>
+          <div id="auth-title" className="qr-modal-title" style={{ fontSize: '1.2rem', marginBottom: 12 }}>Host sign-in</div>
           <div className="qr-modal-sub" style={{ textTransform: 'none', lineHeight: 1.4 }}>
             You need to be signed in to host a table or scan receipts.
           </div>
         </div>
-        
+
         <div style={{ padding: "24px", display: "flex", flexDirection: "column", gap: "12px" }}>
           <button className="btn btn-ink" onClick={() => onLogin('google')} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
             <span style={{ fontSize: '1.2rem', fontWeight: 900 }}>G</span> Sign in with Google
           </button>
         </div>
-        
+
         <button className="qr-modal-close" onClick={() => dialogRef.current.close()}>Cancel</button>
       </div>
     </dialog>
@@ -2980,52 +2954,55 @@ function QROnboarding({ onSkip, user, profile, setProfile }) {
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef();
 
-  const handleQR = async (f) => {
-    if (!f?.type.startsWith("image/")) return;
+  const [qrError, setQrError] = useState("");
+  const handleQR = async file => {
+    if (!file || uploading) return;
     setUploading(true);
-
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      const b64 = e.target.result;
-      const { error } = await supabase.from('profiles').update({ qr_url: b64 }).eq('id', user.id);
-      if (!error) {
-        setProfile(prev => ({ ...prev, qr_url: b64 }));
-        onSkip();
-      }
+    setQrError("");
+    try {
+      const image = await readPaymentQr(file);
+      const { error } = await supabase.from("profiles").update({ qr_url: image }).eq("id", user.id);
+      if (error) throw error;
+      setProfile(previous => ({ ...previous, qr_url: image }));
+      onSkip();
+    } catch {
+      setQrError("Couldn’t save your payment QR. Check your connection or choose another image, then try again.");
+    } finally {
       setUploading(false);
-    };
-    reader.readAsDataURL(f);
+      if (fileRef.current) fileRef.current.value = "";
+    }
   };
 
   return (
     <div className="receipt landing">
       <div className="header-receipt">
         <div className="profile-hero" style={{ borderBottom: "none", marginBottom: 0 }}>
-          <img src={user?.user_metadata?.picture || user?.user_metadata?.avatar_url || profile?.avatar_url} alt="User" className="profile-large-avatar" />
-          <div className="profile-name">Welcome, {profile?.full_name?.split(" ")[0]}!</div>
+          <ProfileAvatar user={user} profile={profile} large />
+          <div className="profile-name">Welcome, {profile?.full_name?.split(" ")[0] || "host"}!</div>
         </div>
       </div>
 
       <div className="section" style={{ paddingTop: 0, textAlign: "center" }}>
         <p className="vault-desc" style={{ fontSize: "0.8rem", marginBottom: "24px" }}>
-          Before hosting, upload your payment QR code. We'll automatically attach it to your receipts.
+          Save your payment QR for future tables, or skip and add it when you host.
         </p>
 
-        <button type="button" className="vault-qr-area" onClick={() => fileRef.current.click()} aria-label="Upload your payment QR" style={{ marginBottom: "24px", maxWidth: "240px", margin: "0 auto 24px" }}>
+        <button type="button" disabled={uploading} className="vault-qr-area" aria-label="Choose payment QR image" onClick={() => fileRef.current.click()} style={{ marginBottom: "24px", maxWidth: "240px", margin: "0 auto 24px" }}>
           {profile?.qr_url ? (
             <img src={profile.qr_url} alt="Default QR" className="vault-qr-preview" />
           ) : (
             <span className="vault-qr-placeholder">
               <span>➕</span>
-              <span>Upload QR (Optional)</span>
+              <span>Upload payment QR</span>
             </span>
           )}
         </button>
-        <input type="file" ref={fileRef} hidden accept="image/*" aria-label="Payment QR image" onChange={e => handleQR(e.target.files[0])} />
-        {uploading && <div className="spinner" style={{ margin: "10px auto" }} />}
+        <input type="file" ref={fileRef} hidden accept="image/*" aria-label="Default payment QR image" onChange={e => handleQR(e.target.files[0])} />
+        {uploading && <p className="section-sub" role="status">Saving payment QR…</p>}
+          {qrError && <p className="error-strip" role="alert">{qrError}</p>}
 
-        <button className="btn btn-ink" style={{ marginBottom: "12px" }} onClick={() => fileRef.current.click()}>Select Image</button>
-        <button className="btn btn-outline" onClick={onSkip}>Skip for now</button>
+        <button className="btn btn-ink" disabled={uploading} style={{ marginBottom: "12px" }} onClick={() => fileRef.current.click()}>Choose QR image</button>
+        <button className="btn btn-outline" disabled={uploading} onClick={onSkip}>Skip for now</button>
       </div>
     </div>
   );
@@ -3033,22 +3010,22 @@ function QROnboarding({ onSkip, user, profile, setProfile }) {
 
 // ── LANDING PAGE ──────────────────────────────────────────────
 function LandingPage({ onHost, onGuest, onReturnTable, currency, onCurrencyChange, user, profile, onLogin, onProfile }) {
-  const tables = JSON.parse(localStorage.getItem("ks_tables") || "[]");
+  const tables = savedTables();
 
   const oldTables = tables.filter(t => {
     const tableDate = new Date(t.date);
     const now = new Date();
     const diff = now - tableDate;
-    return diff > 12 * 60 * 60 * 1000;
+    return t.date && t.date !== localDate() && diff > 0;
   });
 
   return (
     <div className="receipt landing">
       <div className="top-nav">
         {user ? (
-          <button className="user-chip" onClick={onProfile} aria-label="Open your profile">
-            <img src={user.user_metadata.picture || user.user_metadata.avatar_url || profile?.avatar_url} alt="Profile" className="user-avatar" />
-            <span className="user-name">{profile?.full_name?.split(" ")[0]}</span>
+          <button className="user-chip" onClick={onProfile} aria-label="Open profile">
+            <ProfileAvatar user={user} profile={profile} />
+            <span className="user-name">{profile?.full_name?.split(" ")[0] || "Profile"}</span>
           </button>
         ) : (
           <button className="login-pill" onClick={onLogin}>Host Login</button>
@@ -3062,8 +3039,8 @@ function LandingPage({ onHost, onGuest, onReturnTable, currency, onCurrencyChang
           <div className="pending-alert">
             <span style={{ fontSize: "1.5rem" }}>🕒</span>
             <div>
-              <div className="pending-title">Unconcluded Tables</div>
-              <div className="pending-desc">You have {oldTables.length} table{oldTables.length > 1 ? "s" : ""} from {oldTables[0].date} still active.</div>
+              <div className="pending-title">Tables still open</div>
+              <div className="pending-desc">You have {oldTables.length} table{oldTables.length > 1 ? "s" : ""} still open. Select one under Your tables to check payments.</div>
             </div>
           </div>
         )}
@@ -3073,7 +3050,7 @@ function LandingPage({ onHost, onGuest, onReturnTable, currency, onCurrencyChang
         </div>
         <div className="hero-sub">
           Snap a receipt. Share a code.<br />
-          Everyone pays their exact share — instantly.
+          Everyone pays their exact share — no drama.
         </div>
 
         <div className="currency-selector-row">
@@ -3108,7 +3085,7 @@ function LandingPage({ onHost, onGuest, onReturnTable, currency, onCurrencyChang
             <div className="how-step-num">02</div>
             <div>
               <div className="how-step-title">Share the code</div>
-              <div className="how-step-desc">Guests tap what they ordered. Splitting is automatic.</div>
+              <div className="how-step-desc">Guests pick their items and split shared dishes.</div>
             </div>
           </div>
           <div className="how-step">
@@ -3123,12 +3100,12 @@ function LandingPage({ onHost, onGuest, onReturnTable, currency, onCurrencyChang
 
       {tables.length > 0 && (
         <div className="recent-tables" style={{ paddingTop: 20, borderTop: "1px dashed var(--ink-faint)" }}>
-          <div className="recent-label">Your Tables</div>
+          <div className="recent-label">Your tables</div>
           {tables.map(t => (
-            <button key={t.code} className="recent-card" onClick={() => onReturnTable(t.code)} aria-label={`Open ${t.name}, table ${t.code}`}>
+            <button key={t.code} className="recent-card" onClick={() => onReturnTable(t.code)} aria-label={`Open ${t.name || "My Table"}, table ${t.code}`}>
               <div>
-                <div className="recent-name">{t.name}</div>
-                <div className="recent-meta">{t.date}</div>
+                <div className="recent-name">{t.name || "My Table"}</div>
+                <div className="recent-meta">{formatTableDate(t.date)}</div>
               </div>
               <div className="recent-code">{t.code}</div>
             </button>
@@ -3297,8 +3274,7 @@ export default function KakiSplit() {
 
   const [currency, setCurrency] = useState(() => {
     const saved = localStorage.getItem("ks_currency");
-    if (saved === "RM") return "MYR"; // Migration
-    return saved || "MYR";
+    return ["MYR", "SGD", "AUD"].includes(saved) ? saved : "MYR";
   });
 
   const [showQROnboarding, setShowQROnboarding] = useState(false);
@@ -3322,6 +3298,17 @@ export default function KakiSplit() {
     localStorage.setItem("ks_currency", c);
   };
 
+  const goHome = () => {
+    const url = new URL(window.location.href);
+    url.searchParams.delete("table");
+    window.history.replaceState(null, "", url.pathname + url.search + url.hash);
+    setGuestSession(null);
+    setMode(null);
+    window.scrollTo(0, 0);
+  };
+
+  useEffect(() => { window.scrollTo(0, 0); }, [mode]);
+
   return (
     <>
       <style>{css}</style>
@@ -3331,7 +3318,7 @@ export default function KakiSplit() {
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
             <div style={{ textAlign: "center", color: "var(--paper)" }}>
               <div className="spinner" style={{ margin: "0 auto 16px" }} />
-              <div style={{ fontSize: "0.8rem", letterSpacing: 2, textTransform: "uppercase", opacity: 0.5 }}>Loading...</div>
+              <div style={{ fontSize: "0.8rem", letterSpacing: 2, textTransform: "uppercase", opacity: 0.5 }}>Loading…</div>
             </div>
           </div>
         )}
@@ -3339,7 +3326,7 @@ export default function KakiSplit() {
         {!initializing && <>
           {authError && <div className="error-strip" role="alert">{authError}</div>}
           {showQROnboarding && (
-            <QROnboarding 
+            <QROnboarding
               onSkip={handleSkipQR}
               user={user}
               profile={profile}
@@ -3348,8 +3335,8 @@ export default function KakiSplit() {
           )}
 
           {showAuthModal && (
-            <AuthModal 
-              onClose={() => setShowAuthModal(false)} 
+            <AuthModal
+              onClose={() => setShowAuthModal(false)}
               onLogin={provider => handleLogin(provider, authIntentMode, authIntentCode)}
             />
           )}
@@ -3377,14 +3364,14 @@ export default function KakiSplit() {
             />
           )}
 
-          {mode === "host" && <HostView onHome={() => setMode(null)} currency={currency} user={user} profile={profile} />}
-          {mode === "host-return" && <HostReturn onHome={() => setMode(null)} currency={currency} user={user} profile={profile} />}
-          {mode === "profile" && <ProfileView onHome={() => setMode(null)} user={user} profile={profile} setProfile={setProfile} onLogout={handleLogout} />}
+          {!showQROnboarding && mode === "host" && <HostView onHome={goHome} currency={currency} user={user} profile={profile} />}
+          {!showQROnboarding && mode === "host-return" && <HostReturn onHome={goHome} currency={currency} user={user} profile={profile} />}
+          {!showQROnboarding && mode === "profile" && <ProfileView onHome={goHome} user={user} profile={profile} setProfile={setProfile} onLogout={handleLogout} />}
 
           {mode === "guest" && guestSession && (
             <>
-              <nav className="guest-nav" aria-label="App"><button onClick={() => setMode(null)}>← Home</button><span>Split bills. No drama.</span></nav>
-              <GuestView session={guestSession} onBack={() => setMode(null)} currency={currency} />
+              <nav className="guest-nav" aria-label="App"><button onClick={goHome}>← Home</button><span>Split bills. No drama.</span></nav>
+              <GuestView session={guestSession} onBack={goHome} currency={currency} />
             </>
           )}
 
@@ -3392,7 +3379,7 @@ export default function KakiSplit() {
             <>
               <div className="receipt">
                 <div className="header-receipt">
-                  <button className="home-btn" onClick={() => setMode(null)}>
+                  <button className="home-btn" onClick={goHome}>
                     <span className="home-btn-icon">⌂</span>
                     <span className="home-btn-label">Home</span>
                   </button>
@@ -3401,7 +3388,7 @@ export default function KakiSplit() {
                   <div><span className="badge-strip guest-badge">👥 Guest</span></div>
                 </div>
               </div>
-              <GuestCode onJoin={s => { setGuestSession(s); setMode("guest"); }} onBack={() => setMode(null)} />
+              <GuestCode onJoin={s => { setGuestSession(s); setMode("guest"); }} onBack={goHome} />
             </>
           )}
 
@@ -3411,7 +3398,7 @@ export default function KakiSplit() {
                 <div style={{ fontSize: "3rem", marginBottom: 14 }}>😕</div>
                 <div className="section-head" style={{ textAlign: "center" }}>Table not found</div>
                 <div className="section-sub" style={{ textAlign: "center", marginBottom: 24 }}>Link may have expired or host hasn't started yet</div>
-                <button className="btn btn-ink" onClick={() => setMode(null)}>Back to Home</button>
+                <button className="btn btn-ink" onClick={goHome}>Back to Home</button>
               </div>
             </div>
           )}
