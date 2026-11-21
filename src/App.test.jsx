@@ -307,7 +307,7 @@ describe('joining and paying as a guest', () => {
     await user.type(screen.getByLabelText('Your name'), '\u00a0 Bob   Doe \u00a0');
     if (method === 'Enter') await user.keyboard('{Enter}');
     else await user.click(button(/Continue/));
-    expect(await screen.findByText('You paid')).toBeVisible();
+    expect(await screen.findByText('you paid')).toBeVisible();
     expect(screen.queryByRole('button', { name: /Tea/ })).not.toBeInTheDocument();
     await user.click(button(/Noodles/));
     await waitFor(() => expect(rows.get('1234').selections.noodles).toEqual(['Bob Doe']));
