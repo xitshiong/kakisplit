@@ -33,6 +33,7 @@ test('saved table corruption does not break home', () => {
   assert.deepEqual(read('broken'), []);
   assert.deepEqual(read('{}'), []);
   assert.deepEqual(read('[null, {"code":"1234"}, {"code":"wrong"}]'), [{ code: '1234' }]);
+  assert.deepEqual(read('[{"code":"ABCDEFGH"}]'), [{ code: 'ABCDEFGH' }]);
 });
 
 test('table dates use readable local calendar dates', () => {

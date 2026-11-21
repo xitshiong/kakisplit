@@ -1,3 +1,4 @@
+import { isTableCode } from './tableCode.mjs';
 export const LOGIN_INTENT_KEY = 'ks_post_login_mode';
 export const LOGIN_INTENT_TTL = 30 * 60 * 1000;
 const MODES = new Set(['host', 'host-return', 'profile']);
@@ -7,7 +8,7 @@ export function readLoginIntent(storage, now = Date.now()) {
     const intent = JSON.parse(storage.getItem(LOGIN_INTENT_KEY));
     if (intent && MODES.has(intent.mode) && Number.isFinite(intent.ts) &&
         now >= intent.ts && now - intent.ts < LOGIN_INTENT_TTL &&
-        (intent.mode !== 'host-return' || /^\d{4}$/.test(intent.code))) return intent;
+        (intent.mode !== 'host-return' || isTableCode(intent.code))) return intent;
     storage.removeItem(LOGIN_INTENT_KEY);
   } catch { /* Storage can be unavailable in privacy-restricted browsers. */ }
   return null;

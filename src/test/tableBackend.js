@@ -38,10 +38,11 @@ export function mockTableBackend({ tables = [], profile = testProfile } = {}) {
     const url = new URL(input);
     const method = init.method || 'GET';
     const resource = url.pathname.replace(/^\/rest\/v1\//, '');
-    const code = url.searchParams.get('code')?.replace(/^eq\./, '');
+    let code = url.searchParams.get('code')?.replace(/^eq\./, '');
     const select = url.searchParams.get('select');
     const paidFilter = url.searchParams.get('paid');
     const body = init.body ? JSON.parse(init.body) : undefined;
+    if (resource.startsWith('rpc/')) code = body.p_code;
     const request = { method, resource, code, select, body };
     requests.push(request);
 
@@ -56,6 +57,26 @@ export function mockTableBackend({ tables = [], profile = testProfile } = {}) {
       if (method === 'PATCH') {
         Object.assign(profileRow, body);
         return new Response(null, { status: 204 });
+      }
+    }
+    if (resource.startsWith('rpc/')) {
+      const row = rows.get(code);
+      if (resource === 'rpc/get_session') return json(row && !row.concluded ? row : null);
+      if (!row || row.concluded) return json(resource === 'rpc/mark_paid' ? { success: false } : false);
+      if (resource === 'rpc/mark_paid') {
+        const { p_item_id: id, p_name: name, p_split_count: count } = body;
+        if (!row.items.some(item => String(item.id) === id)) return json({ success: false });
+        const entry = row.paid[id] || { payers: [], total: count };
+        if (entry.payers.includes(name)) return json({ success: true, alreadyPaid: true });
+        if (entry.payers.length >= entry.total) return json({ success: false, full: true });
+        entry.payers.push(name);
+        row.paid[id] = entry;
+        return json({ success: true });
+      }
+      if (resource === 'rpc/set_selections') {
+        for (const id of Object.keys(row.selections)) row.selections[id] = row.selections[id].filter(name => name !== body.p_name);
+        for (const id of body.p_item_ids) row.selections[id] = [...(row.selections[id] || []), body.p_name];
+        return json(true);
       }
     }
     if (resource !== 'sessions') return json({ message: 'Unexpected test request' }, 500);

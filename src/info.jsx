@@ -12,7 +12,7 @@ const STEPS = [
   {
     num: '02',
     title: 'Share the code',
-    body: 'Friends join with a four-digit table code. No guest account or group-chat spreadsheet needed.',
+    body: 'Friends join with a private table code. No guest account or group-chat spreadsheet needed.',
   },
   {
     num: '03',

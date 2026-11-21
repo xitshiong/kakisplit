@@ -1,3 +1,5 @@
+import { isTableCode } from './tableCode.mjs';
+
 export function paymentStatus(value) {
   const entries = Array.isArray(value?.payers) ? value.payers : value ? [value] : [];
   const payers = entries.map(payer => typeof payer === 'object' ? payer?.name || 'Host' : payer);
@@ -19,7 +21,7 @@ export function paymentBreakdown(price, value, selected = []) {
 export function savedTables(storage = localStorage) {
   try {
     const tables = JSON.parse(storage.getItem('ks_tables') || '[]');
-    return Array.isArray(tables) ? tables.filter(table => table && /^\d{4}$/.test(table.code)) : [];
+    return Array.isArray(tables) ? tables.filter(table => table && isTableCode(table.code)) : [];
   } catch {
     return [];
   }

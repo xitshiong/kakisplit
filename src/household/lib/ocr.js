@@ -1,45 +1,19 @@
-// Receipt reading pipeline for KakiSplit Household.
-//
-// A single vision-model pass over a 50-line grocery receipt is not
-// trustworthy enough to charge housemates real money, and worse, when it is
-// wrong it is wrong silently. So this pipeline is built so that correctness
-// can be *demonstrated* rather than assumed:
-//
-//   1. EXTRACT   Two different models (different vendors, so their mistakes
-//                are uncorrelated) each read the receipt independently.
-//   2. ALIGN     Their line items are aligned and compared field by field.
-//                Any disagreement marks that specific line for review.
-//   3. VERIFY    Both readings are checked against arithmetic the receipt
-//                itself prints: line totals + tax - discounts must equal the
-//                grand total, and the item count must match the receipt's own
-//                counter when it prints one.
-//   4. REPAIR    If neither reading balances, a third pass shows a model the
-//                discrepancy and asks it to find the specific error.
-//   5. BAKE      Tax and discounts are allocated across items in integer
-//                cents so item totals sum to the grand total exactly.
-//
-// A scan is only labelled "verified" when the models agreed AND the money
-// balances. Everything else surfaces in the review UI with the exact lines to
-// check, which is a far more useful guarantee than a confident guess.
+// Household review uses fixed server extraction; independent-reader verification is unavailable.
 
 import { toCents } from "./money.js";
 import { extractionPrompt, repairPrompt } from "./prompts.js";
 
-// Reading a receipt wrong costs more than the few cents of inference, so the
-// defaults here are accuracy-first. Override per deployment if you want.
-// Optional chaining so this module can also be imported by the Node test run,
-// where import.meta.env doesn't exist.
 export const MODELS = {
-  primary: import.meta.env?.VITE_HH_OCR_PRIMARY || "google/gemini-3.1-pro-preview",
-  auditor: import.meta.env?.VITE_HH_OCR_AUDITOR || "anthropic/claude-sonnet-5",
-  fallback: import.meta.env?.VITE_HH_OCR_FALLBACK || "google/gemini-3.6-flash",
+  primary: "google/gemini-2.5-flash-lite",
+  auditor: "google/gemini-2.5-flash-lite",
+  fallback: null,
 };
 
 const OCR_PROXY = "/api/ocr";
-const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
+
 const CENT_TOLERANCE = 2;
 
-let proxyAvailable = null; // null = untested, false = fall back to direct calls
+
 
 // ── IMAGE PREPARATION ─────────────────────────────────────────
 // Receipts are tall and thin, and detail lives in small print. Downscaling to
@@ -182,102 +156,34 @@ function withTimeout(promise, ms, label) {
   ]);
 }
 
-function buildMessages(prompt, images) {
-  // OpenRouter recommends text before images.
-  return [
-    {
-      role: "user",
-      content: [
-        { type: "text", text: prompt },
-        ...images.map((b64) => ({
-          type: "image_url",
-          image_url: { url: `data:image/jpeg;base64,${b64}` },
-        })),
-      ],
-    },
-  ];
-}
 
-function extractText(data) {
-  if (data?.error) {
-    throw new Error(data.error.message || String(data.error));
-  }
-  const choice = data?.choices?.[0];
-  const text = choice?.message?.content?.trim();
-  if (!text) throw new Error("The reader returned an empty response.");
-  return {
-    text,
-    finishReason: choice?.finish_reason || choice?.native_finish_reason || "",
+async function callModel({ images, accessToken, timeout = 50000 }) {
+  if (!accessToken) throw new Error("Sign in to scan receipts.");
+  if (images.length !== 1) throw new Error("Scan one receipt image at a time.");
+  const res = await withTimeout(fetch(OCR_PROXY, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+    body: JSON.stringify({ image: `data:image/jpeg;base64,${images[0]}` }),
+  }), timeout, "Receipt scan");
+  if (res.status === 401) throw new Error("Sign in to scan receipts.");
+  if (res.status === 429) throw new Error("Receipt scan limit reached. Try tomorrow.");
+  if (!res.ok) throw new Error("Receipt scanning is unavailable.");
+  const result = await res.json();
+  const reading = parseModelJson(result.text);
+  const adapted = {
+    ...reading, totalsVisible: reading.grandTotal !== null,
+    items: reading.items.map((item, i) => ({
+      ...item, lineNo: i + 1, unit: "ea", category: "other",
+      confidence: 0, uncertain: ["Review server extraction against the receipt."],
+    })),
+    adjustments: reading.adjustments.map((amount, i) => ({ lineNo: i + 1, label: "Receipt adjustment", amount })),
+    unreadable: ["Server extraction requires review; household-specific metadata was not extracted."],
   };
+  return { text: JSON.stringify(adapted), finishReason: result.finishReason };
 }
 
-async function callModel({ model, prompt, images, maxTokens = 32000, timeout = 120000 }) {
-  const payload = {
-    model,
-    messages: buildMessages(prompt, images),
-    temperature: 0,
-    max_tokens: maxTokens,
-    response_format: { type: "json_object" },
-    reasoning: { exclude: true },
-  };
-
-  // Prefer the serverless proxy so the API key stays server-side. Fall back to
-  // a direct browser call (dev, or a static deploy without functions).
-  if (proxyAvailable !== false) {
-    try {
-      const res = await withTimeout(
-        fetch(OCR_PROXY, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        }),
-        timeout,
-        "Receipt scan"
-      );
-      if (res.ok) {
-        proxyAvailable = true;
-        return extractText(await res.json());
-      }
-      // 404/501: not deployed or not configured. 502/504: the function exists
-      // but timed out, which a long two-model scan can do on short function
-      // limits — the browser has no such limit, so retry directly.
-      if ([404, 501, 502, 504].includes(res.status)) {
-        proxyAvailable = false;
-      } else {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data?.error?.message || `Scan failed (${res.status}).`);
-      }
-    } catch (e) {
-      if (proxyAvailable === true) throw e;
-      proxyAvailable = false;
-    }
-  }
-
-  const key = import.meta.env?.VITE_OPENROUTER_API_KEY;
-  if (!key) {
-    throw new Error(
-      "Receipt scanning isn't configured. Set OPENROUTER_API_KEY on the server, or VITE_OPENROUTER_API_KEY for local development."
-    );
-  }
-  const res = await withTimeout(
-    fetch(OPENROUTER_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${key}`,
-      },
-      body: JSON.stringify(payload),
-    }),
-    timeout,
-    "Receipt scan"
-  );
-  const data = await res.json();
-  if (!res.ok && !data?.error) throw new Error(`Scan failed (${res.status}).`);
-  return extractText(data);
-}
-
-async function readWith(model, prompt, images) {
-  const { text, finishReason } = await callModel({ model, prompt, images });
+async function readWith(model, prompt, images, accessToken) {
+  const { text, finishReason } = await callModel({ images, accessToken });
   try {
     return parseModelJson(text);
   } catch (e) {
@@ -720,7 +626,13 @@ function allocateCents(total, weights) {
  * @param {Array<{b64: string}>} parts  photos of ONE receipt, top to bottom
  * @param {(stage: string, detail?: string) => void} onProgress
  */
-export async function scanReceipt(parts, { onProgress = () => {} } = {}) {
+export async function scanReceipt(parts, { onProgress = () => {}, accessToken } = {}) {
+  if (!accessToken) {
+    const { supabase } = await import('../../lib/supabaseClient.js');
+    const { data: { session } } = await supabase.auth.getSession();
+    accessToken = session?.access_token;
+  }
+  if (!accessToken) throw new Error("Sign in to scan receipts.");
   if (!parts?.length) throw new Error("Add a photo of the receipt first.");
 
   // Local OCR only orients the photo and scores readability. Extraction and
@@ -737,7 +649,7 @@ export async function scanReceipt(parts, { onProgress = () => {} } = {}) {
       const raw = await readWith(
         model,
         extractionPrompt({ partIndex: i + 1, partCount: images.length }),
-        [images[i]]
+        [images[i]], accessToken
       );
       readings.push(normaliseReading(raw));
     }
@@ -799,7 +711,7 @@ export async function scanReceipt(parts, { onProgress = () => {} } = {}) {
             `(${delta > 0 ? "the items are short of" : "the items exceed"} the printed total of ` +
             `${(reading.grandTotalCents / 100).toFixed(2)}).`,
         }),
-        images
+        images, accessToken
       );
       const candidate = normaliseReading(raw);
       const check = verifyArithmetic(candidate);
@@ -812,8 +724,8 @@ export async function scanReceipt(parts, { onProgress = () => {} } = {}) {
   }
 
   const baked = bakeItems(reading);
-  const modelsAgreed = agreementRate === null ? null : agreementRate >= 0.999;
-  const verified = Boolean(primaryCheck.balanced && modelsAgreed !== false);
+  const modelsAgreed = null;
+  const verified = false;
 
   return {
     verified,

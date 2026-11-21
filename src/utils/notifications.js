@@ -1,6 +1,4 @@
-export function genCode() {
-  return Math.floor(1000 + Math.random() * 9000).toString();
-}
+export { genCode } from '../lib/tableCode.mjs';
 
 export async function requestNotificationPermission() {
   if (typeof window === "undefined" || !("Notification" in window)) return "unsupported";

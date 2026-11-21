@@ -21,9 +21,12 @@ test('CSP supports Tesseract v7 workers, WASM and traineddata without allowing J
   assert.ok(directives['connect-src'].includes("'self'"), 'same-origin analytics events');
   assert.ok(directives['connect-src'].includes('https://*.supabase.co'));
   assert.ok(directives['connect-src'].includes('wss://*.supabase.co'));
+  assert.ok(!directives['connect-src'].includes('https://openrouter.ai'));
+  assert.ok(!directives['connect-src'].includes('https://generativelanguage.googleapis.com'));
   assert.ok(directives['img-src'].includes('https:'), 'Google avatars');
   assert.ok(directives['style-src'].includes("'unsafe-inline'"), 'React styles and static style tags');
   assert.ok(!directives['navigate-to'], 'OAuth top-level redirects must remain unrestricted');
+  assert.deepEqual(config.rewrites[0], { source: '/api/:path*', destination: '/api/:path*' });
 });
 
 test('HTML entrypoints contain no inline scripts requiring a weaker script policy', async () => {

@@ -207,7 +207,7 @@ describe('home and sign-in', () => {
     localStorage.setItem(LOGIN_INTENT_KEY, JSON.stringify({ mode: 'host-return', code: '1234', ts: Date.now() }));
     const { requests } = renderApp({ signedIn: true, tables: [dinner()] });
     expect(await screen.findByRole('heading', { name: 'Night market' })).toBeVisible();
-    expect(requests.filter(request => request.resource === 'sessions').map(request => request.code)).toEqual(['1234']);
+    expect(requests.filter(request => request.resource === 'sessions' && request.method === 'GET').map(request => request.code)).toEqual(['1234']);
     expect(localStorage.getItem('ks_current_code')).toBe('1234');
   });
 
@@ -256,17 +256,24 @@ describe('home and sign-in', () => {
 });
 
 describe('joining and paying as a guest', () => {
+  it('normalizes an eight-character code and never reads session rows directly', async () => {
+    const { user, requests } = renderApp({ tables: [dinner({ code: 'ABCDEFGH' })] });
+    await user.click(await screen.findByRole('button', { name: /Join as Guest/ }));
+    await user.type(screen.getByLabelText('Table code'), 'abcd-efgh{Enter}');
+    expect(await screen.findByLabelText('Your name')).toBeVisible();
+    expect(requests).toEqual([expect.objectContaining({ resource: 'rpc/get_session', code: 'ABCDEFGH' })]);
+  });
   it('requires four digits, handles an unknown code, and joins a corrected code on Enter', async () => {
     const { user, requests } = renderApp({ tables: [dinner()] });
     await user.click(await screen.findByRole('button', { name: /Join as Guest/ }));
     const code = screen.getByLabelText('Table code');
-    await user.type(code, 'x99');
+    await user.type(code, '99');
     expect(code).toHaveValue('99');
     expect(button(/Join Table/)).toBeDisabled();
     await user.keyboard('{Enter}');
     expect(requests).toHaveLength(0);
 
-    await user.type(code, '999');
+    await user.type(code, '99');
     expect(code).toHaveValue('9999');
     await user.click(button(/Join Table/));
     expect(await screen.findByRole('alert')).toHaveTextContent('Table not found');
@@ -325,7 +332,7 @@ describe('joining and paying as a guest', () => {
     await user.click(button('I have paid'));
     expect(await screen.findByText('Confirmed, Ari!')).toBeVisible();
     expect(rows.get('1234').paid).toEqual({ noodles: { payers: ['Ari'], total: 2 } });
-    expect(requests.filter(request => request.body?.paid)).toHaveLength(1);
+    expect(requests.filter(request => request.resource === 'rpc/mark_paid')).toHaveLength(1);
   });
 
   it('confirms without a QR on an older table and honors a split already started', async () => {
@@ -356,7 +363,7 @@ describe('joining and paying as a guest', () => {
     await enterName(user);
     await user.click(button(/Tea/));
     await user.click(button(/Pay host/));
-    failNext(request => request.method === 'GET' && request.select === 'paid');
+    failNext(request => request.resource === 'rpc/mark_paid');
     await user.click(button('I have paid'));
     expect(await screen.findByRole('alert')).toHaveTextContent('don’t pay again');
     expect(rows.get('1234').paid).toEqual({});
@@ -410,10 +417,12 @@ describe('joining and paying as a guest', () => {
     await enterName(user);
     await user.click(button(/Tea/));
     await user.click(button(/Pay host/));
-    failNext(request => request.body?.paid);
+    failNext(request => request.resource === 'rpc/mark_paid');
+    await user.click(button('I have paid'));
+    expect(await screen.findByRole('alert')).toHaveTextContent('don’t pay again');
     await user.click(button('I have paid'));
     expect(await screen.findByText('Confirmed, Ari!')).toBeVisible();
-    expect(requests.filter(request => request.body?.paid)).toHaveLength(2);
+    expect(requests.filter(request => request.resource === 'rpc/mark_paid')).toHaveLength(2);
     expect(rows.get('1234').paid.tea).toEqual({ payers: ['Ari'], total: 1 });
   });
 });
@@ -432,7 +441,7 @@ describe('creating and returning to a table', () => {
     expect(await screen.findByRole('heading', { name: 'Friday dinner' })).toBeVisible();
     const [created] = rows.values();
     expect(created).toMatchObject({
-      code: expect.stringMatching(/^\d{4}$/), table_name: 'Friday dinner', qr_image: '/payment.png',
+      code: expect.stringMatching(/^[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{8}$/), table_name: 'Friday dinner', qr_image: '/payment.png',
       items: [{ name: 'Noodles', price: '15.50' }, { name: 'Tea', price: '3.25' }],
     });
     expect(screen.getByText('RM18.75')).toBeVisible();
@@ -444,16 +453,16 @@ describe('creating and returning to a table', () => {
   });
 
   it('generates a new code after a collision without overwriting the existing table', async () => {
-    const { user, rows, requests } = renderApp({ signedIn: true, tables: [dinner({ code: '1000' })] });
+    const { user, rows, requests } = renderApp({ signedIn: true, tables: [dinner({ code: '22222222' })] });
     await manualEditor(user);
     await addItem(user, 'Tea', '3');
     await user.click(button(/Next: Payment QR/));
-    vi.spyOn(Math, 'random').mockReturnValueOnce(0).mockReturnValueOnce(0.5);
+    vi.spyOn(crypto, 'getRandomValues').mockImplementationOnce(bytes => bytes.fill(0)).mockImplementationOnce(bytes => bytes.fill(1));
     await user.click(button(/Generate Table Link/));
     expect(await screen.findByRole('heading', { name: 'Friday dinner' })).toBeVisible();
-    expect(requests.filter(request => request.method === 'POST').map(request => request.body.code)).toEqual(['1000', '5500']);
-    expect(rows.get('1000').table_name).toBe('Night market');
-    expect(rows.get('5500').table_name).toBe('Friday dinner');
+    expect(requests.filter(request => request.resource === 'sessions' && request.method === 'POST').map(request => request.body.code)).toEqual(['22222222', '33333333']);
+    expect(rows.get('22222222').table_name).toBe('Night market');
+    expect(rows.get('33333333').table_name).toBe('Friday dinner');
   });
 
   it('leaves a failed table creation retryable and does not store the failed table', async () => {
