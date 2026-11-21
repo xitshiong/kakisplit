@@ -1930,11 +1930,15 @@ function GuestView({ session, onBack, currency }) {
   const normalizeName = value => value.trim().replace(/\s+/g, " ");
   const resumeGuest = guestName => {
     const restored = {};
+    const restoredSplits = {};
     for (const item of items) {
       const paidInfo = paidMap[item.id];
       const payers = (paidInfo?.payers || (paidInfo ? [paidInfo] : [])).map(payer => typeof payer === "object" ? payer.name : payer);
       const total = paidInfo ? (paidInfo.payers ? paidInfo.total || 1 : 1) : Infinity;
-      if ((selections[item.id] || []).includes(guestName) && !payers.includes(guestName) && payers.length < total) restored[item.id] = true;
+      if ((selections[item.id] || []).includes(guestName) && !payers.includes(guestName) && payers.length < total) {
+        restored[item.id] = true;
+        restoredSplits[item.id] = paidInfo?.total || selections[item.id].length;
+      }
     }
     try {
       const key = `ks_guest_names_${session.code}`;
@@ -1943,6 +1947,7 @@ function GuestView({ session, onBack, currency }) {
     } catch { /* Joining must work even when browser storage is unavailable. */ }
     setName(guestName);
     setSel(restored);
+    setSplits(restoredSplits);
     setNamed(true);
   };
 

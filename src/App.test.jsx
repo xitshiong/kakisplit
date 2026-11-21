@@ -258,6 +258,29 @@ describe('home and sign-in', () => {
 });
 
 describe('joining and paying as a guest', () => {
+  it('restores the shared amount after going home and rejoining the same table', async () => {
+    const { user, rows } = await joinViaLink({ tables: [dinner({ selections: { tea: ['Bela'] } })] });
+    await enterName(user);
+    await user.click(button(/Tea/, { pressed: false }));
+    await user.click(button('Split Tea with more people'));
+    expect(button(/Tea.*Split 2 ways.*1\.50/)).toBeVisible();
+    await waitFor(() => expect(rows.get('1234').selections.tea).toEqual(['Bela', 'Ari']));
+    await user.click(button('← Home'));
+    await user.click(button(/Join as Guest/));
+    await user.type(screen.getByLabelText('Table code'), '1234');
+    await user.click(button(/Join Table/));
+    await screen.findByLabelText('Your name');
+    await enterName(user);
+    expect(button(/Tea.*Split 2 ways.*1\.50/, { pressed: true })).toBeVisible();
+    expect(screen.getByText('1 other')).toBeVisible();
+  });
+
+  it('restores an established paid split rather than the current selection count', async () => {
+    const { user } = await joinViaLink({ tables: [dinner({ selections: { tea: ['Ari', 'Bela'] }, paid: { tea: { payers: ['Bela'], total: 3 } } })] });
+    await enterName(user);
+    expect(button(/Tea.*Split 3 ways.*1\.00/, { pressed: true })).toBeVisible();
+  });
+
   it('prefers an exact-case identity when two saved names differ only in casing', async () => {
     const { user } = await joinViaLink({ tables: [dinner({ selections: { tea: ['Ari'], noodles: ['ari'] } })] });
     await user.type(screen.getByLabelText('Your name'), 'ari');
