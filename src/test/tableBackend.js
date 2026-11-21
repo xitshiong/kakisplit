@@ -41,6 +41,7 @@ export function mockTableBackend({ tables = [], profile = testProfile } = {}) {
     const code = url.searchParams.get('code')?.replace(/^eq\./, '');
     const select = url.searchParams.get('select');
     const paidFilter = url.searchParams.get('paid');
+    const selectionFilter = url.searchParams.get('selections');
     const body = init.body ? JSON.parse(init.body) : undefined;
     const request = { method, resource, code, select, body };
     requests.push(request);
@@ -67,10 +68,12 @@ export function mockTableBackend({ tables = [], profile = testProfile } = {}) {
 
     const row = rows.get(code);
     if (method === 'PATCH' && row) {
+      if (selectionFilter === 'is.null' && row.selections != null) return json([]);
+      if (selectionFilter?.startsWith('eq.') && JSON.stringify(row.selections) !== selectionFilter.slice(3)) return json([]);
       if (paidFilter === 'is.null' && row.paid != null) return json([]);
       if (paidFilter?.startsWith('eq.') && JSON.stringify(row.paid) !== paidFilter.slice(3)) return json([]);
       Object.assign(row, body);
-      return select === 'paid' ? json([{ paid: row.paid }]) : new Response(null, { status: 204 });
+      return select ? json([{ [select]: row[select] }]) : new Response(null, { status: 204 });
     }
     if (method === 'GET') {
       const single = new Headers(init.headers).get('accept') === 'application/vnd.pgrst.object+json';

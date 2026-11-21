@@ -405,6 +405,35 @@ describe('joining and paying as a guest', () => {
     expect(requests).toHaveLength(count);
   });
 
+  it('restores a returning guest selection without clearing it', async () => {
+    const { user, rows } = await joinViaLink({ tables: [dinner({ selections: { tea: ['Ari', 'Bela'] } })] });
+    await enterName(user);
+    expect(screen.getByRole('button', { name: /Tea/, pressed: true })).toBeVisible();
+    await waitFor(() => expect(rows.get('1234').selections.tea).toEqual(['Bela', 'Ari']));
+  });
+
+  it('keeps paid items visible as paid on a failed poll and reports the outage', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    const { user, failNext } = await joinViaLink({ tables: [dinner({ paid: { tea: { payers: ['Bela'], total: 1 } } })] });
+    await enterName(user);
+    failNext(request => request.method === 'GET' && request.select === '*');
+    await act(() => vi.advanceTimersByTimeAsync(2_000));
+    expect(screen.getByText('paid by Bela')).toBeVisible();
+    expect(screen.getByRole('alert')).toHaveTextContent('Couldn’t refresh table status');
+  });
+
+  it('retains a manually joined table across refresh', async () => {
+    const { user, unmount } = renderApp({ tables: [dinner()] });
+    await user.click(await screen.findByRole('button', { name: /Join as Guest/ }));
+    await user.type(screen.getByLabelText('Table code'), '1234');
+    await user.click(button(/Join Table/));
+    await screen.findByLabelText('Your name');
+    expect(window.location.search).toBe('?table=1234');
+    unmount();
+    render(<App />);
+    expect(await screen.findByLabelText('Your name')).toBeVisible();
+  });
+
   it('retries a rejected payment update before showing success', async () => {
     const { user, rows, requests, failNext } = await joinViaLink();
     await enterName(user);
@@ -419,6 +448,28 @@ describe('joining and paying as a guest', () => {
 });
 
 describe('creating and returning to a table', () => {
+  it('creates the table and its QR in one write', async () => {
+    const { user, requests } = renderApp({ signedIn: true });
+    await manualEditor(user);
+    await addItem(user, 'Tea', '3');
+    await user.click(button(/Next: Payment QR/));
+    await user.click(button(/Generate Table Link/));
+    await screen.findByRole('heading', { name: 'Friday dinner' });
+    expect(requests.find(request => request.method === 'POST').body.qr_image).toBe('/payment.png');
+    expect(requests.filter(request => request.method === 'PATCH')).toHaveLength(0);
+  });
+
+  it('keeps the created link available when local storage is full', async () => {
+    const { user, rows } = renderApp({ signedIn: true });
+    await manualEditor(user);
+    await addItem(user, 'Tea', '3');
+    await user.click(button(/Next: Payment QR/));
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('Quota exceeded'); });
+    await user.click(button(/Generate Table Link/));
+    expect(await screen.findByRole('heading', { name: 'Friday dinner' })).toBeVisible();
+    expect(screen.getByRole('alert')).toHaveTextContent('Table created');
+    expect(rows.size).toBe(1);
+  });
   it('walks through manual receipt entry, QR, and a shareable table saved locally', async () => {
     const { user, rows } = renderApp({ signedIn: true });
     await manualEditor(user);
