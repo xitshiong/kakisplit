@@ -448,6 +448,48 @@ describe('joining and paying as a guest', () => {
 });
 
 describe('creating and returning to a table', () => {
+  it('notifies on the first payment of a newly created table without repeating it', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    const notify = vi.fn(function () {});
+    notify.permission = 'granted';
+    vi.stubGlobal('Notification', notify);
+    const { user, rows } = renderApp({ signedIn: true });
+    await manualEditor(user);
+    await addItem(user, 'Tea', '3');
+    await user.click(button(/Next: Payment QR/));
+    await user.click(button(/Generate Table Link/));
+    await screen.findByRole('heading', { name: 'Friday dinner' });
+    expect(notify).not.toHaveBeenCalled();
+    const table = [...rows.values()][0];
+    const payment = { [table.items[0].id]: { payers: ['Ari'], total: 1 } };
+    table.paid = payment;
+    await act(() => vi.advanceTimersByTimeAsync(2_000));
+    expect(notify).toHaveBeenCalledWith('Incoming Payment!', expect.objectContaining({ body: 'Ari paid for Tea' }));
+    await act(() => vi.advanceTimersByTimeAsync(2_000));
+    expect(notify).toHaveBeenCalledTimes(1);
+  });
+
+  it('notifies on the first payment after reopening an unpaid table, but not existing payments', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    const notify = vi.fn(function () {});
+    notify.permission = 'granted';
+    vi.stubGlobal('Notification', notify);
+    saveLocally(dinner());
+    const { user, rows, unmount } = renderApp({ signedIn: true, tables: [dinner()] });
+    await user.click(await screen.findByRole('button', { name: /Open Night market/ }));
+    await screen.findByText('0/2 items paid');
+    expect(notify).not.toHaveBeenCalled();
+    rows.get('1234').paid = { tea: { payers: ['Ari'], total: 1 } };
+    await act(() => vi.advanceTimersByTimeAsync(2_000));
+    expect(notify).toHaveBeenCalledTimes(1);
+    unmount();
+    render(<App />);
+    await user.click(await screen.findByRole('button', { name: /Open Night market/ }));
+    await screen.findByText('1/2 items paid');
+    await act(() => vi.advanceTimersByTimeAsync(2_000));
+    expect(notify).toHaveBeenCalledTimes(1);
+  });
+
   it('creates the table and its QR in one write', async () => {
     const { user, requests } = renderApp({ signedIn: true });
     await manualEditor(user);
@@ -536,6 +578,7 @@ describe('creating and returning to a table', () => {
     await user.click(button(/Generate Table Link/));
     expect(await screen.findByRole('heading', { name: 'Friday dinner' })).toBeVisible();
     expect([...rows.values()][0].qr_image).toBe(dataUrl);
+    expect(localStorage.getItem(`ks_qr_${[...rows.values()][0].code}`)).toBe(dataUrl);
     expect(requests.some(request => request.resource === 'profiles' && request.method === 'PATCH')).toBe(false);
 
     await user.click(button(/Start new table/));

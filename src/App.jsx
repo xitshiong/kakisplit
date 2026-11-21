@@ -2272,15 +2272,6 @@ function HostView({ onHome, currency, user, profile }) {
   useEffect(() => {
     if (!paidMap || step !== 4) return;
 
-    // On first data load, mark everything already paid as notified
-    if (notifiedRef.current.size === 0 && Object.keys(paidMap).length > 0) {
-      Object.keys(paidMap).forEach(itemId => {
-        const payers = paidMap[itemId]?.payers || [];
-        payers.forEach(p => notifiedRef.current.add(`${itemId}-${p}`));
-      });
-      return;
-    }
-
     const newPaymentsByPayer = {};
     Object.keys(paidMap).forEach(itemId => {
       const current = paidMap[itemId]?.payers || [];
@@ -2337,6 +2328,7 @@ function HostView({ onHome, currency, user, profile }) {
       const existing = savedTables();
       existing.unshift({ code: c, name: tableName || "My Table", date: tableDate });
       try {
+        if (qrForSave?.startsWith("data:")) localStorage.setItem(`ks_qr_${c}`, qrForSave);
         localStorage.setItem("ks_tables", JSON.stringify(existing));
         localStorage.setItem("ks_current_code", c);
         localStorage.setItem("ks_current_name", tableName || "My Table");
@@ -2346,6 +2338,7 @@ function HostView({ onHome, currency, user, profile }) {
       }
 
       setCode(c);
+      notifiedRef.current = new Set();
       setPaidMap(initialPaid);
       setTableSelections({});
       setStep(4);
@@ -2703,12 +2696,13 @@ function HostReturn({ onHome, currency, user, profile }) {
     return () => { active = false; };
   }, [code, retry]);
 
-  const notifiedRef = useRef(new Set());
+  const notifiedRef = useRef(null);
   useEffect(() => {
     if (!paidMap || !session || !code) return;
 
     // On first load, mark existing as notified
-    if (notifiedRef.current.size === 0 && Object.keys(paidMap).length > 0) {
+    if (notifiedRef.current === null) {
+      notifiedRef.current = new Set();
       Object.keys(paidMap).forEach(itemId => {
         const payers = paidMap[itemId]?.payers || [];
         payers.forEach(p => notifiedRef.current.add(`${itemId}-${p}`));
