@@ -256,6 +256,57 @@ describe('home and sign-in', () => {
 });
 
 describe('joining and paying as a guest', () => {
+  it('preserves the caret when replacing characters with lowercase input', async () => {
+    const { user, requests } = renderApp({ tables: [dinner({ code: 'ABCDEFGH' })] });
+    await user.click(await screen.findByRole('button', { name: /Join as Guest/ }));
+    const code = screen.getByLabelText('Table code');
+    await user.type(code, 'ABZZEFGH');
+    code.setSelectionRange(2, 4);
+    await user.keyboard('cd');
+    expect(code).toHaveValue('ABcdEFGH');
+    expect(code.selectionStart).toBe(4);
+    expect(code.selectionEnd).toBe(4);
+    await user.keyboard('{Enter}');
+    expect(await screen.findByLabelText('Your name')).toBeVisible();
+    expect(requests[0].body.p_code).toBe('ABCDEFGH');
+  });
+
+  it.each(['ABCDEFGHJ', 'ABCD-EFGHJ', 'ABCD EFGH J'])('rejects an overlong pasted code without truncating: %s', async pasted => {
+    const { user, requests } = renderApp();
+    await user.click(await screen.findByRole('button', { name: /Join as Guest/ }));
+    const code = screen.getByLabelText('Table code');
+    await user.click(code);
+    await user.paste(pasted);
+    expect(code).toHaveValue(pasted);
+    expect(code).toBeInvalid();
+    expect(button(/Join Table/)).toBeDisabled();
+    expect(screen.getByRole('alert')).toHaveTextContent('spaces and dashes don’t count'.replace('’', "'"));
+    await user.keyboard('{Enter}');
+    expect(requests).toEqual([]);
+    await user.clear(code);
+    await user.type(code, 'abcd efgh');
+    expect(code).not.toBeInvalid();
+    expect(button(/Join Table/)).toBeEnabled();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it.each([true, false])('retries a failed table link and distinguishes a missing table (exists: %s)', async exists => {
+    const { user, requests, failNext } = renderApp({
+      search: 'table=abcd-efgh', tables: exists ? [dinner({ code: 'ABCDEFGH' })] : [],
+    });
+    failNext(request => request.resource === 'rpc/get_session');
+    expect(await screen.findByText('Couldn’t load the table')).toBeVisible();
+    expect(screen.getByText('Check your connection and try again.')).toBeVisible();
+    expect(screen.queryByText('Table not found')).not.toBeInTheDocument();
+    await user.click(button('Try again'));
+    if (exists) expect(await screen.findByLabelText('Your name')).toBeVisible();
+    else {
+      expect(await screen.findByText('Table not found')).toBeVisible();
+      expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument();
+    }
+    expect(requests.map(request => request.code)).toEqual(['ABCDEFGH', 'ABCDEFGH']);
+  });
+
   it('normalizes an eight-character code and never reads session rows directly', async () => {
     const { user, requests } = renderApp({ tables: [dinner({ code: 'ABCDEFGH' })] });
     await user.click(await screen.findByRole('button', { name: /Join as Guest/ }));

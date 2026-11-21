@@ -2531,6 +2531,7 @@ function GuestCode({ onJoin, onBack }) {
   const [code, setCode] = useState("");
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
+  const tooLong = normalizeCode(code).length > 8;
   const tryJoin = async () => {
     if (loading || !isTableCode(code)) return;
     setLoading(true);
@@ -2552,16 +2553,49 @@ function GuestCode({ onJoin, onBack }) {
         <div className="section-sub" id="table-code-hint" style={{ marginBottom: 16 }}>Ask your host for the table code (e.g. ABCD-EFGH).</div>
         <label className="field-label" htmlFor="table-code">Table code</label>
         <input id="table-code" className="name-in table-code-input" placeholder="e.g. ABCD-EFGH" value={code}
-          aria-describedby={err ? "table-code-hint table-code-error" : "table-code-hint"} aria-invalid={!!err}
-          onChange={e => { setCode(normalizeCode(e.target.value).slice(0, 8)); setErr(""); }}
+          aria-describedby={err || tooLong ? "table-code-hint table-code-error" : "table-code-hint"} aria-invalid={!!err || tooLong}
+          onChange={e => { setCode(e.target.value); setErr(""); }}
           onKeyDown={e => e.key === "Enter" && tryJoin()}
           autoCapitalize="characters" autoComplete="off"
-          style={{ textAlign: "center", letterSpacing: 6, fontSize: "1.2rem" }} />
-        {err && <div id="table-code-error" className="error-strip" role="alert">⚠ {err}</div>}
+          style={{ textAlign: "center", letterSpacing: 6, fontSize: "1.2rem", textTransform: "uppercase" }} />
+        {(err || tooLong) && <div id="table-code-error" className="error-strip" role="alert">⚠ {tooLong ? "Use 8 characters (or 4 legacy digits); spaces and dashes don't count." : err}</div>}
         <button className="btn btn-ink" disabled={!isTableCode(code) || loading} onClick={tryJoin}>
           {loading ? "Looking up…" : "Join Table →"}
         </button>
         <button className="btn btn-outline" onClick={onBack}>← Back</button>
+      </div>
+    </div>
+  );
+}
+
+function GuestLinkLookup({ code, onJoin, onBack }) {
+  const [status, setStatus] = useState("loading");
+  const [retry, setRetry] = useState(0);
+  useEffect(() => {
+    let active = true;
+    setStatus("loading");
+    load(code).then(session => {
+      if (!active) return;
+      if (session) onJoin(session);
+      else setStatus("notfound");
+    }).catch(() => {
+      if (active) setStatus("error");
+    });
+    return () => { active = false; };
+  }, [code, retry]);
+
+  return (
+    <div className="receipt">
+      <div className="receipt-inner" style={{ textAlign: "center", padding: "40px 24px" }}>
+        {status === "loading" ? <p role="status">Looking up table…</p> : <>
+          <div style={{ fontSize: "3rem", marginBottom: 14 }}>😕</div>
+          <div className="section-head" style={{ textAlign: "center" }}>{status === "error" ? "Couldn’t load the table" : "Table not found"}</div>
+          <div className="section-sub" style={{ textAlign: "center", marginBottom: 24 }}>
+            {status === "error" ? "Check your connection and try again." : "Link may have expired or host hasn't started yet"}
+          </div>
+          {status === "error" && <button className="btn btn-ink" onClick={() => setRetry(value => value + 1)}>Try again</button>}
+        </>}
+        <button className="btn btn-outline" onClick={onBack}>Back to Home</button>
       </div>
     </div>
   );
@@ -3096,14 +3130,7 @@ export default function KakiSplit() {
         subscription = sub;
 
         if (tableCode) {
-          const s = await load(tableCode);
-          if (!mounted) return;
-          if (s) {
-            setGuestSession(s);
-            setMode("guest");
-          } else {
-            setMode("notfound");
-          }
+          setMode("guest-link");
         } else if (session?.user) {
           restorePostLoginMode();
         } else if (readLoginIntent(localStorage)) {
@@ -3111,7 +3138,7 @@ export default function KakiSplit() {
         }
       } catch (e) {
         console.error("Init failed:", e);
-        if (mounted && tableCode) setMode("notfound");
+        if (mounted && tableCode) setMode("guest-link");
       } finally {
         if (mounted) setInitializing(false);
       }
@@ -3276,15 +3303,9 @@ export default function KakiSplit() {
             </>
           )}
 
-          {mode === "notfound" && (
-            <div className="receipt">
-              <div className="receipt-inner" style={{ textAlign: "center", padding: "40px 24px" }}>
-                <div style={{ fontSize: "3rem", marginBottom: 14 }}>😕</div>
-                <div className="section-head" style={{ textAlign: "center" }}>Table not found</div>
-                <div className="section-sub" style={{ textAlign: "center", marginBottom: 24 }}>Link may have expired or host hasn't started yet</div>
-                <button className="btn btn-ink" onClick={goHome}>Back to Home</button>
-              </div>
-            </div>
+          {mode === "guest-link" && (
+            <GuestLinkLookup code={new URLSearchParams(window.location.search).get("table")}
+              onJoin={s => { setGuestSession(s); setMode("guest"); }} onBack={goHome} />
           )}
         </>}
       </div>
