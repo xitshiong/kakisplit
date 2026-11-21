@@ -13,6 +13,21 @@ const geminiResponse = (data, finishReason = "STOP") => new Response(JSON.string
   candidates: [{ content: { parts: [{ text: JSON.stringify(data) }] }, finishReason }],
 }));
 
+test('oversized model arrays are rejected and oversized item names are not rendered', () => {
+  assert.throws(() => reconcileReceipt(reading(Array(201).fill(line('Tea', 1, 1)), 201)));
+  assert.throws(() => reconcileReceipt(reading([], 0, Array(101).fill(0))));
+  const result = reconcileReceipt(reading([line('x'.repeat(301), 1, 1), line('Tea', 1, 2)], 3));
+  assert.equal(result.items.length, 1);
+  assert.equal(result.items[0].name, 'Tea');
+  assert.match(result.warnings.join(' '), /Some rows may be missing/);
+});
+
+test('hostile model quantities cannot expand into more than 1000 rendered rows', () => {
+  const result = reconcileReceipt(reading(Array(20).fill(line('Tea', 100, 100)), 2000));
+  assert.equal(result.items.length, 1000);
+  assert.match(result.warnings.join(' '), /Some rows may be missing/);
+});
+
 test("Gemini joins non-thought response parts and reads fenced JSON", async () => {
   const raw = JSON.stringify(reading([line("Kopi", 1, 2.5)], 2.5));
   const result = await scanReceipt(photo, { geminiApiKey: "parts-key" }, async () => Response.json({

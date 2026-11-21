@@ -98,7 +98,8 @@ function cents(value) {
 }
 
 export function reconcileReceipt(reading) {
-  if (!Array.isArray(reading?.items) || !Array.isArray(reading.adjustments) || typeof reading.hasUnreadableRows !== "boolean") {
+  if (!Array.isArray(reading?.items) || reading.items.length > 200 ||
+      !Array.isArray(reading.adjustments) || reading.adjustments.length > 100 || typeof reading.hasUnreadableRows !== "boolean") {
     throw new UnusableReading();
   }
 
@@ -108,7 +109,8 @@ export function reconcileReceipt(reading) {
     const name = typeof item?.name === "string" ? item.name.trim().replace(/\s+/g, " ") : "";
     const qty = item?.qty;
     const line = cents(item?.lineTotal) ?? (typeof item?.unitPrice === "number" ? cents(item.unitPrice * qty) : null);
-    if (!name || !Number.isFinite(qty) || qty <= 0 || line === null || line < 0) {
+    const rowCount = Number.isInteger(qty) && qty > 0 && qty <= 100 ? qty : 1;
+    if (!name || name.length > 300 || !Number.isFinite(qty) || qty <= 0 || line === null || line < 0 || portions.length + rowCount > 1000) {
       incomplete = true;
       continue;
     }

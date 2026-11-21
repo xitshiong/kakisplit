@@ -1,12 +1,22 @@
 export async function savePaidWithClient(client, itemId, name, code, splitCount = 1) {
+  if (Number.isSafeInteger(itemId) && itemId >= 0) itemId = String(itemId);
+  if (typeof itemId !== 'string' || !itemId || itemId.length > 200 ||
+      ['__proto__', 'constructor', 'prototype'].includes(itemId) ||
+      typeof name !== 'string' || !name.trim() || name.length > 100 ||
+      typeof code !== 'string' || !/^\d{4}$/.test(code) ||
+      !Number.isInteger(splitCount) || splitCount < 1 || splitCount > 100) return { success: false };
   for (let attempt = 0; attempt < 5; attempt++) {
     const { data, error } = await client.from("sessions").select("paid").eq("code", code).single();
     if (error || !data) return { success: false };
 
     const snapshot = data.paid;
+    if (snapshot != null && (typeof snapshot !== 'object' || Array.isArray(snapshot))) return { success: false };
     const paid = structuredClone(snapshot || {});
-    if (!paid[itemId]) paid[itemId] = { payers: [], total: splitCount };
-    if (!paid[itemId].payers) paid[itemId] = { payers: [paid[itemId]], total: 1 };
+    if (!Object.hasOwn(paid, itemId)) paid[itemId] = { payers: [], total: splitCount };
+    if (typeof paid[itemId] === 'string') paid[itemId] = { payers: [paid[itemId]], total: 1 };
+    const entry = paid[itemId];
+    if (!entry || !Array.isArray(entry.payers) || !entry.payers.every(payer => typeof payer === 'string') ||
+        !Number.isInteger(entry.total) || entry.total < 1 || entry.total > 100) return { success: false };
 
     const payers = paid[itemId].payers;
     const total = paid[itemId].total || splitCount;

@@ -74,6 +74,34 @@ function mockClient(initial, { concurrent = false, readError = false, updateErro
 
 const pay = (client, name, item = 'dish', total = 2) => savePaidWithClient(client, item, name, '1234', total);
 
+test('numeric IDs emitted by OCR can still be paid', async () => {
+  const client = mockClient({});
+  assert.deepEqual(await pay(client, 'Guest', 1, 1), { success: true });
+  assert.deepEqual(client.paid, { 1: { payers: ['Guest'], total: 1 } });
+});
+
+test('untrusted payment arguments are rejected before any database access', async () => {
+  for (const [item, name, code, count] of [
+    ['__proto__', 'Guest', '1234', 1], ['constructor', 'Guest', '1234', 1],
+    ['', 'Guest', '1234', 1], ['dish', '', '1234', 1], ['dish', 'x'.repeat(101), '1234', 1],
+    ['dish', 'Guest', '1234)or(code.neq.0', 1], ['dish', 'Guest', '1234', Infinity],
+    ['dish', 'Guest', '1234', -1], ['dish', 'Guest', '1234', 101],
+  ]) {
+    const client = mockClient({});
+    assert.deepEqual(await savePaidWithClient(client, item, name, code, count), { success: false });
+    assert.equal(client.reads, 0);
+  }
+});
+
+test('tampered database payment entries fail closed without throwing or writing', async () => {
+  for (const state of [[], 'bad', { dish: null }, { dish: { payers: 'Guest', total: 1 } },
+    { dish: { payers: [{}], total: 1 } }, { dish: { payers: [], total: -1 } }]) {
+    const client = mockClient(state);
+    assert.deepEqual(await pay(client, 'Guest'), { success: false });
+    assert.equal(client.writes, 0);
+  }
+});
+
 test('concurrent payments on the same split both survive', async () => {
   const client = mockClient({}, { concurrent: true });
   assert.deepEqual(await Promise.all([pay(client, 'cha'), pay(client, 'charl')]), [
