@@ -7,7 +7,7 @@ import { paymentBreakdown } from './tableUi.mjs';
 test('legacy negative and invalid prices do not crash share rendering', () => {
   for (const price of [-2, 'junk', null, 'NaN']) {
     assert.equal(guestShareCents(price, { payers: ['Other'], total: 2 }, 'Guest'), 0);
-    assert.equal(paymentBreakdown(price, { payers: ['Other'], total: 2 }).paidCents, 0);
+    assert.equal(paymentBreakdown(price, { payers: ['Other'], total: 2 }).paidCents, price === -2 ? -100 : 0);
   }
 });
 

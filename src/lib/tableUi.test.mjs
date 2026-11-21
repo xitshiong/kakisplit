@@ -9,6 +9,14 @@ test('partial shares are not marked paid', () => {
   assert.equal(paymentStatus(undefined).complete, false);
 });
 
+test('legacy discounts retain signed totals and conserve signed paid shares', () => {
+  assert.equal(paymentBreakdown(-2, undefined).totalCents, -200);
+  assert.equal(paymentBreakdown(-2, undefined).paidCents, 0);
+  assert.equal(paymentBreakdown(-2, { payers: ['A'], total: 3 }).paidCents, -67);
+  assert.equal(paymentBreakdown(-2, { payers: ['A', 'B'], total: 3 }).paidCents, -134);
+  assert.equal(paymentBreakdown(-2, { payers: ['A', 'B', 'C'], total: 3 }).paidCents, -200);
+});
+
 test('legacy paid entries retain payer names', () => {
   assert.deepEqual(paymentStatus('Ali'), { payers: ['Ali'], total: 1, complete: true });
   assert.deepEqual(paymentStatus({ name: 'Mei' }).payers, ['Mei']);

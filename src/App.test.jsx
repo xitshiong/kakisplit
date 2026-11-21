@@ -685,6 +685,21 @@ describe('creating and returning to a table', () => {
     expect(button(/Bill copied/)).toBeVisible();
   });
 
+  it('shows the same real legacy discounted bill total as the Excel export', async () => {
+    const table = dinner({ items: [
+      { id: 'food', name: 'Food', price: 10 },
+      { id: 'discount', name: 'Discount', price: -2 },
+    ] });
+    saveLocally(table);
+    const { user } = renderApp({ signedIn: true, tables: [table] });
+    await user.click(await screen.findByRole('button', { name: /Open Night market/ }));
+    await user.click(await screen.findByRole('button', { name: 'Copy to Excel' }));
+    expect(screen.getByText('RM-2.00')).toBeVisible();
+    expect(screen.getByText('RM8.00')).toBeVisible();
+    expect(await navigator.clipboard.readText()).toContain('Discount\t-2.00\t0.00\t-2.00\t');
+    expect(await navigator.clipboard.readText()).toContain('Total\t\t\t8.00\t');
+  });
+
   it('refreshes a reopened table when a remote guest pays', async () => {
     vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
     saveLocally(dinner());
