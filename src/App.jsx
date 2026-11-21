@@ -10,6 +10,7 @@ import { savedTables, localDate, formatTableDate } from "./lib/tableUi.mjs";
 import { savePaidWithClient } from "./lib/paidWrite.mjs";
 import { prepareQrForSave, readPaymentQr } from "./lib/paymentQr.mjs";
 import { updateSelectionWithClient } from "./lib/selectionWrite.mjs";
+import { requestNotificationPermission } from "./utils/notifications.js";
 
 const callbackFailed = hasAuthError(new URL(window.location.href));
 
@@ -1776,20 +1777,6 @@ function usePrevious(value) {
   return ref.current;
 }
 
-async function requestNotificationPermission() {
-  if (typeof window === "undefined" || !("Notification" in window)) return "unsupported";
-  if (Notification.permission === "granted") return "granted";
-  try {
-    const permission = await new Promise((resolve, reject) => {
-      const p = Notification.requestPermission(resolve);
-      if (p && p.then) p.then(resolve).catch(reject);
-    });
-    return permission;
-  } catch (e) {
-    return "denied";
-  }
-}
-
 function sendLocalNotification(title, body) {
   if (typeof window === "undefined" || !("Notification" in window) || Notification.permission !== "granted") return;
 
@@ -2330,6 +2317,7 @@ function HostView({ onHome, currency, user, profile }) {
   const finalise = async () => {
     if (finalising) return;
     if (!reviewReceiptItems(items).valid) { setStep(2); return; }
+    void requestNotificationPermission().catch(() => {});
     setFinalising(true);
     setErr("");
     try {
@@ -3287,6 +3275,7 @@ export default function KakiSplit() {
               onHost={user ? () => setMode("host") : () => { setAuthIntentMode("host"); setShowAuthModal(true); }}
               onGuest={() => setMode("guest-code")}
               onReturnTable={code => {
+                void requestNotificationPermission().catch(() => {});
                 if (user) {
                   localStorage.setItem("ks_current_code", code);
                   setMode("host-return");

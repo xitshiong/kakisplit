@@ -511,6 +511,33 @@ describe('joining and paying as a guest', () => {
 });
 
 describe('creating and returning to a table', () => {
+  it.each(['new', 'returning'])('requests notification permission without blocking the %s host flow', async mode => {
+    const requestPermission = vi.fn(() => new Promise(() => {}));
+    vi.stubGlobal('Notification', { permission: 'default', requestPermission });
+    if (mode === 'returning') saveLocally(dinner());
+    const { user } = renderApp({ signedIn: true, tables: [dinner()] });
+    expect(requestPermission).not.toHaveBeenCalled();
+    if (mode === 'new') {
+      await manualEditor(user);
+      await addItem(user, 'Tea', '3');
+      await user.click(button(/Next: Payment QR/));
+      await user.click(button(/Generate Table Link/));
+      await screen.findByRole('heading', { name: 'Friday dinner' });
+    } else {
+      await user.click(await screen.findByRole('button', { name: /Open Night market/ }));
+      await screen.findByText('0/2 items paid');
+    }
+    expect(requestPermission).toHaveBeenCalledTimes(1);
+  });
+
+  it('continues opening a table when the notification permission request rejects', async () => {
+    vi.stubGlobal('Notification', { permission: 'default', requestPermission: vi.fn().mockRejectedValue(new Error('Denied')) });
+    saveLocally(dinner());
+    const { user } = renderApp({ signedIn: true, tables: [dinner()] });
+    await user.click(await screen.findByRole('button', { name: /Open Night market/ }));
+    expect(await screen.findByText('0/2 items paid')).toBeVisible();
+  });
+
   it.each(['new', 'returning'])('clears only the poll warning after a successful poll on a %s table', async mode => {
     vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
     if (mode === 'returning') saveLocally(dinner());
