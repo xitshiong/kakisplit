@@ -418,7 +418,7 @@ describe('joining and paying as a guest', () => {
     rows.get('1234').paid = { tea: { payers: ['Bela'], total: 1 } };
     await user.click(button('I have paid'));
     expect(await screen.findByRole('alert')).toHaveTextContent('Already paid by someone else: Tea');
-    expect(button('I have paid')).toBeDisabled();
+    expect(button(/Pay host/)).toBeDisabled();
     expect(requests.some(request => request.body?.paid)).toBe(false);
   });
 
@@ -466,6 +466,31 @@ describe('joining and paying as a guest', () => {
     expect(button(/Food.*3\.33/)).toBeVisible();
     await user.click(button(/Pay host/));
     expect(screen.getByText('MYR 3.33')).toBeVisible();
+  });
+
+  it('excludes saved items from a new quote after a later share changes during confirmation', async () => {
+    const { user, rows, requests } = await joinViaLink({ tables: [dinner({ items: [
+      { id: 'tea', name: 'Tea', price: 3 },
+      { id: 'food', name: 'Food', price: 10 },
+    ] })] });
+    await enterName(user);
+    await user.click(button(/Tea/));
+    await user.click(button(/Food/));
+    await user.click(button('Split Food with more people'));
+    await user.click(button('Split Food with more people'));
+    await user.click(button(/Pay host/));
+    expect(screen.getByText('MYR 6.34')).toBeVisible();
+    rows.get('1234').paid = { food: { payers: ['Bela'], total: 3 } };
+    await user.click(button('I have paid'));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Your share changed');
+    expect(rows.get('1234').paid.tea).toEqual({ payers: ['Ari'], total: 1 });
+    expect(screen.getByText('Your share · 1 item')).toBeVisible();
+    await user.click(button(/Pay host/));
+    expect(screen.getByText('MYR 3.33')).toBeVisible();
+    await user.click(button('I have paid'));
+    expect(await screen.findByText('Confirmed, Ari!')).toBeVisible();
+    expect(rows.get('1234').paid.food).toEqual({ payers: ['Bela', 'Ari'], total: 3 });
+    expect(requests.filter(request => request.body?.paid)).toHaveLength(2);
   });
 
   it('retries a rejected payment update before showing success', async () => {

@@ -2019,6 +2019,8 @@ function GuestView({ session, onBack, currency }) {
           setPaymentError("Your share changed. Check the updated amount before confirming; if you already transferred, contact your host.");
           const state = await loadSessionState(session.code);
           setPaidMap(state.paid);
+          setSel(selected => Object.fromEntries(Object.entries(selected)
+            .filter(([id]) => !paymentStatus(state.paid[id]).payers.includes(name))));
           setShowQR(false);
           setPaymentQuote(null);
           return;
@@ -2028,7 +2030,15 @@ function GuestView({ session, onBack, currency }) {
       }
       const { paid } = await loadSessionState(session.code);
       setPaidMap(paid);
+      if ((full.length || failed.length) && myItems.some(item => paymentStatus(paid[item.id]).payers.includes(name))) {
+        setSel(selected => Object.fromEntries(Object.entries(selected)
+          .filter(([id]) => !paymentStatus(paid[id]).payers.includes(name))));
+        setShowQR(false);
+        setPaymentQuote(null);
+      }
       if (full.length) {
+        setShowQR(false);
+        setPaymentQuote(null);
         setSel(selected => {
           const next = { ...selected };
           full.forEach(item => { delete next[item.id]; });
