@@ -1953,7 +1953,8 @@ function GuestView({ session, onBack, currency }) {
       ...Object.values(selections).flatMap(value => Array.isArray(value) ? value : []),
       ...Object.values(paidMap).flatMap(value => value?.payers || (value ? [value] : [])),
     ].map(value => typeof value === "object" && value !== null ? value.name : value).filter(value => typeof value === "string");
-    const existing = knownNames.find(value => normalizeName(value).toLowerCase() === normalized.toLowerCase());
+    const existing = knownNames.find(value => value === normalized) ||
+      knownNames.find(value => normalizeName(value).toLowerCase() === normalized.toLowerCase());
     let remembered = false;
     try {
       const saved = JSON.parse(localStorage.getItem(`ks_guest_names_${session.code}`) || "[]");

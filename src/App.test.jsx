@@ -258,6 +258,17 @@ describe('home and sign-in', () => {
 });
 
 describe('joining and paying as a guest', () => {
+  it('prefers an exact-case identity when two saved names differ only in casing', async () => {
+    const { user } = await joinViaLink({ tables: [dinner({ selections: { tea: ['Ari'], noodles: ['ari'] } })] });
+    await user.type(screen.getByLabelText('Your name'), 'ari');
+    await user.click(button(/Continue/));
+    expect(screen.getByRole('alert')).toHaveTextContent('already using "ari"');
+    await user.click(button("That's me"));
+    expect(screen.getByText('Hey ari, pick what you had.')).toBeVisible();
+    expect(screen.getByRole('button', { name: /Noodles/, pressed: true })).toBeVisible();
+    expect(screen.getByRole('button', { name: /Tea/, pressed: false })).toBeVisible();
+  });
+
   it.each(['Bela', { name: 'Bela' }])('does not restore fully paid legacy items on rejoin (%j)', async payer => {
     const { user } = await joinViaLink({ tables: [dinner({ selections: { tea: ['Ari'] }, paid: { tea: payer } })] });
     await enterName(user);
