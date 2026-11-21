@@ -1,3 +1,5 @@
+import { priceCents, shareCents } from './splitMoney.mjs';
+
 export function paymentStatus(value) {
   const entries = Array.isArray(value?.payers) ? value.payers : value ? [value] : [];
   const payers = entries.map(payer => typeof payer === 'object' ? payer?.name || 'Host' : payer);
@@ -7,9 +9,9 @@ export function paymentStatus(value) {
 
 export function paymentBreakdown(price, value, selected = []) {
   const status = paymentStatus(value);
-  const totalCents = Math.round((Number(price) || 0) * 100);
-  const shareCents = Math.round(Number(((Number(price) || 0) / status.total).toFixed(2)) * 100);
-  const paidCents = status.complete ? totalCents : shareCents * status.payers.length;
+  const totalCents = priceCents(price) ?? 0;
+  const paidCents = status.complete ? totalCents : status.payers.reduce((sum, _, slot) =>
+    sum + Math.sign(totalCents) * shareCents(Math.abs(totalCents), status.total, slot), 0);
   const owing = [...new Set(Array.isArray(selected) ? selected : [])]
     .filter(name => typeof name === 'string' && name.trim() && !status.payers.includes(name));
   const unnamedShares = Math.max(0, status.total - status.payers.length - owing.length);

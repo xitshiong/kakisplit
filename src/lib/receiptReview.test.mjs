@@ -29,7 +29,7 @@ test('rejects missing, nonfinite, unsafe or fractional-cent amounts', () => {
 test('preserves signed discounts, free items and common decimal entry', () => {
   const result = reviewReceiptItems([
     { name: 'Meal', price: '12.90' },
-    { name: 'Discount', price: '-2.5' },
+    { name: 'Discount', price: '-2.5', billLevel: true },
     { name: 'Extra sambal', price: '.50' },
     { name: 'Water', price: 0 },
   ]);
@@ -49,20 +49,40 @@ test('does not alter item drafts and recovers after correction', () => {
   assert.equal(reviewReceiptItems([{ ...items[0], price: '15.00' }]).valid, true);
 });
 
-test('rejects an unsafe grand total even when individual amounts fit in safe cents', () => {
+test('rejects an oversized bill even when individual amounts are within the line cap', () => {
   const result = reviewReceiptItems([
-    { name: 'A', price: '80000000000000.00' },
-    { name: 'B', price: '80000000000000.00' },
+    { name: 'A', price: '1000000.00' },
+    { name: 'B', price: '0.01' },
   ]);
   assert.deepEqual(result.errors, [{ name: '', price: '' }, { name: '', price: '' }]);
   assert.equal(result.valid, false);
+  assert.match(result.totalError, /Amount is too large/);
+  assert.equal(result.totalText, null);
+});
+
+test('reports oversized decimal amounts clearly, including unsafe cents and signed adjustments', () => {
+  for (const price of ['1000000.01', '1000000,01', '90071992547389.90', '90071992547409.92', '-1000000.01']) {
+    const result = reviewReceiptItems([{ name: 'Amount', price, billLevel: true }]);
+    assert.equal(result.valid, false);
+    assert.match(result.errors[0].price, /^Amount is too large/);
+  }
+  const result = reviewReceiptItems([{ name: 'A', price: '10.00' }, { name: 'B', price: '10.00' }, { name: 'C', price: '90071992547389.90' }]);
+  assert.equal(result.totalText, '20.00');
+  assert.match(result.errors[2].price, /^Amount is too large/);
+});
+
+test('formats displayed totals from integer cents at the cap and below', () => {
+  const atCap = reviewReceiptItems([{ name: 'A', price: '999999.99' }, { name: 'B', price: '0.01' }]);
+  assert.equal(atCap.valid, true);
+  assert.equal(atCap.totalText, '1000000.00');
+  assert.equal(reviewReceiptItems([{ name: 'A', price: '.10' }, { name: 'B', price: '.20' }]).totalText, '0.30');
 });
 
 test('marks errors only on affected lines while keeping the total of valid amounts', () => {
   const result = reviewReceiptItems([
     { name: '', price: '3.00' },
     { name: 'Tea', price: 'invalid' },
-    { name: 'Discount', price: '-1.50' },
+    { name: 'Discount', price: '-1.50', billLevel: true },
   ]);
   assert.equal(result.total, 1.5);
   assert.deepEqual(result.errors.map(({ name, price }) => [Boolean(name), Boolean(price)]), [

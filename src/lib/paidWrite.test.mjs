@@ -2,6 +2,15 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { savePaidWithClient } from './paidWrite.mjs';
 
+test('does not confirm a different cent amount than the guest saw', async () => {
+  const client = mockClient({ food: { payers: ['A'], total: 3 } });
+  assert.deepEqual(await savePaidWithClient(client, 'food', 'B', '1234', 3, 334, 10), { success: false, amountChanged: true });
+  assert.equal(client.writes, 0);
+  assert.deepEqual(await savePaidWithClient(client, 'food', 'B', '1234', 3, 333, 10), { success: true });
+  const zero = mockClient({});
+  assert.deepEqual(await savePaidWithClient(zero, 'free', 'A', '1234', 1, 0, 0), { success: true });
+});
+
 function mockClient(initial, { concurrent = false, readError = false, updateError = false, conflict = false } = {}) {
   let paid = structuredClone(initial);
   let reads = 0;
