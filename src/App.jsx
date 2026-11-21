@@ -1990,11 +1990,22 @@ function GuestView({ session, onBack, currency }) {
   const myTotal = myTotalCents / 100;
 
   useEffect(() => {
+    if (paying || done) return;
+    setSel(selected => {
+      const remaining = Object.entries(selected).filter(([id]) => {
+        const status = paymentStatus(paidMap[id]);
+        return !status.complete && !status.payers.includes(name);
+      });
+      return remaining.length === Object.keys(selected).length ? selected : Object.fromEntries(remaining);
+    });
+  }, [paidMap, name, paying, done]);
+
+  useEffect(() => {
     if (!showQR || !paymentQuote || paying || done) return;
     const changed = items.some(item => {
       if (paymentQuote[item.id] === undefined) return false;
       const status = paymentStatus(paidMap[item.id]);
-      return (status.complete && !status.payers.includes(name)) ||
+      return status.complete || status.payers.includes(name) ||
         guestShareCents(item.price, paidMap[item.id], name, splits[item.id] || 1) !== paymentQuote[item.id];
     });
     if (changed) {
@@ -2019,8 +2030,6 @@ function GuestView({ session, onBack, currency }) {
           setPaymentError("Your share changed. Check the updated amount before confirming; if you already transferred, contact your host.");
           const state = await loadSessionState(session.code);
           setPaidMap(state.paid);
-          setSel(selected => Object.fromEntries(Object.entries(selected)
-            .filter(([id]) => !paymentStatus(state.paid[id]).payers.includes(name))));
           setShowQR(false);
           setPaymentQuote(null);
           return;
@@ -2031,19 +2040,12 @@ function GuestView({ session, onBack, currency }) {
       const { paid } = await loadSessionState(session.code);
       setPaidMap(paid);
       if ((full.length || failed.length) && myItems.some(item => paymentStatus(paid[item.id]).payers.includes(name))) {
-        setSel(selected => Object.fromEntries(Object.entries(selected)
-          .filter(([id]) => !paymentStatus(paid[id]).payers.includes(name))));
         setShowQR(false);
         setPaymentQuote(null);
       }
       if (full.length) {
         setShowQR(false);
         setPaymentQuote(null);
-        setSel(selected => {
-          const next = { ...selected };
-          full.forEach(item => { delete next[item.id]; });
-          return next;
-        });
         setPaymentError(`Already paid by someone else: ${full.map(item => item.name).join(", ")}. Go back to check your items before confirming again.`);
       } else if (failed.length) {
         setPaymentError("Couldn’t save your payment status. Check your connection and try again. If you already transferred, don’t pay again.");

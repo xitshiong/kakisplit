@@ -493,6 +493,24 @@ describe('joining and paying as a guest', () => {
     expect(requests.filter(request => request.body?.paid)).toHaveLength(2);
   });
 
+  it.each(['other guest', 'this guest'])('drops items recorded by %s during polling from subsequent quotes', async payer => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    const { user, rows } = await joinViaLink();
+    await enterName(user);
+    await user.click(button(/Tea/));
+    await user.click(button(/Noodles/));
+    await user.click(button(/Pay host/));
+    rows.get('1234').paid = { tea: { payers: [payer === 'this guest' ? 'Ari' : 'Bela'], total: payer === 'this guest' ? 2 : 1 } };
+    await act(() => vi.advanceTimersByTimeAsync(2_000));
+    expect(screen.queryByRole('button', { name: 'I have paid' })).not.toBeInTheDocument();
+    expect(screen.getByText('Your share · 1 item')).toBeVisible();
+    expect(screen.queryByRole('button', { name: /Tea/ })).not.toBeInTheDocument();
+    await user.click(button(/Pay host/));
+    expect(screen.getByText('MYR 15.00')).toBeVisible();
+    await act(() => vi.advanceTimersByTimeAsync(2_000));
+    expect(button('I have paid')).toBeVisible();
+  });
+
   it('retries a rejected payment update before showing success', async () => {
     const { user, rows, requests, failNext } = await joinViaLink();
     await enterName(user);
