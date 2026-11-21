@@ -34,6 +34,13 @@ do $$ begin
   assert public.get_session('abcd-efgh')->>'code' = 'ABCDEFGH';
   assert not public.get_session('ABCDEFGH') ? 'owner_id';
   assert public.get_session('ZZZZZZZZ') is null;
+  assert public.set_selections('ABCDEFGH',E' \tAri\n ',array['tea']);
+  assert public.set_selections('ABCDEFGH','Bela',array['tea']);
+  assert public.set_selections('ABCDEFGH',U&'\00A0Ari\FEFF',array['rice']);
+  assert public.get_session('ABCDEFGH')->'selections'->'tea' = '["Bela"]'::jsonb;
+  assert public.get_session('ABCDEFGH')->'selections'->'rice' = '["Ari"]'::jsonb;
+  assert not public.set_selections('ABCDEFGH','Ari',array['missing']);
+  assert public.set_selections('ABCDEFGH','Ari',array[]::text[]);
   assert public.mark_paid('ABCDEFGH','missing','Guest',1) = '{"success":false}'::jsonb;
   assert public.mark_paid('ABCDEFGH','tea','Ari',2) = '{"success":true}'::jsonb;
   assert public.mark_paid('ABCDEFGH','tea','Ari',2) = '{"success":true,"alreadyPaid":true}'::jsonb;
@@ -44,13 +51,10 @@ do $$ begin
   assert public.mark_paid('ABCDEFGH','rice',E' \tBob \n Doe\r ',1) = '{"success":true}'::jsonb;
   assert public.mark_paid('ABCDEFGH','rice',U&'\00A0Bob\2003Doe\FEFF',1) = '{"success":true,"alreadyPaid":true}'::jsonb;
   assert public.mark_paid('1234','legacy','Guest',1) = '{"success":true}'::jsonb;
-  assert public.set_selections('ABCDEFGH',E' \tAri\n ',array['tea']);
-  assert public.set_selections('ABCDEFGH','Bela',array['tea']);
-  assert public.set_selections('ABCDEFGH',U&'\00A0Ari\FEFF',array['rice']);
-  assert public.get_session('ABCDEFGH')->'selections'->'tea' = '["Bela"]'::jsonb;
-  assert public.get_session('ABCDEFGH')->'selections'->'rice' = '["Ari"]'::jsonb;
-  assert not public.set_selections('ABCDEFGH','Ari',array['missing']);
-  assert public.set_selections('ABCDEFGH','Ari',array[]::text[]);
+  assert public.get_session('ABCDEFGH')->'selections'->'tea' = '[]'::jsonb;
+  assert public.set_selections('ABCDEFGH','Ari',array['tea','rice']);
+  assert public.get_session('ABCDEFGH')->'selections'->'tea' = '[]'::jsonb;
+  assert public.get_session('ABCDEFGH')->'selections'->'rice' = '[]'::jsonb;
   begin
     update public.sessions set table_name = 'hijacked' where code = 'ABCDEFGH';
     raise exception 'Anon UPDATE unexpectedly allowed';
@@ -65,6 +69,31 @@ do $$ begin
   exception when insufficient_privilege then null; end;
 end $$;
 \echo PASS: guest RPCs, duplicate/capacity/bad-item/legacy checks, atomic selections, anon table-write denial
+
+reset role;
+update public.sessions set items = items || '[{"id":"food","price":10},{"id":"free","price":0},{"id":"discount","price":-2},{"id":"invalid","price":"bad"},{"id":"cap","price":1000000},{"id":"unsafe","price":"90071992547409.92"},{"id":"fallback","price":5}]'::jsonb,
+  paid = paid || '{"fallback":{"payers":[],"total":0}}'::jsonb,
+  selections = selections || '{"food":["A","B","C"]}'::jsonb where code='ABCDEFGH';
+set role anon;
+do $$ begin
+  assert public.mark_paid('ABCDEFGH','food','A',3,334) = '{"success":true}'::jsonb;
+  assert public.get_session('ABCDEFGH')->'selections'->'food' = '["B","C"]'::jsonb;
+  assert public.mark_paid('ABCDEFGH','food','B',3,334) = '{"success":false,"amountChanged":true}'::jsonb;
+  assert public.get_session('ABCDEFGH')->'paid'->'food'->'payers' = '["A"]'::jsonb;
+  assert public.mark_paid('ABCDEFGH','food','B',99,333) = '{"success":true}'::jsonb;
+  assert public.mark_paid('ABCDEFGH','food','C',3,333) = '{"success":true}'::jsonb;
+  assert public.get_session('ABCDEFGH')->'selections'->'food' = '[]'::jsonb;
+  assert public.set_selections('ABCDEFGH','B',array['food']);
+  assert public.get_session('ABCDEFGH')->'selections'->'food' = '[]'::jsonb;
+  assert public.mark_paid('ABCDEFGH','free','A',1,0) = '{"success":true}'::jsonb;
+  assert public.mark_paid('ABCDEFGH','discount','A',1,0) = '{"success":false}'::jsonb;
+  assert public.mark_paid('ABCDEFGH','invalid','A',1,0) = '{"success":false}'::jsonb;
+  assert public.mark_paid('ABCDEFGH','cap','A',1,100000000) = '{"success":true}'::jsonb;
+  assert public.mark_paid('ABCDEFGH','unsafe','A',1,0) = '{"success":false}'::jsonb;
+  assert public.mark_paid('ABCDEFGH','fallback','A',2,250) = '{"success":true}'::jsonb;
+  assert public.get_session('ABCDEFGH')->'paid'->'fallback'->>'total' = '2';
+end $$;
+\echo PASS: locked cent quotes, zero shares, amount bounds, legacy split fallback, selection pruning
 
 reset role;
 select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000002',false);

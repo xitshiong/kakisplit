@@ -3,13 +3,29 @@ import assert from 'node:assert/strict';
 import { savePaidWithClient } from './paidWrite.mjs';
 
 test('payments use only the locked server RPC and preserve its return semantics', async () => {
-  for (const result of [{ success: true }, { success: true, alreadyPaid: true }, { success: false, full: true }]) {
+  for (const result of [{ success: true }, { success: true, alreadyPaid: true }, { success: false, full: true }, { success: false, amountChanged: true }]) {
     const client = { rpc: async (name, args) => {
       assert.equal(name, 'mark_paid');
       assert.deepEqual(args, { p_code: 'ABCDEFGH', p_item_id: '1', p_name: 'Ari', p_split_count: 2 });
       return { data: result };
     } };
     assert.deepEqual(await savePaidWithClient(client, 1, 'Ari', 'abcd-efgh', 2), result);
+  }
+});
+
+test('quotes are checked by the RPC against locked server prices, including zero-cent shares', async () => {
+  for (const cents of [0, 333, 334]) {
+    const client = { rpc: async (name, args) => {
+      assert.equal(name, 'mark_paid');
+      assert.equal(args.p_expected_cents, cents);
+      assert.equal(Object.hasOwn(args, 'price'), false);
+      return { data: cents === 334 ? { success: false, amountChanged: true } : { success: true } };
+    } };
+    assert.deepEqual(await savePaidWithClient(client, 'food', 'B', '1234', 3, cents),
+      cents === 334 ? { success: false, amountChanged: true } : { success: true });
+  }
+  for (const cents of [-1, NaN, Infinity, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
+    assert.deepEqual(await savePaidWithClient({ rpc() { assert.fail('Unexpected call'); } }, 'food', 'B', '1234', 3, cents), { success: false });
   }
 });
 

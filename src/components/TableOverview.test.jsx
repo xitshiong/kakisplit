@@ -53,6 +53,20 @@ it('omits empty payment groups and shows the selected currency everywhere', () =
   expect(screen.getByText('SGD 15.00')).toBeVisible();
 });
 
+it('preserves legacy signed discounts in line breakdowns and the real bill total', () => {
+  render(<TableOverview {...overview} currency="MYR" paidMap={{}} items={[
+    { id: 'food', name: 'Food', price: 10 },
+    { id: 'discount', name: 'Legacy discount', price: -2 },
+    { id: 'invalid', name: 'Unreadable', price: 'junk' },
+  ]} />);
+  const lines = screen.getByRole('region', { name: 'Unpaid' });
+  expect(within(lines).getByText('RM10.00')).toBeVisible();
+  expect(within(lines).getByText('RM-2.00')).toBeVisible();
+  expect(within(lines).getByText('RM0.00')).toBeVisible();
+  const summary = screen.getByText('Total').parentElement;
+  expect(within(summary).getByText('RM8.00')).toBeVisible();
+});
+
 it('blocks duplicate copy while the clipboard is pending and announces success', async () => {
   const user = userEvent.setup();
   let resolveCopy;
