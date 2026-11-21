@@ -15,9 +15,16 @@ export function shareCents(cents, count, slot) {
 }
 
 export function guestShareCents(price, paid, name, count = 1) {
+  const cents = priceCents(price);
+  if (cents === null || cents < 0) return 0;
   const payers = paid?.payers || (paid ? [paid] : []);
   const index = payers.findIndex(payer => (typeof payer === 'object' ? payer.name : payer) === name);
-  return shareCents(priceCents(price), paid?.total || count, index < 0 ? payers.length : index);
+  return shareCents(cents, paid?.total || count, index < 0 ? payers.length : index);
+}
+
+export function isPayableItem(item) {
+  const cents = priceCents(item.price);
+  return cents !== null && cents >= 0;
 }
 
 export function canConfirmSelection(items, cents) {

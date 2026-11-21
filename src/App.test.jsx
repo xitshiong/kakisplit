@@ -351,6 +351,21 @@ describe('joining and paying as a guest', () => {
     expect(rows.get('1234').paid.water).toEqual({ payers: ['Ari'], total: 1 });
   });
 
+  it('excludes legacy discount and invalid lines without blocking other payments', async () => {
+    const { user, rows } = await joinViaLink({ tables: [dinner({ qr_image: null, items: [
+      { id: 'discount', name: 'Legacy discount', price: -2 },
+      { id: 'invalid', name: 'Unreadable price', price: 'junk' },
+      { id: 'food', name: 'Food', price: 10 },
+    ] })] });
+    await enterName(user);
+    expect(screen.getAllByText('Not payable · check with host')).toHaveLength(2);
+    expect(screen.queryByRole('button', { name: /Legacy discount|Unreadable price/ })).not.toBeInTheDocument();
+    await user.click(button(/Food/));
+    await user.click(button(/Confirm →/));
+    expect(await screen.findByText('Confirmed, Ari!')).toBeVisible();
+    expect(rows.get('1234').paid).toEqual({ food: { payers: ['Ari'], total: 1 } });
+  });
+
   it('quotes and confirms the first cent-allocated share', async () => {
     const { user, rows } = await joinViaLink({
       tables: [dinner({ items: [{ id: 'food', name: 'Food', price: 10 }] })],

@@ -4,6 +4,13 @@ import { priceCents, shareCents, guestShareCents, canConfirmSelection, allocateB
 import { reviewReceiptItems } from './receiptReview.mjs';
 import { paymentBreakdown } from './tableUi.mjs';
 
+test('legacy negative and invalid prices do not crash share rendering', () => {
+  for (const price of [-2, 'junk', null, 'NaN']) {
+    assert.equal(guestShareCents(price, { payers: ['Other'], total: 2 }, 'Guest'), 0);
+    assert.equal(paymentBreakdown(price, { payers: ['Other'], total: 2 }).paidCents, 0);
+  }
+});
+
 test('shared cents conserve the bill including tiny and uneven splits', () => {
   for (const [cents, count] of [[1000, 3], [1, 3], [100, 7], [10000, 7]]) {
     const shares = Array.from({ length: count }, (_, slot) => shareCents(cents, count, slot));

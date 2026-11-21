@@ -6,7 +6,7 @@ import { LOGIN_INTENT_KEY, readLoginIntent, hasAuthError } from "./lib/authFlow.
 import ReceiptItemEditor from "./components/ReceiptItemEditor.jsx";
 import TableOverview from "./components/TableOverview.jsx";
 import { reviewReceiptItems } from "./lib/receiptReview.mjs";
-import { allocateBillItems, canConfirmSelection, guestShareCents } from "./lib/splitMoney.mjs";
+import { allocateBillItems, canConfirmSelection, guestShareCents, isPayableItem } from "./lib/splitMoney.mjs";
 import { savedTables, localDate, formatTableDate } from "./lib/tableUi.mjs";
 import { savePaidWithClient } from "./lib/paidWrite.mjs";
 import { prepareQrForSave, readPaymentQr } from "./lib/paymentQr.mjs";
@@ -1985,7 +1985,7 @@ function GuestView({ session, onBack, currency }) {
     }
   }, [sel, named, name, session.code]);
 
-  const myItems = items.filter(i => sel[i.id]);
+  const myItems = items.filter(i => sel[i.id] && isPayableItem(i));
   const myTotalCents = myItems.reduce((sum, item) => sum + guestShareCents(item.price, paidMap[item.id], name, splits[item.id] || 1), 0);
   const myTotal = myTotalCents / 100;
 
@@ -2122,6 +2122,12 @@ function GuestView({ session, onBack, currency }) {
         <div className="guest-items-label"><span>Your items</span><span>{currency}</span></div>
         <div className="guest-receipt-items">
           {items.map(item => {
+            if (!isPayableItem(item)) return (
+              <div key={item.id} className="guest-item paid-item">
+                <span className="g-name">{item.name}</span>
+                <span className="guest-paid-tag">Not payable · check with host</span>
+              </div>
+            );
             const paidInfo = paidMap[item.id];
             const paidBy = (paidInfo?.payers || (paidInfo ? [paidInfo] : [])).map(p => typeof p === 'object' ? (p.name || "Host") : p);
             const alreadyPaid = paidBy.includes(name);

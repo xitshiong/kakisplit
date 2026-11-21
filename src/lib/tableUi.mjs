@@ -9,7 +9,7 @@ export function paymentStatus(value) {
 
 export function paymentBreakdown(price, value, selected = []) {
   const status = paymentStatus(value);
-  const totalCents = priceCents(price) ?? 0;
+  const totalCents = Math.max(0, priceCents(price) ?? 0);
   const paidCents = status.complete ? totalCents : status.payers.reduce((sum, _, slot) => sum + shareCents(totalCents, status.total, slot), 0);
   const owing = [...new Set(Array.isArray(selected) ? selected : [])]
     .filter(name => typeof name === 'string' && name.trim() && !status.payers.includes(name));
