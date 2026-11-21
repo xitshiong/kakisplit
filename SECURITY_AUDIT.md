@@ -26,6 +26,12 @@ Scope: repository/static analysis and local regression tests, not a production p
 - Supabase URL and anon/publishable key are intended to be public. No service-role key literal was found in tracked source. Do not configure a service-role key in **any** `VITE_` variable.
 - Supabase defaults persist browser auth tokens in localStorage; local table codes/names/QR images are also persisted. Local host-return markers are not proof of ownership. An XSS or an untrusted same-origin script can read browser tokens; a shared browser retains table metadata. CSP reduces script injection exposure but does not create a server-side session. A backend-for-frontend with HttpOnly cookies is a separate architecture change.
 
+### CSP compatibility
+
+Tesseract.js 7.0.0 browser defaults were checked in the installed package (`src/worker/browser/defaultOptions.js`, `spawnWorker.js`, `src/worker-script/browser/getCore.js`, and `src/worker-script/index.js`). The worker is `https://cdn.jsdelivr.net/npm/tesseract.js@v7.0.0/dist/worker.min.js`, bootstrapped through a blob worker. Core glue and WASM come from `https://cdn.jsdelivr.net/npm/tesseract.js-core@v7.0.0/` (SIMD/relaxed-SIMD and legacy/LSTM variants depend on runtime features/options). The current prep options enable legacy language/core support, so English data is `https://cdn.jsdelivr.net/npm/@tesseract.js-data/eng/4.0.0/eng.traineddata.gz`; LSTM-only defaults use `4.0.0_best_int` instead. No separate tessdata host is used by these v7 defaults.
+
+The CSP permits jsDelivr in script/worker/connect sources, blob workers, and WASM compilation via `'wasm-unsafe-eval'`, without allowing JavaScript eval or inline scripts. Allowing the CDN also trusts its executable scripts; self-hosting pinned OCR assets would reduce that trust boundary. Same-origin Vercel analytics scripts/events, HTTPS Google avatars, Supabase HTTPS/WSS calls and top-level OAuth redirects remain permitted. React inline styles and static `<style>` tags are allowed; the four source HTML entrypoints contain no inline scripts or event handlers. Custom Supabase domains would need explicit CSP entries.
+
 ## Required Supabase/server actions
 
 1. Inspect all `sessions`/`profiles` grants, RLS flags, policies and SECURITY DEFINER functions in the dashboard. Confirm production matches intended schema before applying migrations. Check for overlapping permissive policies: adding a restrictive-looking permissive policy does not remove an existing `USING (true)` policy.
