@@ -7,7 +7,7 @@ export default function TableOverview({ code, tableName, tableDate, items, paidM
   const url = `${window.location.origin}/app/?table=${code}`;
   const rows = items.map(item => ({ item, status: paymentBreakdown(item.price, paidMap[item.id], selections[item.id]) }));
   const paidCount = rows.filter(({ status }) => status.complete).length;
-  const total = items.reduce((sum, item) => sum + (Number(item.price) || 0), 0);
+  const totalCents = rows.reduce((sum, { status }) => sum + status.totalCents, 0);
   const money = cents => `${currency === 'MYR' ? 'RM' : `${currency} `}${(cents / 100).toFixed(2)}`;
   const groups = [
     { label: 'Unpaid', kind: 'unpaid', rows: rows.filter(({ status }) => !status.payers.length) },
@@ -61,7 +61,7 @@ export default function TableOverview({ code, tableName, tableDate, items, paidM
         ))}
         <div className="bill-summary-row highlight table-summary-total">
           <span>Total</span>
-          <span className="bill-summary-val">{money(Math.round(total * 100))}</span>
+          <span className="bill-summary-val">{money(totalCents)}</span>
         </div>
       </section>
     </>
