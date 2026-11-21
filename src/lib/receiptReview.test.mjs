@@ -29,7 +29,7 @@ test('rejects missing, nonfinite, unsafe or fractional-cent amounts', () => {
 test('preserves signed discounts, free items and common decimal entry', () => {
   const result = reviewReceiptItems([
     { name: 'Meal', price: '12.90' },
-    { name: 'Discount', price: '-2.5' },
+    { name: 'Discount', price: '-2.5', billLevel: true },
     { name: 'Extra sambal', price: '.50' },
     { name: 'Water', price: 0 },
   ]);
@@ -62,7 +62,7 @@ test('marks errors only on affected lines while keeping the total of valid amoun
   const result = reviewReceiptItems([
     { name: '', price: '3.00' },
     { name: 'Tea', price: 'invalid' },
-    { name: 'Discount', price: '-1.50' },
+    { name: 'Discount', price: '-1.50', billLevel: true },
   ]);
   assert.equal(result.total, 1.5);
   assert.deepEqual(result.errors.map(({ name, price }) => [Boolean(name), Boolean(price)]), [

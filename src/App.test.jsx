@@ -114,7 +114,7 @@ async function manualEditor(user, name = 'Friday dinner') {
 async function addItem(user, name, amount) {
   await user.click(button(/Add item/));
   await user.type(screen.getAllByLabelText(/^Item \d+$/).at(-1), name);
-  await user.type(screen.getAllByRole('spinbutton', { name: /Total/ }).at(-1), amount);
+  await user.type(screen.getAllByRole('textbox', { name: /Total/ }).at(-1), amount);
 }
 
 function saveLocally(...tables) {
@@ -340,6 +340,34 @@ describe('joining and paying as a guest', () => {
     expect(rows.get('1234').paid.noodles).toEqual({ payers: ['Bela', 'Ari'], total: 3 });
   });
 
+  it('confirms a free item without requiring a bank transfer', async () => {
+    const { user, rows } = await joinViaLink({
+      tables: [dinner({ items: [{ id: 'water', name: 'Free water', price: 0 }] })],
+    });
+    await enterName(user);
+    await user.click(button(/Free water/));
+    await user.click(button(/Confirm →/));
+    expect(await screen.findByText('Confirmed, Ari!')).toBeVisible();
+    expect(rows.get('1234').paid.water).toEqual({ payers: ['Ari'], total: 1 });
+  });
+
+  it('quotes and confirms the first cent-allocated share', async () => {
+    const { user, rows } = await joinViaLink({
+      tables: [dinner({ items: [{ id: 'food', name: 'Food', price: 10 }] })],
+    });
+    await enterName(user);
+    await user.click(button(/Food/));
+    await user.click(button('Split Food with more people'));
+    await user.click(button('Split Food with more people'));
+    expect(button(/Food.*3\.34/)).toBeVisible();
+    await user.click(button(/Pay host/));
+    expect(screen.getByText('MYR 3.34')).toBeVisible();
+    await user.click(button('I have paid'));
+    expect(await screen.findByText('Confirmed, Ari!')).toBeVisible();
+    expect(rows.get('1234').paid.food).toEqual({ payers: ['Ari'], total: 3 });
+    expect(screen.getAllByText('MYR 3.34')).toHaveLength(2);
+  });
+
   it('does not let a guest select a fully paid item or a share they have already paid', async () => {
     const { user } = await joinViaLink({
       tables: [dinner({ paid: { tea: 'Bela', noodles: { payers: ['Ari'], total: 2 } } })],
@@ -419,6 +447,22 @@ describe('joining and paying as a guest', () => {
 });
 
 describe('creating and returning to a table', () => {
+  it('publishes manual whole-bill discounts into regular item prices', async () => {
+    const { user, rows } = renderApp({ signedIn: true });
+    await manualEditor(user);
+    await addItem(user, 'Food', '10,00');
+    await addItem(user, 'Free water', '0');
+    await addItem(user, 'Coupon', '-1,50');
+    await user.click(screen.getAllByRole('checkbox', { name: 'Applies to whole bill' })[2]);
+    await user.click(button(/Next: Payment QR/));
+    await user.click(button(/Generate Table Link/));
+    expect(await screen.findByRole('heading', { name: 'Friday dinner' })).toBeVisible();
+    const [created] = rows.values();
+    expect(created.items.map(({ name, price }) => ({ name, price }))).toEqual([
+      { name: 'Food', price: '8.50' }, { name: 'Free water', price: '0.00' },
+    ]);
+  });
+
   it('walks through manual receipt entry, QR, and a shareable table saved locally', async () => {
     const { user, rows } = renderApp({ signedIn: true });
     await manualEditor(user);

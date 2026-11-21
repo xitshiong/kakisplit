@@ -18,10 +18,12 @@ function ItemRow({ item, index, currency, error, showErrors, autoFocus, onUpdate
           onChange={event => onUpdate(item.id, 'name', event.target.value)}
           onBlur={() => setTouched(value => ({ ...value, name: true }))} />
         {nameError && <p id={`${id}-name-error`} className="field-error">{nameError}</p>}
+        <label><input type="checkbox" checked={!!item.billLevel}
+          onChange={event => onUpdate(item.id, 'billLevel', event.target.checked)} /> Applies to whole bill</label>
       </div>
       <div className="receipt-edit-price">
         <label htmlFor={`${id}-price`}>Total ({currency})</label>
-        <input id={`${id}-price`} className="name-in" type="number" inputMode="decimal" step="0.01"
+        <input id={`${id}-price`} className="name-in" type="text" inputMode="decimal"
           required value={item.price} placeholder="0.00" aria-invalid={!!priceError}
           aria-describedby={priceError ? `${id}-price-error` : undefined}
           onChange={event => onUpdate(item.id, 'price', event.target.value)}
@@ -61,7 +63,7 @@ export default function ReceiptItemEditor({ items, receipts, currency, notices, 
   return (
     <form className="section receipt-editor" noValidate onSubmit={submit}>
       <h2 className="section-head">Check items</h2>
-      <p className="section-sub">Edit each name and line total. Include tax or service charges as separate items.</p>
+      <p className="section-sub">Edit each name and line total. Mark tax, service charges and discounts as applying to the whole bill; these are spread across items.</p>
       {notices}
       {!items.length && <div className="editor-empty">
         <strong>No items yet</strong>

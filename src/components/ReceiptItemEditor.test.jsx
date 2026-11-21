@@ -41,7 +41,7 @@ it('explains why an empty draft cannot advance and focuses the first added item'
 it('shows the attempted validation errors and advances after correcting them', async () => {
   const { user, onNext } = renderEditor([{ id: 'a', name: ' ', price: '3.123' }]);
   const name = screen.getByLabelText('Item 1');
-  const amount = screen.getByRole('spinbutton', { name: 'Total (MYR)' });
+  const amount = screen.getByRole('textbox', { name: 'Total (MYR)' });
   expect(name).not.toBeInvalid();
   expect(screen.getByText('—')).toBeVisible();
   await user.click(next());
@@ -55,7 +55,7 @@ it('shows the attempted validation errors and advances after correcting them', a
   await user.clear(amount);
   await user.type(amount, '3.25');
   expect(name).not.toBeInvalid();
-  expect(amount).toHaveValue(3.25);
+  expect(amount).toHaveValue('3.25');
   expect(amount).toHaveAttribute('aria-invalid', 'false');
   expect(screen.getByText('MYR 3.25')).toBeVisible();
   await user.click(next());
@@ -65,7 +65,7 @@ it('shows the attempted validation errors and advances after correcting them', a
 it('rejects a zero net bill even when each individual line is valid', async () => {
   const { user, onNext } = renderEditor([
     { id: 'a', name: 'Tea', price: '3' },
-    { id: 'b', name: 'Coupon', price: '-3' },
+    { id: 'b', name: 'Coupon', price: '-3', billLevel: true },
   ]);
   expect(screen.getByText('MYR 0.00')).toBeVisible();
   await user.click(next());
@@ -106,4 +106,17 @@ it('goes back without submitting and recalculates the total when a row is delete
   await user.click(screen.getByRole('button', { name: /Back: Table details/ }));
   expect(onBack).toHaveBeenCalledTimes(1);
   expect(onNext).not.toHaveBeenCalled();
+});
+
+it('accepts decimal commas and only permits negative whole-bill adjustments', async () => {
+  const { user, onNext } = renderEditor([
+    { id: 'a', name: 'Tea', price: '10' },
+    { id: 'b', name: 'Coupon', price: '-1,50' },
+  ]);
+  await user.click(next());
+  expect(screen.getByText('Only whole-bill adjustments can be negative.')).toBeVisible();
+  await user.click(screen.getAllByRole('checkbox', { name: 'Applies to whole bill' })[1]);
+  expect(screen.getByText('MYR 8.50')).toBeVisible();
+  await user.click(next());
+  expect(onNext).toHaveBeenCalledTimes(1);
 });

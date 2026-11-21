@@ -6,6 +6,7 @@ import { LOGIN_INTENT_KEY, readLoginIntent, hasAuthError } from "./lib/authFlow.
 import ReceiptItemEditor from "./components/ReceiptItemEditor.jsx";
 import TableOverview from "./components/TableOverview.jsx";
 import { reviewReceiptItems } from "./lib/receiptReview.mjs";
+import { allocateBillItems, canConfirmSelection, guestShareCents } from "./lib/splitMoney.mjs";
 import { savedTables, localDate, formatTableDate } from "./lib/tableUi.mjs";
 import { savePaidWithClient } from "./lib/paidWrite.mjs";
 import { prepareQrForSave, readPaymentQr } from "./lib/paymentQr.mjs";
@@ -1874,11 +1875,11 @@ async function load(code) {
   };
 }
 
-async function savePaid(itemId, name, code, splitCount = 1) {
+async function savePaid(itemId, name, code, splitCount = 1, expectedCents, price) {
   if (!code) code = new URLSearchParams(window.location.search).get("table") || localStorage.getItem("ks_current_code");
   if (!code) return { success: false };
 
-  return savePaidWithClient(supabase, itemId, name, code, splitCount);
+  return savePaidWithClient(supabase, itemId, name, code, splitCount, expectedCents, price);
 }
 
 async function loadSessionState(code) {
@@ -1953,6 +1954,7 @@ function GuestView({ session, onBack, currency }) {
   const [splits, setSplits] = useState({});
   const [done, setDone] = useState(false);
   const [showQR, setShowQR] = useState(false);
+  const [paymentQuote, setPaymentQuote] = useState(null);
   const [paidMap, setPaidMap] = useState(session.paid || {});
   const [paying, setPaying] = useState(false);
   const [paymentError, setPaymentError] = useState("");
@@ -1984,14 +1986,11 @@ function GuestView({ session, onBack, currency }) {
   }, [sel, named, name, session.code]);
 
   const myItems = items.filter(i => sel[i.id]);
-  const myTotal = myItems.reduce((s, i) => {
-    const paidInfo = paidMap[i.id];
-    const totalSplit = paidInfo?.total || splits[i.id] || 1;
-    return s + parseFloat(i.price || 0) / totalSplit;
-  }, 0);
+  const myTotalCents = myItems.reduce((sum, item) => sum + guestShareCents(item.price, paidMap[item.id], name, splits[item.id] || 1), 0);
+  const myTotal = myTotalCents / 100;
 
   const confirmPayment = async () => {
-    if (paying || !myItems.length) return;
+    if (paying || !canConfirmSelection(myItems, myTotalCents)) return;
     setPaying(true);
     setPaymentError("");
     try {
@@ -1999,7 +1998,16 @@ function GuestView({ session, onBack, currency }) {
       const failed = [];
       for (const item of myItems) {
         const totalSplit = paidMap[item.id]?.total || splits[item.id] || 1;
-        const result = await savePaid(item.id, name, session.code, totalSplit);
+        const result = await savePaid(item.id, name, session.code, totalSplit,
+          paymentQuote?.[item.id] ?? guestShareCents(item.price, paidMap[item.id], name, totalSplit), item.price);
+        if (result?.amountChanged) {
+          setPaymentError("Your share changed. Check the updated amount before confirming; if you already transferred, contact your host.");
+          const state = await loadSessionState(session.code);
+          setPaidMap(state.paid);
+          setShowQR(false);
+          setPaymentQuote(null);
+          return;
+        }
         if (result?.full) full.push(item);
         else if (!result?.success) failed.push(item);
       }
@@ -2060,7 +2068,7 @@ function GuestView({ session, onBack, currency }) {
         {myItems.map(i => {
           const paidInfo = paidMap[i.id];
           const totalSplit = paidInfo?.total || splits[i.id] || 1;
-          const splitPrice = parseFloat(i.price) / totalSplit;
+          const splitPrice = guestShareCents(i.price, paidInfo, name, totalSplit) / 100;
           return (
             <div key={i.id} className="bill-summary-row">
               <span>{i.name}{totalSplit > 1 ? ` (split ${totalSplit} ways)` : ""}</span>
@@ -2083,7 +2091,7 @@ function GuestView({ session, onBack, currency }) {
 
       <div style={{ textAlign: "center", padding: "30px 24px", borderBottom: "1px dashed var(--ink-faint)" }}>
         <div style={{ fontFamily: "'DM Mono', monospace", fontSize: "clamp(1.6rem, 7vw, 2.4rem)", fontWeight: 900, color: "var(--accent-ink)" }}>
-          {currency} {myTotal.toFixed(2)}
+          {currency} {((paymentQuote ? Object.values(paymentQuote).reduce((sum, cents) => sum + cents, 0) : myTotalCents) / 100).toFixed(2)}
         </div>
       </div>
 
@@ -2096,7 +2104,7 @@ function GuestView({ session, onBack, currency }) {
         <button className="btn btn-neon" disabled={paying || !myItems.length} style={{ width: "100%", marginBottom: 12, padding: "20px", fontSize: "1rem" }} onClick={confirmPayment}>
           {paying ? "Saving…" : "I have paid"}
         </button>
-        <button className="btn btn-outline" disabled={paying} style={{ width: "100%", border: "none" }} onClick={() => setShowQR(false)}>
+        <button className="btn btn-outline" disabled={paying} style={{ width: "100%", border: "none" }} onClick={() => { setShowQR(false); setPaymentQuote(null); }}>
           ← BACK
         </button>
       </div>
@@ -2118,7 +2126,7 @@ function GuestView({ session, onBack, currency }) {
             const paidBy = (paidInfo?.payers || (paidInfo ? [paidInfo] : [])).map(p => typeof p === 'object' ? (p.name || "Host") : p);
             const alreadyPaid = paidBy.includes(name);
             const totalSplit = paidInfo?.total || splits[item.id] || 1;
-            const splitPrice = parseFloat(item.price || 0) / totalSplit;
+            const splitPrice = guestShareCents(item.price, paidInfo, name, totalSplit) / 100;
             const fullyPaid = paidBy.length >= totalSplit;
 
             if (fullyPaid) return (
@@ -2189,8 +2197,13 @@ function GuestView({ session, onBack, currency }) {
           <div className="sticky-label">Your share · {myItems.length} item{myItems.length === 1 ? "" : "s"}</div>
           <div className="sticky-amt" aria-live="polite">{currency} {myTotal.toFixed(2)}</div>
         </div>
-        <button className="sticky-pay-btn" disabled={myTotal <= 0 || paying} onClick={() => qrImage ? setShowQR(true) : confirmPayment()}>
-          {paying ? "Saving…" : qrImage ? "Pay host →" : "Confirm →"}
+        <button className="sticky-pay-btn" disabled={!canConfirmSelection(myItems, myTotalCents) || paying} onClick={() => {
+          if (qrImage && myTotalCents > 0) {
+            setPaymentQuote(Object.fromEntries(myItems.map(item => [item.id, guestShareCents(item.price, paidMap[item.id], name, splits[item.id] || 1)])));
+            setShowQR(true);
+          } else confirmPayment();
+        }}>
+          {paying ? "Saving…" : qrImage && (!myItems.length || myTotalCents > 0) ? "Pay host →" : "Confirm →"}
         </button>
       </div>
     </>
@@ -2322,7 +2335,7 @@ function HostView({ onHome, currency, user, profile }) {
         c = genCode();
         const { error } = await supabase.from("sessions").insert({
           code: c,
-          items,
+          items: allocateBillItems(items),
           qr_image: null,
           paid: initialPaid,
           table_name: tableName || "My Table",
@@ -2361,6 +2374,7 @@ function HostView({ onHome, currency, user, profile }) {
       localStorage.setItem("ks_current_name", tableName || "My Table");
       localStorage.setItem("ks_current_date", tableDate);
 
+      setItems(allocateBillItems(items));
       setCode(c);
       setPaidMap(initialPaid);
       setTableSelections({});
