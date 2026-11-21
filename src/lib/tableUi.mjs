@@ -1,3 +1,4 @@
+import { isTableCode } from './tableCode.mjs';
 import { priceCents, shareCents } from './splitMoney.mjs';
 
 export function paymentStatus(value) {
@@ -21,7 +22,7 @@ export function paymentBreakdown(price, value, selected = []) {
 export function savedTables(storage = localStorage) {
   try {
     const tables = JSON.parse(storage.getItem('ks_tables') || '[]');
-    return Array.isArray(tables) ? tables.filter(table => table && /^\d{4}$/.test(table.code)) : [];
+    return Array.isArray(tables) ? tables.filter(table => table && isTableCode(table.code)) : [];
   } catch {
     return [];
   }

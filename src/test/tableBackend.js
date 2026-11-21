@@ -1,4 +1,6 @@
 import { vi } from 'vitest';
+import { guestShareCents, isPayableItem } from '../lib/splitMoney.mjs';
+import { paymentStatus } from '../lib/tableUi.mjs';
 
 export const testUser = {
   id: 'host-1',
@@ -38,10 +40,11 @@ export function mockTableBackend({ tables = [], profile = testProfile } = {}) {
     const url = new URL(input);
     const method = init.method || 'GET';
     const resource = url.pathname.replace(/^\/rest\/v1\//, '');
-    const code = url.searchParams.get('code')?.replace(/^eq\./, '');
+    let code = url.searchParams.get('code')?.replace(/^eq\./, '');
     const select = url.searchParams.get('select');
     const paidFilter = url.searchParams.get('paid');
     const body = init.body ? JSON.parse(init.body) : undefined;
+    if (resource.startsWith('rpc/')) code = body.p_code;
     const request = { method, resource, code, select, body };
     requests.push(request);
 
@@ -58,10 +61,38 @@ export function mockTableBackend({ tables = [], profile = testProfile } = {}) {
         return new Response(null, { status: 204 });
       }
     }
+    if (resource.startsWith('rpc/')) {
+      const row = rows.get(code);
+      if (resource === 'rpc/get_session') return json(row && !row.concluded ? row : null);
+      if (!row || row.concluded) return json(resource === 'rpc/mark_paid' ? { success: false } : false);
+      if (resource === 'rpc/mark_paid') {
+        const { p_item_id: id, p_name: name, p_split_count: count } = body;
+        const item = row.items.find(item => String(item.id) === id);
+        if (!item || !isPayableItem(item)) return json({ success: false });
+        const saved = row.paid[id];
+        const entry = typeof saved === 'string' ? { payers: [saved], total: 1 }
+          : { payers: saved?.payers || [], total: saved?.total || count };
+        if (entry.payers.includes(name)) return json({ success: true, alreadyPaid: true });
+        if (entry.payers.length >= entry.total) return json({ success: false, full: true });
+        if (body.p_expected_cents !== undefined && guestShareCents(item.price, entry, name, count) !== body.p_expected_cents) return json({ success: false, amountChanged: true });
+        entry.payers.push(name);
+        row.paid[id] = entry;
+        row.selections[id] = (row.selections[id] || []).filter(selected => selected !== name && entry.payers.length < entry.total);
+        return json({ success: true });
+      }
+      if (resource === 'rpc/set_selections') {
+        for (const id of Object.keys(row.selections)) row.selections[id] = row.selections[id].filter(name => name !== body.p_name);
+        for (const id of body.p_item_ids) {
+          const status = paymentStatus(row.paid[id]);
+          if (!status.complete && !status.payers.includes(body.p_name)) row.selections[id] = [...(row.selections[id] || []), body.p_name];
+        }
+        return json(true);
+      }
+    }
     if (resource !== 'sessions') return json({ message: 'Unexpected test request' }, 500);
     if (method === 'POST') {
       if (rows.has(body.code)) return json({ code: '23505', message: 'Duplicate code' }, 409);
-      rows.set(body.code, structuredClone(body));
+      rows.set(body.code, { paid: {}, selections: {}, ...structuredClone(body) });
       return new Response(null, { status: 201 });
     }
 

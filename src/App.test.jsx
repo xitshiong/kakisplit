@@ -207,7 +207,7 @@ describe('home and sign-in', () => {
     localStorage.setItem(LOGIN_INTENT_KEY, JSON.stringify({ mode: 'host-return', code: '1234', ts: Date.now() }));
     const { requests } = renderApp({ signedIn: true, tables: [dinner()] });
     expect(await screen.findByRole('heading', { name: 'Night market' })).toBeVisible();
-    expect(requests.filter(request => request.resource === 'sessions').map(request => request.code)).toEqual(['1234']);
+    expect(requests.filter(request => request.resource === 'sessions' && request.method === 'GET').map(request => request.code)).toEqual(['1234']);
     expect(localStorage.getItem('ks_current_code')).toBe('1234');
   });
 
@@ -256,17 +256,75 @@ describe('home and sign-in', () => {
 });
 
 describe('joining and paying as a guest', () => {
+  it('preserves the caret when replacing characters with lowercase input', async () => {
+    const { user, requests } = renderApp({ tables: [dinner({ code: 'ABCDEFGH' })] });
+    await user.click(await screen.findByRole('button', { name: /Join as Guest/ }));
+    const code = screen.getByLabelText('Table code');
+    await user.type(code, 'ABZZEFGH');
+    code.setSelectionRange(2, 4);
+    await user.keyboard('cd');
+    expect(code).toHaveValue('ABcdEFGH');
+    expect(code.selectionStart).toBe(4);
+    expect(code.selectionEnd).toBe(4);
+    await user.keyboard('{Enter}');
+    expect(await screen.findByLabelText('Your name')).toBeVisible();
+    expect(requests[0].body.p_code).toBe('ABCDEFGH');
+  });
+
+  it.each(['ABCDEFGHJ', 'ABCD-EFGHJ', 'ABCD EFGH J'])('rejects an overlong pasted code without truncating: %s', async pasted => {
+    const { user, requests } = renderApp();
+    await user.click(await screen.findByRole('button', { name: /Join as Guest/ }));
+    const code = screen.getByLabelText('Table code');
+    await user.click(code);
+    await user.paste(pasted);
+    expect(code).toHaveValue(pasted);
+    expect(code).toBeInvalid();
+    expect(button(/Join Table/)).toBeDisabled();
+    expect(screen.getByRole('alert')).toHaveTextContent('spaces and dashes don’t count'.replace('’', "'"));
+    await user.keyboard('{Enter}');
+    expect(requests).toEqual([]);
+    await user.clear(code);
+    await user.type(code, 'abcd efgh');
+    expect(code).not.toBeInvalid();
+    expect(button(/Join Table/)).toBeEnabled();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it.each([true, false])('retries a failed table link and distinguishes a missing table (exists: %s)', async exists => {
+    const { user, requests, failNext } = renderApp({
+      search: 'table=abcd-efgh', tables: exists ? [dinner({ code: 'ABCDEFGH' })] : [],
+    });
+    failNext(request => request.resource === 'rpc/get_session');
+    expect(await screen.findByText('Couldn’t load the table')).toBeVisible();
+    expect(screen.getByText('Check your connection and try again.')).toBeVisible();
+    expect(screen.queryByText('Table not found')).not.toBeInTheDocument();
+    await user.click(button('Try again'));
+    if (exists) expect(await screen.findByLabelText('Your name')).toBeVisible();
+    else {
+      expect(await screen.findByText('Table not found')).toBeVisible();
+      expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument();
+    }
+    expect(requests.map(request => request.code)).toEqual(['ABCDEFGH', 'ABCDEFGH']);
+  });
+
+  it('normalizes an eight-character code and never reads session rows directly', async () => {
+    const { user, requests } = renderApp({ tables: [dinner({ code: 'ABCDEFGH' })] });
+    await user.click(await screen.findByRole('button', { name: /Join as Guest/ }));
+    await user.type(screen.getByLabelText('Table code'), 'abcd-efgh{Enter}');
+    expect(await screen.findByLabelText('Your name')).toBeVisible();
+    expect(requests).toEqual([expect.objectContaining({ resource: 'rpc/get_session', code: 'ABCDEFGH' })]);
+  });
   it('requires four digits, handles an unknown code, and joins a corrected code on Enter', async () => {
     const { user, requests } = renderApp({ tables: [dinner()] });
     await user.click(await screen.findByRole('button', { name: /Join as Guest/ }));
     const code = screen.getByLabelText('Table code');
-    await user.type(code, 'x99');
+    await user.type(code, '99');
     expect(code).toHaveValue('99');
     expect(button(/Join Table/)).toBeDisabled();
     await user.keyboard('{Enter}');
     expect(requests).toHaveLength(0);
 
-    await user.type(code, '999');
+    await user.type(code, '99');
     expect(code).toHaveValue('9999');
     await user.click(button(/Join Table/));
     expect(await screen.findByRole('alert')).toHaveTextContent('Table not found');
@@ -291,6 +349,25 @@ describe('joining and paying as a guest', () => {
     expect(button(/Continue/)).toBeDisabled();
     expect(screen.queryByRole('button', { name: /Noodles/ })).not.toBeInTheDocument();
     expect(requests.some(request => request.method === 'PATCH')).toBe(false);
+  });
+
+  it.each(['click', 'Enter'])('normalizes guest identity before selection and paid comparisons via %s', async method => {
+    const { user, rows, requests } = await joinViaLink({ tables: [dinner({
+      paid: { tea: { payers: ['Bob Doe'], total: 2 } },
+    })] });
+    await user.type(screen.getByLabelText('Your name'), '\u00a0 Bob   Doe \u00a0');
+    if (method === 'Enter') await user.keyboard('{Enter}');
+    else await user.click(button(/Continue/));
+    expect(await screen.findByText('you paid')).toBeVisible();
+    expect(screen.queryByRole('button', { name: /Tea/ })).not.toBeInTheDocument();
+    await user.click(button(/Noodles/));
+    await waitFor(() => expect(rows.get('1234').selections.noodles).toEqual(['Bob Doe']));
+    await user.click(button(/Pay host/));
+    await user.click(button('I have paid'));
+    expect(await screen.findByText('Confirmed, Bob Doe!')).toBeVisible();
+    expect(requests.filter(request => request.resource === 'rpc/mark_paid')).toEqual([
+      expect.objectContaining({ body: expect.objectContaining({ p_name: 'Bob Doe', p_item_id: 'noodles' }) }),
+    ]);
   });
 
   it('recalculates a guest share and synchronizes selection without removing another guest', async () => {
@@ -325,7 +402,7 @@ describe('joining and paying as a guest', () => {
     await user.click(button('I have paid'));
     expect(await screen.findByText('Confirmed, Ari!')).toBeVisible();
     expect(rows.get('1234').paid).toEqual({ noodles: { payers: ['Ari'], total: 2 } });
-    expect(requests.filter(request => request.body?.paid)).toHaveLength(1);
+    expect(requests.filter(request => request.resource === 'rpc/mark_paid')).toHaveLength(1);
   });
 
   it('confirms without a QR on an older table and honors a split already started', async () => {
@@ -399,7 +476,7 @@ describe('joining and paying as a guest', () => {
     await enterName(user);
     await user.click(button(/Tea/));
     await user.click(button(/Pay host/));
-    failNext(request => request.method === 'GET' && request.select === 'paid');
+    failNext(request => request.resource === 'rpc/mark_paid');
     await user.click(button('I have paid'));
     expect(await screen.findByRole('alert')).toHaveTextContent('don’t pay again');
     expect(rows.get('1234').paid).toEqual({});
@@ -490,7 +567,7 @@ describe('joining and paying as a guest', () => {
     await user.click(button('I have paid'));
     expect(await screen.findByText('Confirmed, Ari!')).toBeVisible();
     expect(rows.get('1234').paid.food).toEqual({ payers: ['Bela', 'Ari'], total: 3 });
-    expect(requests.filter(request => request.body?.paid)).toHaveLength(2);
+    expect(requests.filter(request => request.resource === 'rpc/mark_paid').map(request => request.body.p_expected_cents)).toEqual([300, 334, 333]);
   });
 
   it.each(['other guest', 'this guest'])('drops items recorded by %s during polling from subsequent quotes', async payer => {
@@ -516,10 +593,12 @@ describe('joining and paying as a guest', () => {
     await enterName(user);
     await user.click(button(/Tea/));
     await user.click(button(/Pay host/));
-    failNext(request => request.body?.paid);
+    failNext(request => request.resource === 'rpc/mark_paid');
+    await user.click(button('I have paid'));
+    expect(await screen.findByRole('alert')).toHaveTextContent('don’t pay again');
     await user.click(button('I have paid'));
     expect(await screen.findByText('Confirmed, Ari!')).toBeVisible();
-    expect(requests.filter(request => request.body?.paid)).toHaveLength(2);
+    expect(requests.filter(request => request.resource === 'rpc/mark_paid')).toHaveLength(2);
     expect(rows.get('1234').paid.tea).toEqual({ payers: ['Ari'], total: 1 });
   });
 });
@@ -554,7 +633,7 @@ describe('creating and returning to a table', () => {
     expect(await screen.findByRole('heading', { name: 'Friday dinner' })).toBeVisible();
     const [created] = rows.values();
     expect(created).toMatchObject({
-      code: expect.stringMatching(/^\d{4}$/), table_name: 'Friday dinner', qr_image: '/payment.png',
+      code: expect.stringMatching(/^[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{8}$/), table_name: 'Friday dinner', qr_image: '/payment.png',
       items: [{ name: 'Noodles', price: '15.50' }, { name: 'Tea', price: '3.25' }],
     });
     expect(screen.getByText('RM18.75')).toBeVisible();
@@ -566,16 +645,16 @@ describe('creating and returning to a table', () => {
   });
 
   it('generates a new code after a collision without overwriting the existing table', async () => {
-    const { user, rows, requests } = renderApp({ signedIn: true, tables: [dinner({ code: '1000' })] });
+    const { user, rows, requests } = renderApp({ signedIn: true, tables: [dinner({ code: '22222222' })] });
     await manualEditor(user);
     await addItem(user, 'Tea', '3');
     await user.click(button(/Next: Payment QR/));
-    vi.spyOn(Math, 'random').mockReturnValueOnce(0).mockReturnValueOnce(0.5);
+    vi.spyOn(crypto, 'getRandomValues').mockImplementationOnce(bytes => bytes.fill(0)).mockImplementationOnce(bytes => bytes.fill(1));
     await user.click(button(/Generate Table Link/));
     expect(await screen.findByRole('heading', { name: 'Friday dinner' })).toBeVisible();
-    expect(requests.filter(request => request.method === 'POST').map(request => request.body.code)).toEqual(['1000', '5500']);
-    expect(rows.get('1000').table_name).toBe('Night market');
-    expect(rows.get('5500').table_name).toBe('Friday dinner');
+    expect(requests.filter(request => request.resource === 'sessions' && request.method === 'POST').map(request => request.body.code)).toEqual(['22222222', '33333333']);
+    expect(rows.get('22222222').table_name).toBe('Night market');
+    expect(rows.get('33333333').table_name).toBe('Friday dinner');
   });
 
   it('leaves a failed table creation retryable and does not store the failed table', async () => {

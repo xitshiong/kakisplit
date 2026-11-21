@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
-import { createClient } from "@supabase/supabase-js";
+import { genCode, normalizeCode, isTableCode, formatCode } from "./lib/tableCode.mjs";
+import { supabase } from "./lib/supabaseClient.js";
 import { Analytics } from "@vercel/analytics/react"
 import { scanReceipt, scanReceiptBatch } from "./lib/receiptOcr.js";
 import { LOGIN_INTENT_KEY, readLoginIntent, hasAuthError } from "./lib/authFlow.mjs";
@@ -12,16 +13,6 @@ import { savePaidWithClient } from "./lib/paidWrite.mjs";
 import { prepareQrForSave, readPaymentQr } from "./lib/paymentQr.mjs";
 
 const callbackFailed = hasAuthError(new URL(window.location.href));
-
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY,
-  {
-    global: {
-      fetch: (...args) => fetch(...args),
-    },
-  }
-);
 
 const LOGO_SRC = "/kakisplit-logo.png";
 
@@ -1816,7 +1807,7 @@ function sendLocalNotification(title, body) {
   }
 }
 
-function genCode() { return Math.floor(1000 + Math.random() * 9000).toString(); }
+
 
 function isDuplicateCodeError(error) {
   return error?.code === "23505" || /duplicate key/i.test(error?.message || "");
@@ -1843,78 +1834,40 @@ async function prepareReceiptImage(file) {
   }
 }
 
-async function save(d) {
-  const { error } = await supabase.from("sessions").upsert({
-    code: d.code,
-    items: d.items,
-    qr_image: d.qrImage || null,
-    paid: d.paid || {},
-    table_name: d.tableName || "My Table",
-    table_date: d.tableDate || new Date().toISOString().split("T")[0]
-  });
-  if (error) throw new Error(error.message);
-}
-
-async function load(code) {
-  const { data, error } = await supabase
-    .from("sessions")
-    .select("*")
-    .eq("code", code)
-    .limit(1);
-  if (!data || error || data.length === 0) return null;
-  const row = data[0];
-  const qrImage = localStorage.getItem(`ks_qr_${code}`) || null;
+async function load(code, { ownerOnly = false } = {}) {
+  code = normalizeCode(code);
+  if (!isTableCode(code)) return null;
+  const { data, error } = ownerOnly
+    ? await supabase.from("sessions").select("*").eq("code", code).single()
+    : await supabase.rpc("get_session", { p_code: code });
+  if (error) throw new Error("Table could not be loaded.");
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row || row.concluded) return null;
   return {
-    code: row.code,
-    items: row.items,
-    qrImage: row.qr_image || qrImage,
-    paid: row.paid,
-    selections: row.selections || {},
-    tableName: row.table_name,
-    tableDate: row.table_date
+    code: row.code, items: row.items, qrImage: row.qr_image || null,
+    paid: row.paid || {}, selections: row.selections || {},
+    tableName: row.table_name, tableDate: row.table_date,
   };
 }
 
-async function savePaid(itemId, name, code, splitCount = 1, expectedCents, price) {
-  if (!code) code = new URLSearchParams(window.location.search).get("table") || localStorage.getItem("ks_current_code");
-  if (!code) return { success: false };
-
-  return savePaidWithClient(supabase, itemId, name, code, splitCount, expectedCents, price);
+async function savePaid(itemId, name, code, splitCount = 1, expectedCents) {
+  return savePaidWithClient(supabase, itemId, name, code, splitCount, expectedCents);
 }
 
 async function loadSessionState(code) {
-  // Use select("*") to avoid crashing if certain columns (like selections) haven't been added yet
-  const { data, error } = await supabase.from("sessions").select("*").eq("code", code).single();
-  if (error || !data) return { paid: {}, selections: {} };
-  return { paid: data.paid || {}, selections: data.selections || {} };
+  try {
+    const session = await load(code);
+    return { paid: session?.paid || {}, selections: session?.selections || {} };
+  } catch { return { paid: {}, selections: {} }; }
 }
 
 async function updateGuestSelection(code, name, sel) {
-  if (!code || !name) return;
-  try {
-    const { data } = await supabase.from("sessions").select("selections").eq("code", code).single();
-    let selections = data?.selections || {};
-
-    // Remove user from all previously held items
-    Object.keys(selections).forEach(itemId => {
-      if (Array.isArray(selections[itemId])) {
-        selections[itemId] = selections[itemId].filter(n => n !== name);
-      }
-    });
-
-    // Add user to currently selected items
-    Object.keys(sel).forEach(itemId => {
-      if (sel[itemId]) {
-        if (!selections[itemId]) selections[itemId] = [];
-        if (!selections[itemId].includes(name)) selections[itemId].push(name);
-      }
-    });
-
-    // We use a try-catch in case the 'selections' column is missing in Supabase
-    await supabase.from("sessions").update({ selections }).eq("code", code);
-  } catch (e) {
-    console.warn("Selections sync failed (Column might be missing)", e);
-  }
+  if (!isTableCode(code) || !name) return;
+  const { error } = await supabase.rpc("set_selections", {
+    p_code: normalizeCode(code), p_name: name,
+    p_item_ids: Object.keys(sel).filter(id => sel[id]),
+  });
+  if (error) console.warn("Selections sync failed.");
 }
 // ── STEP BAR ──────────────────────────────────────────────────
 function StepBar({ current, steps }) {
@@ -1940,7 +1893,7 @@ function GuestReceiptHeader({ session, status = "Split the bill", onHome }) {
         {onHome ? <button type="button" className="guest-receipt-home" onClick={onHome}>← Home</button>
           : <span className="guest-receipt-status"><span aria-hidden="true">✓</span> {status}</span>}
       </div>
-      <p className="guest-receipt-meta">Table #{session.code}{session.tableDate ? ` · ${formatTableDate(session.tableDate)}` : ""}</p>
+      <p className="guest-receipt-meta">Table #{formatCode(session.code)}{session.tableDate ? ` · ${formatTableDate(session.tableDate)}` : ""}</p>
       <h1 className="guest-table-name">{session.tableName || "My Table"}</h1>
     </header>
   );
@@ -1961,6 +1914,12 @@ function GuestView({ session, onBack, currency }) {
   const { items = [], qrImage } = session;
 
   const [selections, setSelections] = useState({});
+  const confirmName = () => {
+    const normalized = name.trim().replace(/\s+/g, " ");
+    if (!normalized) return;
+    setName(normalized);
+    setNamed(true);
+  };
 
   useEffect(() => {
     // Preserve the browser's scroll-to-focus while the guest is entering a name.
@@ -2025,7 +1984,7 @@ function GuestView({ session, onBack, currency }) {
       for (const item of myItems) {
         const totalSplit = paidMap[item.id]?.total || splits[item.id] || 1;
         const result = await savePaid(item.id, name, session.code, totalSplit,
-          paymentQuote?.[item.id] ?? guestShareCents(item.price, paidMap[item.id], name, totalSplit), item.price);
+          paymentQuote?.[item.id] ?? guestShareCents(item.price, paidMap[item.id], name, totalSplit));
         if (result?.amountChanged) {
           setPaymentError("Your share changed. Check the updated amount before confirming; if you already transferred, contact your host.");
           const state = await loadSessionState(session.code);
@@ -2069,8 +2028,8 @@ function GuestView({ session, onBack, currency }) {
         <label className="field-label" htmlFor="guest-name">Your name</label>
         <input id="guest-name" autoComplete="given-name" className="name-in" placeholder="e.g. Ali"
           value={name} onChange={e => setName(e.target.value)}
-          onKeyDown={e => e.key === "Enter" && name.trim() && setNamed(true)} />
-        <button className="btn btn-ink" disabled={!name.trim()} onClick={() => setNamed(true)}>
+          onKeyDown={e => e.key === "Enter" && confirmName()} />
+        <button className="btn btn-ink" disabled={!name.trim()} onClick={confirmName}>
           Continue →
         </button>
         <button className="btn btn-outline" onClick={onBack}>← Back</button>
@@ -2293,9 +2252,9 @@ function HostView({ onHome, currency, user, profile }) {
     setLoading(true);
     setErr("");
     try {
+      const { data: { session } } = await supabase.auth.getSession();
       const result = await scanReceiptBatch(receipts, image => scanReceipt(image, {
-        geminiApiKey: import.meta.env.VITE_GEMINI_API_KEY,
-        openRouterApiKey: import.meta.env.VITE_OPENROUTER_API_KEY,
+        accessToken: session?.access_token,
       }));
       setItems(prev => [...result.items, ...prev.filter(item => !item.receiptId)]);
       setScanWarnings(result.warnings);
@@ -2619,8 +2578,9 @@ function GuestCode({ onJoin, onBack }) {
   const [code, setCode] = useState("");
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
+  const tooLong = normalizeCode(code).length > 8;
   const tryJoin = async () => {
-    if (loading || !/^\d{4}$/.test(code)) return;
+    if (loading || !isTableCode(code)) return;
     setLoading(true);
     setErr("");
     try {
@@ -2637,19 +2597,52 @@ function GuestCode({ onJoin, onBack }) {
     <div className="receipt">
       <div className="receipt-inner">
         <div className="section-head">Join a table</div>
-        <div className="section-sub" id="table-code-hint" style={{ marginBottom: 16 }}>Ask your host for the 4-digit table code.</div>
+        <div className="section-sub" id="table-code-hint" style={{ marginBottom: 16 }}>Ask your host for the table code (e.g. ABCD-EFGH).</div>
         <label className="field-label" htmlFor="table-code">Table code</label>
-        <input id="table-code" className="name-in table-code-input" placeholder="e.g. 1234" value={code}
-          aria-describedby={err ? "table-code-hint table-code-error" : "table-code-hint"} aria-invalid={!!err}
-          onChange={e => { setCode(e.target.value.replace(/\D/g, "").slice(0, 4)); setErr(""); }}
+        <input id="table-code" className="name-in table-code-input" placeholder="e.g. ABCD-EFGH" value={code}
+          aria-describedby={err || tooLong ? "table-code-hint table-code-error" : "table-code-hint"} aria-invalid={!!err || tooLong}
+          onChange={e => { setCode(e.target.value); setErr(""); }}
           onKeyDown={e => e.key === "Enter" && tryJoin()}
-          inputMode="numeric" pattern="[0-9]{4}" autoComplete="off"
-          style={{ textAlign: "center", letterSpacing: 6, fontSize: "1.2rem" }} />
-        {err && <div id="table-code-error" className="error-strip" role="alert">⚠ {err}</div>}
-        <button className="btn btn-ink" disabled={code.length !== 4 || loading} onClick={tryJoin}>
+          autoCapitalize="characters" autoComplete="off"
+          style={{ textAlign: "center", letterSpacing: 6, fontSize: "1.2rem", textTransform: "uppercase" }} />
+        {(err || tooLong) && <div id="table-code-error" className="error-strip" role="alert">⚠ {tooLong ? "Use 8 characters (or 4 legacy digits); spaces and dashes don't count." : err}</div>}
+        <button className="btn btn-ink" disabled={!isTableCode(code) || loading} onClick={tryJoin}>
           {loading ? "Looking up…" : "Join Table →"}
         </button>
         <button className="btn btn-outline" onClick={onBack}>← Back</button>
+      </div>
+    </div>
+  );
+}
+
+function GuestLinkLookup({ code, onJoin, onBack }) {
+  const [status, setStatus] = useState("loading");
+  const [retry, setRetry] = useState(0);
+  useEffect(() => {
+    let active = true;
+    setStatus("loading");
+    load(code).then(session => {
+      if (!active) return;
+      if (session) onJoin(session);
+      else setStatus("notfound");
+    }).catch(() => {
+      if (active) setStatus("error");
+    });
+    return () => { active = false; };
+  }, [code, retry]);
+
+  return (
+    <div className="receipt">
+      <div className="receipt-inner" style={{ textAlign: "center", padding: "40px 24px" }}>
+        {status === "loading" ? <p role="status">Looking up table…</p> : <>
+          <div style={{ fontSize: "3rem", marginBottom: 14 }}>😕</div>
+          <div className="section-head" style={{ textAlign: "center" }}>{status === "error" ? "Couldn’t load the table" : "Table not found"}</div>
+          <div className="section-sub" style={{ textAlign: "center", marginBottom: 24 }}>
+            {status === "error" ? "Check your connection and try again." : "Link may have expired or host hasn't started yet"}
+          </div>
+          {status === "error" && <button className="btn btn-ink" onClick={() => setRetry(value => value + 1)}>Try again</button>}
+        </>}
+        <button className="btn btn-outline" onClick={onBack}>Back to Home</button>
       </div>
     </div>
   );
@@ -2746,7 +2739,7 @@ function HostReturn({ onHome, currency, user, profile }) {
     setError("");
     const open = async () => {
       try {
-        const table = code ? await load(code) : null;
+        const table = code ? await load(code, { ownerOnly: true }) : null;
         if (!active) return;
         if (table) {
           setSession(table);
@@ -3079,7 +3072,7 @@ function LandingPage({ onHost, onGuest, onReturnTable, currency, onCurrencyChang
                 <div className="recent-name">{t.name || "My Table"}</div>
                 <div className="recent-meta">{formatTableDate(t.date)}</div>
               </div>
-              <div className="recent-code">{t.code}</div>
+              <div className="recent-code">{formatCode(t.code)}</div>
             </button>
           ))}
         </div>
@@ -3184,14 +3177,7 @@ export default function KakiSplit() {
         subscription = sub;
 
         if (tableCode) {
-          const s = await load(tableCode);
-          if (!mounted) return;
-          if (s) {
-            setGuestSession(s);
-            setMode("guest");
-          } else {
-            setMode("notfound");
-          }
+          setMode("guest-link");
         } else if (session?.user) {
           restorePostLoginMode();
         } else if (readLoginIntent(localStorage)) {
@@ -3199,7 +3185,7 @@ export default function KakiSplit() {
         }
       } catch (e) {
         console.error("Init failed:", e);
-        if (mounted && tableCode) setMode("notfound");
+        if (mounted && tableCode) setMode("guest-link");
       } finally {
         if (mounted) setInitializing(false);
       }
@@ -3364,15 +3350,9 @@ export default function KakiSplit() {
             </>
           )}
 
-          {mode === "notfound" && (
-            <div className="receipt">
-              <div className="receipt-inner" style={{ textAlign: "center", padding: "40px 24px" }}>
-                <div style={{ fontSize: "3rem", marginBottom: 14 }}>😕</div>
-                <div className="section-head" style={{ textAlign: "center" }}>Table not found</div>
-                <div className="section-sub" style={{ textAlign: "center", marginBottom: 24 }}>Link may have expired or host hasn't started yet</div>
-                <button className="btn btn-ink" onClick={goHome}>Back to Home</button>
-              </div>
-            </div>
+          {mode === "guest-link" && (
+            <GuestLinkLookup code={new URLSearchParams(window.location.search).get("table")}
+              onJoin={s => { setGuestSession(s); setMode("guest"); }} onBack={goHome} />
           )}
         </>}
       </div>

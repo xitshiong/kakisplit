@@ -4,33 +4,56 @@ Split bills lah, no drama.
 
 ## Setup
 
-1. Get a Google AI Studio API key at https://aistudio.google.com/apikey for primary receipt scanning with Gemini 2.5 Flash. Eligible accounts can use Google's free tier, subject to quotas and availability. Optionally get an OpenRouter key at https://openrouter.ai for paid Gemini 2.5 Flash Lite fallback.
-2. Create a `.env` file in the root:
-   ```
-   VITE_GEMINI_API_KEY=your_google_ai_studio_key
-   VITE_OPENROUTER_API_KEY=your_optional_openrouter_key
-   ```
-   Gemini is tried first. OpenRouter is used if the Gemini key is missing, or on quota exhaustion, server errors, connection failures or timeouts. After quota exhaustion, Gemini is skipped until the page is reloaded. Either key alone works; without either, items can still be entered manually.
+Use Node.js 22.13+ and run `npm ci` then `npm run dev` for the Vite UI.
+Create a local `.env` (never commit credentials):
 
-   Vite embeds these keys in the browser bundle; they are not server-side secrets. Restrict keys and set provider quotas/spending limits before deploying publicly.
+```dotenv
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-public-anon-key
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_ANON_KEY=your-public-anon-key
+OPENROUTER_API_KEY=your-server-only-openrouter-key
+```
 
-3. Install and run:
-   ```bash
-   npm install
-   npm run dev
-   ```
+Only the first two variables are public browser configuration. Never put an OCR
+key or Supabase service-role key in a `VITE_` variable. OCR runs exclusively in
+`api/ocr.js`, using a fixed model/prompt/schema. It requires Supabase sign-in
+and SQL quotas (30 requests per user/day and 2,000 globally/day, UTC). Every
+request, including a retry, consumes quota before contacting the provider.
+Manual item entry remains available if OCR is unavailable.
 
-## Tests
-
-Use Node.js 22.13+ (on the 22.x LTS line). Run `npm ci` and then `npm test` for the full suite.
-Use `npm run test:unit` for Node unit tests, `npm run test:receipt` for the
-table receipt OCR and review tests, or `npm run test:ui` for React integration
-tests in jsdom. The suite runs without live credentials or network services.
-GitHub Actions runs the full suite and the production build on pull requests.
+Vite alone does not serve serverless functions. Use Vercel's development runtime
+or a Vercel preview deployment to exercise OCR; `npm run dev` is for UI-only
+development. Static-only deployments cannot scan receipts.
 
 ## Deploy to Vercel
 
-1. Push to GitHub
-2. Import repo on vercel.com
-3. Add `VITE_GEMINI_API_KEY` (primary, free tier where available) and optionally `VITE_OPENROUTER_API_KEY` (paid fallback) in Vercel → Settings → Environment Variables
-4. Deploy!
+Follow the ordered rollout in [SECURITY_AUDIT.md](SECURITY_AUDIT.md): additive
+SQL first, server environment variables/key rotation, client/function deploy,
+then lockdown SQL. Do not apply lockdown before deploying the RPC-aware client.
+Keep the two public Supabase variables in Vercel alongside the three server
+variables above; use the same Supabase project for both.
+
+New tables use cryptographically random eight-character codes, displayed as
+`ABCD-EFGH`. Guests may enter lowercase, spaces or dashes. Existing four-digit
+tables remain joinable until concluded; they are still low-entropy links and
+should be retired promptly. Existing rows without a trusted owner are guest-
+accessible through RPCs only after lockdown; localStorage cannot claim them.
+
+## Tests
+
+`npm test` runs Node unit tests and React integration tests without live services.
+`npm run build` builds the production UI. `supabase/tests/security.sql` bootstraps
+a minimal schema and applies both migrations in a **fresh disposable** PostgreSQL
+database (never run it against Supabase). Example:
+
+```sh
+docker run --name kakisplit-security-test -e POSTGRES_PASSWORD=local-only -d postgres:16
+# Once PostgreSQL is ready:
+docker cp supabase kakisplit-security-test:/audit
+docker exec kakisplit-security-test psql -U postgres -v ON_ERROR_STOP=1 -f /audit/tests/security.sql
+```
+
+The household reader also uses the fixed server extraction endpoint (no public
+key fallback). Its legacy metadata/independent-model verification is not provided
+by this endpoint, so adapted household results are always marked for review.

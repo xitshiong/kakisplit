@@ -286,6 +286,29 @@ test("reconcile prefers the reading whose numbers actually balance", () => {
 
 // ── baking ────────────────────────────────────────────────────
 
+test("missing line totals use quantity times readable unit price without shifting cost", () => {
+  const receipt = reading({
+    items: [
+      { name: "TEA", qty: 2, unitPrice: 3.25, lineTotal: null },
+      { name: "MILK", qty: 1, lineTotal: 1.5 },
+    ],
+    grandTotal: 8,
+  });
+  assert.equal(receipt.items[0].lineCents, 650);
+  assert.equal(verifyArithmetic(receipt).balanced, true);
+  assert.deepEqual(bakeItems(receipt).items.map(item => item.totalCents), [650, 150]);
+});
+
+test("unit-price fallback preserves printed zero and handles absent prices and invalid quantities", () => {
+  const receipt = reading({ items: [
+    { name: "FREE", qty: 2, unitPrice: 3, lineTotal: 0 },
+    { name: "UNKNOWN", qty: null, lineTotal: null, unitPrice: null },
+    { name: "TEA", qty: -1, unitPrice: "RM3.25", lineTotal: null },
+    { name: "LEGACY", qty: 2, price: 4 },
+  ] });
+  assert.deepEqual(receipt.items.map(item => item.lineCents), [0, 0, 325, 400]);
+});
+
 test("adjustments land on the item they belong to", () => {
   const baked = bakeItems(
     reading({

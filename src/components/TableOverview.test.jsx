@@ -18,6 +18,12 @@ const overview = {
   selections: { b: ['Ari', 'Bela'] },
 };
 
+it('displays long codes in readable groups while keeping canonical share URLs', () => {
+  render(<TableOverview {...overview} code="ABCDEFGH" currency="MYR" />);
+  expect(screen.getByText('ABCD-EFGH')).toBeVisible();
+  expect(screen.getByRole('img', { name: 'Join table ABCDEFGH' })).toBeInTheDocument();
+});
+
 it('shows unpaid, partial and legacy paid rows in their own groups', () => {
   render(<TableOverview {...overview} currency="MYR" />);
   expect(screen.getByRole('heading', { name: 'After work' })).toBeVisible();

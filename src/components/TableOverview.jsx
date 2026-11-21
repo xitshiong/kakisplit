@@ -1,4 +1,5 @@
 import { QRCodeSVG } from 'qrcode.react';
+import { formatCode } from '../lib/tableCode.mjs';
 import ShareTableLink from './ShareTableLink.jsx';
 import { formatTableDate, paymentBreakdown } from '../lib/tableUi.mjs';
 import './table-overview.css';
@@ -21,7 +22,7 @@ export default function TableOverview({ code, tableName, tableDate, items, paidM
       <p className="section-sub table-date">{formatTableDate(tableDate)}</p>
       <div className="share-receipt">
         <div className="share-code-label">Table code</div>
-        <div className="share-code">{code}</div>
+        <div className="share-code">{formatCode(code)}</div>
         <div className="neon-divider" />
         <div className="table-join-qr">
           <QRCodeSVG value={url} size={180} title={`Join table ${code}`} />
