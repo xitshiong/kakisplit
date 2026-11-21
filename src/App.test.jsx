@@ -102,6 +102,8 @@ async function joinViaLink(options = {}) {
 async function enterName(user, name = 'Ari') {
   await user.type(screen.getByLabelText('Your name'), name);
   await user.click(button(/Continue/));
+  const confirmIdentity = screen.queryByRole('button', { name: "That's me" });
+  if (confirmIdentity) await user.click(confirmIdentity);
 }
 
 async function manualEditor(user, name = 'Friday dinner') {
@@ -256,6 +258,54 @@ describe('home and sign-in', () => {
 });
 
 describe('joining and paying as a guest', () => {
+  it('warns on whitespace and case variants and restores picks only after confirming identity', async () => {
+    const { user, rows } = await joinViaLink({ tables: [dinner({ selections: { tea: ['Ari Tan'] } })] });
+    await user.type(screen.getByLabelText('Your name'), '  aRI   tan  ');
+    await user.click(button(/Continue/));
+    expect(screen.getByRole('alert')).toHaveTextContent('already using "Ari Tan"');
+    expect(screen.getByLabelText('Your name')).toBeVisible();
+    expect(rows.get('1234').selections.tea).toEqual(['Ari Tan']);
+    await user.click(button("That's me"));
+    expect(screen.getByText('Hey Ari Tan, pick what you had.')).toBeVisible();
+    expect(screen.getByRole('button', { name: /Tea/, pressed: true })).toBeVisible();
+  });
+
+  it('lets a different guest choose a distinct name without inheriting picks', async () => {
+    const { user, rows } = await joinViaLink({ tables: [dinner({ selections: { tea: ['Ari'] } })] });
+    await user.type(screen.getByLabelText('Your name'), 'Ari');
+    await user.click(button(/Continue/));
+    await user.click(button('Use a different name'));
+    expect(screen.getByLabelText('Your name')).toHaveValue('Ari 2');
+    await user.click(button(/Continue/));
+    expect(screen.getByText('Hey Ari 2, pick what you had.')).toBeVisible();
+    expect(screen.getByRole('button', { name: /Tea/, pressed: false })).toBeVisible();
+    await user.click(screen.getByRole('button', { name: /Tea/, pressed: false }));
+    await waitFor(() => expect(rows.get('1234').selections.tea).toEqual(['Ari', 'Ari 2']));
+  });
+
+  it('normalizes a new name and remembers this device on rejoin without a clash prompt', async () => {
+    const { user, rows, unmount } = await joinViaLink();
+    await enterName(user, '  Ari   Tan  ');
+    expect(screen.getByText('Hey Ari Tan, pick what you had.')).toBeVisible();
+    await user.click(button(/Tea/));
+    await waitFor(() => expect(rows.get('1234').selections.tea).toEqual(['Ari Tan']));
+    expect(JSON.parse(localStorage.getItem('ks_guest_names_1234'))).toEqual(['Ari Tan']);
+    unmount();
+    render(<App />);
+    await screen.findByLabelText('Your name');
+    await user.type(screen.getByLabelText('Your name'), 'ari tan');
+    await user.click(button(/Continue/));
+    expect(screen.queryByRole('button', { name: "That's me" })).not.toBeInTheDocument();
+    expect(screen.getByText('Hey Ari Tan, pick what you had.')).toBeVisible();
+  });
+
+  it('warns when a name is present only in the paid map', async () => {
+    const { user } = await joinViaLink({ tables: [dinner({ paid: { tea: { payers: ['Ari'], total: 1 } } })] });
+    await user.type(screen.getByLabelText('Your name'), 'ari');
+    await user.click(button(/Continue/));
+    expect(screen.getByRole('alert')).toHaveTextContent('already using "Ari"');
+    expect(screen.getByLabelText('Your name')).toBeVisible();
+  });
   it('requires four digits, handles an unknown code, and joins a corrected code on Enter', async () => {
     const { user, requests } = renderApp({ tables: [dinner()] });
     await user.click(await screen.findByRole('button', { name: /Join as Guest/ }));

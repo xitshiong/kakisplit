@@ -1926,6 +1926,7 @@ function GuestReceiptHeader({ session, status = "Split the bill", onHome }) {
 function GuestView({ session, onBack, currency }) {
   const [named, setNamed] = useState(false);
   const [name, setName] = useState("");
+  const [nameClash, setNameClash] = useState("");
   const [sel, setSel] = useState({});
   const [splits, setSplits] = useState({});
   const [done, setDone] = useState(false);
@@ -1939,15 +1940,43 @@ function GuestView({ session, onBack, currency }) {
 
   const [selections, setSelections] = useState(session.selections || {});
 
-  const resumeGuest = () => {
+  const normalizeName = value => value.trim().replace(/\s+/g, " ");
+  const resumeGuest = guestName => {
     const restored = {};
     for (const item of items) {
       const paidInfo = paidMap[item.id];
       const payers = paidInfo?.payers || (paidInfo ? [paidInfo] : []);
-      if ((selections[item.id] || []).includes(name) && !payers.includes(name) && payers.length < (paidInfo?.total || Infinity)) restored[item.id] = true;
+      if ((selections[item.id] || []).includes(guestName) && !payers.includes(guestName) && payers.length < (paidInfo?.total || Infinity)) restored[item.id] = true;
     }
+    try {
+      const key = `ks_guest_names_${session.code}`;
+      const saved = JSON.parse(localStorage.getItem(key) || "[]");
+      localStorage.setItem(key, JSON.stringify([...new Set([...(Array.isArray(saved) ? saved : []), guestName])]));
+    } catch { /* Joining must work even when browser storage is unavailable. */ }
+    setName(guestName);
     setSel(restored);
     setNamed(true);
+  };
+
+  const continueGuest = () => {
+    const normalized = normalizeName(name);
+    if (!normalized) return;
+    const knownNames = [
+      ...Object.values(selections).flatMap(value => Array.isArray(value) ? value : []),
+      ...Object.values(paidMap).flatMap(value => value?.payers || (value ? [value] : [])),
+    ].filter(value => typeof value === "string");
+    const existing = knownNames.find(value => normalizeName(value).toLowerCase() === normalized.toLowerCase());
+    let remembered = false;
+    try {
+      const saved = JSON.parse(localStorage.getItem(`ks_guest_names_${session.code}`) || "[]");
+      remembered = Array.isArray(saved) && saved.some(value => typeof value === "string" && normalizeName(value).toLowerCase() === normalized.toLowerCase());
+    } catch { /* Unknown devices should confirm a matching name. */ }
+    if (existing && !remembered) {
+      setName(normalized);
+      setNameClash(existing);
+      return;
+    }
+    resumeGuest(existing || normalized);
   };
 
   useEffect(() => {
@@ -2026,9 +2055,14 @@ function GuestView({ session, onBack, currency }) {
         <div className="section-sub" style={{ marginBottom: 16 }}>So the host knows who's paid</div>
         <label className="field-label" htmlFor="guest-name">Your name</label>
         <input id="guest-name" autoComplete="given-name" className="name-in" placeholder="e.g. Ali"
-          value={name} onChange={e => setName(e.target.value)}
-          onKeyDown={e => e.key === "Enter" && name.trim() && resumeGuest()} />
-        <button className="btn btn-ink" disabled={!name.trim()} onClick={resumeGuest}>
+          value={name} onChange={e => { setName(e.target.value); setNameClash(""); }}
+          onKeyDown={e => e.key === "Enter" && continueGuest()} />
+        {nameClash && <div className="error-strip" role="alert">
+          <p>Someone at this table is already using "{nameClash}". Is that you? Otherwise, pick a different name or add an initial.</p>
+          <button className="btn btn-outline" onClick={() => resumeGuest(nameClash)}>That's me</button>
+          <button className="btn btn-outline" onClick={() => { setName(`${normalizeName(nameClash)} 2`); setNameClash(""); }}>Use a different name</button>
+        </div>}
+        <button className="btn btn-ink" disabled={!name.trim()} onClick={continueGuest}>
           Continue →
         </button>
         <button className="btn btn-outline" onClick={onBack}>← Back</button>
