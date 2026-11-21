@@ -102,6 +102,8 @@ async function joinViaLink(options = {}) {
 async function enterName(user, name = 'Ari') {
   await user.type(screen.getByLabelText('Your name'), name);
   await user.click(button(/Continue/));
+  const confirmIdentity = screen.queryByRole('button', { name: "That's me" });
+  if (confirmIdentity) await user.click(confirmIdentity);
 }
 
 async function manualEditor(user, name = 'Friday dinner') {
@@ -256,6 +258,122 @@ describe('home and sign-in', () => {
 });
 
 describe('joining and paying as a guest', () => {
+  it('restores the shared amount after going home and rejoining the same table', async () => {
+    const { user, rows } = await joinViaLink({ tables: [dinner({ selections: { tea: ['Bela'] } })] });
+    await enterName(user);
+    await user.click(button(/Tea/, { pressed: false }));
+    await user.click(button('Split Tea with more people'));
+    expect(button(/Tea.*Split 2 ways.*1\.50/)).toBeVisible();
+    await waitFor(() => expect(rows.get('1234').selections.tea).toEqual(['Bela', 'Ari']));
+    await user.click(button('← Home'));
+    await user.click(button(/Join as Guest/));
+    await user.type(screen.getByLabelText('Table code'), '1234');
+    await user.click(button(/Join Table/));
+    await screen.findByLabelText('Your name');
+    await enterName(user);
+    expect(button(/Tea.*Split 2 ways.*1\.50/, { pressed: true })).toBeVisible();
+    expect(screen.getByText('1 other')).toBeVisible();
+  });
+
+  it('restores an established paid split rather than the current selection count', async () => {
+    const { user } = await joinViaLink({ tables: [dinner({ selections: { tea: ['Ari', 'Bela'] }, paid: { tea: { payers: ['Bela'], total: 3 } } })] });
+    await enterName(user);
+    expect(button(/Tea.*Split 3 ways.*1\.00/, { pressed: true })).toBeVisible();
+  });
+
+  it('does not infer a split from other guests highlighting the same item', async () => {
+    const { user } = await joinViaLink({ tables: [dinner({ selections: { tea: ['Ari', 'Bela'] } })] });
+    await enterName(user);
+    expect(screen.getByText('no one')).toBeVisible();
+    expect(button(/Tea/, { pressed: true })).toHaveTextContent('3.00');
+  });
+
+  it('keeps an explicit no-split choice on rejoin despite other guests highlighting the item', async () => {
+    const { user, unmount } = await joinViaLink({ tables: [dinner({ selections: { tea: ['Ari', 'Bela'] } })] });
+    await enterName(user);
+    await user.click(button('Split Tea with more people'));
+    await user.click(button('Split Tea with fewer people'));
+    expect(JSON.parse(localStorage.getItem('ks_guest_splits_1234_Ari'))).toEqual({ tea: 1 });
+    unmount();
+    render(<App />);
+    await screen.findByLabelText('Your name');
+    await enterName(user);
+    expect(screen.getByText('no one')).toBeVisible();
+    expect(button(/Tea/, { pressed: true })).toHaveTextContent('3.00');
+  });
+
+  it('prefers an exact-case identity when two saved names differ only in casing', async () => {
+    const { user } = await joinViaLink({ tables: [dinner({ selections: { tea: ['Ari'], noodles: ['ari'] } })] });
+    await user.type(screen.getByLabelText('Your name'), 'ari');
+    await user.click(button(/Continue/));
+    expect(screen.getByRole('alert')).toHaveTextContent('already using "ari"');
+    await user.click(button("That's me"));
+    expect(screen.getByText('Hey ari, pick what you had.')).toBeVisible();
+    expect(screen.getByRole('button', { name: /Noodles/, pressed: true })).toBeVisible();
+    expect(screen.getByRole('button', { name: /Tea/, pressed: false })).toBeVisible();
+  });
+
+  it.each(['Bela', { name: 'Bela' }])('does not restore fully paid legacy items on rejoin (%j)', async payer => {
+    const { user } = await joinViaLink({ tables: [dinner({ selections: { tea: ['Ari'] }, paid: { tea: payer } })] });
+    await enterName(user);
+    expect(button(/Pay host/)).toBeDisabled();
+    expect(screen.getByText('paid by Bela')).toBeVisible();
+  });
+
+  it('recognizes object payer names when excluding a guest’s already paid modern share', async () => {
+    const { user } = await joinViaLink({ tables: [dinner({ selections: { tea: ['Ari'] }, paid: { tea: { payers: [{ name: 'Ari' }], total: 2 } } })] });
+    await enterName(user);
+    expect(button(/Pay host/)).toBeDisabled();
+  });
+
+  it('warns on whitespace and case variants and restores picks only after confirming identity', async () => {
+    const { user, rows } = await joinViaLink({ tables: [dinner({ selections: { tea: ['Ari Tan'] } })] });
+    await user.type(screen.getByLabelText('Your name'), '  aRI   tan  ');
+    await user.click(button(/Continue/));
+    expect(screen.getByRole('alert')).toHaveTextContent('already using "Ari Tan"');
+    expect(screen.getByLabelText('Your name')).toBeVisible();
+    expect(rows.get('1234').selections.tea).toEqual(['Ari Tan']);
+    await user.click(button("That's me"));
+    expect(screen.getByText('Hey Ari Tan, pick what you had.')).toBeVisible();
+    expect(screen.getByRole('button', { name: /Tea/, pressed: true })).toBeVisible();
+  });
+
+  it('lets a different guest choose a distinct name without inheriting picks', async () => {
+    const { user, rows } = await joinViaLink({ tables: [dinner({ selections: { tea: ['Ari'] } })] });
+    await user.type(screen.getByLabelText('Your name'), 'Ari');
+    await user.click(button(/Continue/));
+    await user.click(button('Use a different name'));
+    expect(screen.getByLabelText('Your name')).toHaveValue('Ari 2');
+    await user.click(button(/Continue/));
+    expect(screen.getByText('Hey Ari 2, pick what you had.')).toBeVisible();
+    expect(screen.getByRole('button', { name: /Tea/, pressed: false })).toBeVisible();
+    await user.click(screen.getByRole('button', { name: /Tea/, pressed: false }));
+    await waitFor(() => expect(rows.get('1234').selections.tea).toEqual(['Ari', 'Ari 2']));
+  });
+
+  it('normalizes a new name and remembers this device on rejoin without a clash prompt', async () => {
+    const { user, rows, unmount } = await joinViaLink();
+    await enterName(user, '  Ari   Tan  ');
+    expect(screen.getByText('Hey Ari Tan, pick what you had.')).toBeVisible();
+    await user.click(button(/Tea/));
+    await waitFor(() => expect(rows.get('1234').selections.tea).toEqual(['Ari Tan']));
+    expect(JSON.parse(localStorage.getItem('ks_guest_names_1234'))).toEqual(['Ari Tan']);
+    unmount();
+    render(<App />);
+    await screen.findByLabelText('Your name');
+    await user.type(screen.getByLabelText('Your name'), 'ari tan');
+    await user.click(button(/Continue/));
+    expect(screen.queryByRole('button', { name: "That's me" })).not.toBeInTheDocument();
+    expect(screen.getByText('Hey Ari Tan, pick what you had.')).toBeVisible();
+  });
+
+  it('warns when a name is present only in the paid map', async () => {
+    const { user } = await joinViaLink({ tables: [dinner({ paid: { tea: { payers: ['Ari'], total: 1 } } })] });
+    await user.type(screen.getByLabelText('Your name'), 'ari');
+    await user.click(button(/Continue/));
+    expect(screen.getByRole('alert')).toHaveTextContent('already using "Ari"');
+    expect(screen.getByLabelText('Your name')).toBeVisible();
+  });
   it('requires four digits, handles an unknown code, and joins a corrected code on Enter', async () => {
     const { user, requests } = renderApp({ tables: [dinner()] });
     await user.click(await screen.findByRole('button', { name: /Join as Guest/ }));
@@ -448,6 +566,35 @@ describe('joining and paying as a guest', () => {
     expect(requests).toHaveLength(count);
   });
 
+  it('restores a returning guest selection without clearing it', async () => {
+    const { user, rows } = await joinViaLink({ tables: [dinner({ selections: { tea: ['Ari', 'Bela'] } })] });
+    await enterName(user);
+    expect(screen.getByRole('button', { name: /Tea/, pressed: true })).toBeVisible();
+    await waitFor(() => expect(rows.get('1234').selections.tea).toEqual(['Bela', 'Ari']));
+  });
+
+  it('keeps paid items visible as paid on a failed poll and reports the outage', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    const { user, failNext } = await joinViaLink({ tables: [dinner({ paid: { tea: { payers: ['Bela'], total: 1 } } })] });
+    await enterName(user);
+    failNext(request => request.method === 'GET' && request.select === '*');
+    await act(() => vi.advanceTimersByTimeAsync(2_000));
+    expect(screen.getByText('paid by Bela')).toBeVisible();
+    expect(screen.getByRole('alert')).toHaveTextContent('Couldn’t refresh table status');
+  });
+
+  it('retains a manually joined table across refresh', async () => {
+    const { user, unmount } = renderApp({ tables: [dinner()] });
+    await user.click(await screen.findByRole('button', { name: /Join as Guest/ }));
+    await user.type(screen.getByLabelText('Table code'), '1234');
+    await user.click(button(/Join Table/));
+    await screen.findByLabelText('Your name');
+    expect(window.location.search).toBe('?table=1234');
+    unmount();
+    render(<App />);
+    expect(await screen.findByLabelText('Your name')).toBeVisible();
+  });
+
   it('closes a stale QR quote when polling sees another guest take its slot', async () => {
     vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
     const { user, rows } = await joinViaLink({ tables: [dinner({
@@ -510,7 +657,6 @@ describe('joining and paying as a guest', () => {
     await act(() => vi.advanceTimersByTimeAsync(2_000));
     expect(button('I have paid')).toBeVisible();
   });
-
   it('retries a rejected payment update before showing success', async () => {
     const { user, rows, requests, failNext } = await joinViaLink();
     await enterName(user);
@@ -525,6 +671,118 @@ describe('joining and paying as a guest', () => {
 });
 
 describe('creating and returning to a table', () => {
+  it.each(['new', 'returning'])('requests notification permission without blocking the %s host flow', async mode => {
+    const requestPermission = vi.fn(() => new Promise(() => {}));
+    vi.stubGlobal('Notification', { permission: 'default', requestPermission });
+    if (mode === 'returning') saveLocally(dinner());
+    const { user } = renderApp({ signedIn: true, tables: [dinner()] });
+    expect(requestPermission).not.toHaveBeenCalled();
+    if (mode === 'new') {
+      await manualEditor(user);
+      await addItem(user, 'Tea', '3');
+      await user.click(button(/Next: Payment QR/));
+      await user.click(button(/Generate Table Link/));
+      await screen.findByRole('heading', { name: 'Friday dinner' });
+    } else {
+      await user.click(await screen.findByRole('button', { name: /Open Night market/ }));
+      await screen.findByText('0/2 items paid');
+    }
+    expect(requestPermission).toHaveBeenCalledTimes(1);
+  });
+
+  it('continues opening a table when the notification permission request rejects', async () => {
+    vi.stubGlobal('Notification', { permission: 'default', requestPermission: vi.fn().mockRejectedValue(new Error('Denied')) });
+    saveLocally(dinner());
+    const { user } = renderApp({ signedIn: true, tables: [dinner()] });
+    await user.click(await screen.findByRole('button', { name: /Open Night market/ }));
+    expect(await screen.findByText('0/2 items paid')).toBeVisible();
+  });
+
+  it.each(['new', 'returning'])('clears only the poll warning after a successful poll on a %s table', async mode => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    if (mode === 'returning') saveLocally(dinner());
+    const { user, failNext } = renderApp({ signedIn: true, tables: [dinner()] });
+    if (mode === 'new') {
+      await manualEditor(user);
+      await addItem(user, 'Tea', '3');
+      await user.click(button(/Next: Payment QR/));
+      await user.click(button(/Generate Table Link/));
+      await screen.findByRole('heading', { name: 'Friday dinner' });
+    } else {
+      await user.click(await screen.findByRole('button', { name: /Open Night market/ }));
+      await screen.findByText('0/2 items paid');
+    }
+    failNext(request => request.method === 'GET' && request.select === '*');
+    await act(() => vi.advanceTimersByTimeAsync(2_000));
+    expect(screen.getByRole('alert')).toHaveTextContent('Couldn’t refresh table status');
+    await act(() => vi.advanceTimersByTimeAsync(2_000));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('notifies on the first payment of a newly created table without repeating it', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    const notify = vi.fn(function () {});
+    notify.permission = 'granted';
+    vi.stubGlobal('Notification', notify);
+    const { user, rows } = renderApp({ signedIn: true });
+    await manualEditor(user);
+    await addItem(user, 'Tea', '3');
+    await user.click(button(/Next: Payment QR/));
+    await user.click(button(/Generate Table Link/));
+    await screen.findByRole('heading', { name: 'Friday dinner' });
+    expect(notify).not.toHaveBeenCalled();
+    const table = [...rows.values()][0];
+    const payment = { [table.items[0].id]: { payers: ['Ari'], total: 1 } };
+    table.paid = payment;
+    await act(() => vi.advanceTimersByTimeAsync(2_000));
+    expect(notify).toHaveBeenCalledWith('Incoming Payment!', expect.objectContaining({ body: 'Ari paid for Tea' }));
+    await act(() => vi.advanceTimersByTimeAsync(2_000));
+    expect(notify).toHaveBeenCalledTimes(1);
+  });
+
+  it('notifies on the first payment after reopening an unpaid table, but not existing payments', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    const notify = vi.fn(function () {});
+    notify.permission = 'granted';
+    vi.stubGlobal('Notification', notify);
+    saveLocally(dinner());
+    const { user, rows, unmount } = renderApp({ signedIn: true, tables: [dinner()] });
+    await user.click(await screen.findByRole('button', { name: /Open Night market/ }));
+    await screen.findByText('0/2 items paid');
+    expect(notify).not.toHaveBeenCalled();
+    rows.get('1234').paid = { tea: { payers: ['Ari'], total: 1 } };
+    await act(() => vi.advanceTimersByTimeAsync(2_000));
+    expect(notify).toHaveBeenCalledTimes(1);
+    unmount();
+    render(<App />);
+    await user.click(await screen.findByRole('button', { name: /Open Night market/ }));
+    await screen.findByText('1/2 items paid');
+    await act(() => vi.advanceTimersByTimeAsync(2_000));
+    expect(notify).toHaveBeenCalledTimes(1);
+  });
+
+  it('creates the table and its QR in one write', async () => {
+    const { user, requests } = renderApp({ signedIn: true });
+    await manualEditor(user);
+    await addItem(user, 'Tea', '3');
+    await user.click(button(/Next: Payment QR/));
+    await user.click(button(/Generate Table Link/));
+    await screen.findByRole('heading', { name: 'Friday dinner' });
+    expect(requests.find(request => request.method === 'POST').body.qr_image).toBe('/payment.png');
+    expect(requests.filter(request => request.method === 'PATCH')).toHaveLength(0);
+  });
+
+  it('keeps the created link available when local storage is full', async () => {
+    const { user, rows } = renderApp({ signedIn: true });
+    await manualEditor(user);
+    await addItem(user, 'Tea', '3');
+    await user.click(button(/Next: Payment QR/));
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('Quota exceeded'); });
+    await user.click(button(/Generate Table Link/));
+    expect(await screen.findByRole('heading', { name: 'Friday dinner' })).toBeVisible();
+    expect(screen.getByRole('alert')).toHaveTextContent('Table created');
+    expect(rows.size).toBe(1);
+  });
   it('publishes manual whole-bill discounts into regular item prices', async () => {
     const { user, rows } = renderApp({ signedIn: true });
     await manualEditor(user);
@@ -540,7 +798,6 @@ describe('creating and returning to a table', () => {
       { name: 'Food', price: '8.50' }, { name: 'Free water', price: '0.00' },
     ]);
   });
-
   it('walks through manual receipt entry, QR, and a shareable table saved locally', async () => {
     const { user, rows } = renderApp({ signedIn: true });
     await manualEditor(user);
@@ -607,6 +864,7 @@ describe('creating and returning to a table', () => {
     await user.click(button(/Generate Table Link/));
     expect(await screen.findByRole('heading', { name: 'Friday dinner' })).toBeVisible();
     expect([...rows.values()][0].qr_image).toBe(dataUrl);
+    expect(localStorage.getItem(`ks_qr_${[...rows.values()][0].code}`)).toBe(dataUrl);
     expect(requests.some(request => request.resource === 'profiles' && request.method === 'PATCH')).toBe(false);
 
     await user.click(button(/Start new table/));

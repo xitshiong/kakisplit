@@ -10,6 +10,8 @@ import { allocateBillItems, canConfirmSelection, guestShareCents, isPayableItem 
 import { savedTables, localDate, formatTableDate, paymentStatus } from "./lib/tableUi.mjs";
 import { savePaidWithClient } from "./lib/paidWrite.mjs";
 import { prepareQrForSave, readPaymentQr } from "./lib/paymentQr.mjs";
+import { updateSelectionWithClient } from "./lib/selectionWrite.mjs";
+import { requestNotificationPermission } from "./utils/notifications.js";
 
 const callbackFailed = hasAuthError(new URL(window.location.href));
 
@@ -1776,20 +1778,6 @@ function usePrevious(value) {
   return ref.current;
 }
 
-async function requestNotificationPermission() {
-  if (typeof window === "undefined" || !("Notification" in window)) return "unsupported";
-  if (Notification.permission === "granted") return "granted";
-  try {
-    const permission = await new Promise((resolve, reject) => {
-      const p = Notification.requestPermission(resolve);
-      if (p && p.then) p.then(resolve).catch(reject);
-    });
-    return permission;
-  } catch (e) {
-    return "denied";
-  }
-}
-
 function sendLocalNotification(title, body) {
   if (typeof window === "undefined" || !("Notification" in window) || Notification.permission !== "granted") return;
 
@@ -1885,36 +1873,12 @@ async function savePaid(itemId, name, code, splitCount = 1, expectedCents, price
 async function loadSessionState(code) {
   // Use select("*") to avoid crashing if certain columns (like selections) haven't been added yet
   const { data, error } = await supabase.from("sessions").select("*").eq("code", code).single();
-  if (error || !data) return { paid: {}, selections: {} };
+  if (error || !data) throw new Error(error?.message || "Table unavailable");
   return { paid: data.paid || {}, selections: data.selections || {} };
 }
 
 async function updateGuestSelection(code, name, sel) {
-  if (!code || !name) return;
-  try {
-    const { data } = await supabase.from("sessions").select("selections").eq("code", code).single();
-    let selections = data?.selections || {};
-
-    // Remove user from all previously held items
-    Object.keys(selections).forEach(itemId => {
-      if (Array.isArray(selections[itemId])) {
-        selections[itemId] = selections[itemId].filter(n => n !== name);
-      }
-    });
-
-    // Add user to currently selected items
-    Object.keys(sel).forEach(itemId => {
-      if (sel[itemId]) {
-        if (!selections[itemId]) selections[itemId] = [];
-        if (!selections[itemId].includes(name)) selections[itemId].push(name);
-      }
-    });
-
-    // We use a try-catch in case the 'selections' column is missing in Supabase
-    await supabase.from("sessions").update({ selections }).eq("code", code);
-  } catch (e) {
-    console.warn("Selections sync failed (Column might be missing)", e);
-  }
+  return updateSelectionWithClient(supabase, code, name, sel);
 }
 // ── STEP BAR ──────────────────────────────────────────────────
 function StepBar({ current, steps }) {
@@ -1950,6 +1914,7 @@ function GuestReceiptHeader({ session, status = "Split the bill", onHome }) {
 function GuestView({ session, onBack, currency }) {
   const [named, setNamed] = useState(false);
   const [name, setName] = useState("");
+  const [nameClash, setNameClash] = useState("");
   const [sel, setSel] = useState({});
   const [splits, setSplits] = useState({});
   const [done, setDone] = useState(false);
@@ -1958,9 +1923,70 @@ function GuestView({ session, onBack, currency }) {
   const [paidMap, setPaidMap] = useState(session.paid || {});
   const [paying, setPaying] = useState(false);
   const [paymentError, setPaymentError] = useState("");
+  const [syncError, setSyncError] = useState("");
+  const selectionQueue = useRef(Promise.resolve());
   const { items = [], qrImage } = session;
 
-  const [selections, setSelections] = useState({});
+  const [selections, setSelections] = useState(session.selections || {});
+
+  const normalizeName = value => value.trim().replace(/\s+/g, " ");
+  const resumeGuest = guestName => {
+    const restored = {};
+    const restoredSplits = {};
+    let savedSplits = {};
+    try {
+      const saved = JSON.parse(localStorage.getItem(`ks_guest_splits_${session.code}_${guestName}`) || "{}");
+      if (saved && typeof saved === "object" && !Array.isArray(saved)) savedSplits = saved;
+    } catch { /* A saved split is optional. */ }
+    for (const item of items) {
+      const paidInfo = paidMap[item.id];
+      const payers = (paidInfo?.payers || (paidInfo ? [paidInfo] : [])).map(payer => typeof payer === "object" ? payer.name : payer);
+      const total = paidInfo ? (paidInfo.payers ? paidInfo.total || 1 : 1) : Infinity;
+      if ((selections[item.id] || []).includes(guestName) && !payers.includes(guestName) && payers.length < total) {
+        restored[item.id] = true;
+        const savedSplit = savedSplits[item.id];
+        restoredSplits[item.id] = Number.isSafeInteger(savedSplit) && savedSplit > 0 ? savedSplit : paidInfo?.total || 1;
+      }
+    }
+    try {
+      const key = `ks_guest_names_${session.code}`;
+      const saved = JSON.parse(localStorage.getItem(key) || "[]");
+      localStorage.setItem(key, JSON.stringify([...new Set([...(Array.isArray(saved) ? saved : []), guestName])]));
+    } catch { /* Joining must work even when browser storage is unavailable. */ }
+    setName(guestName);
+    setSel(restored);
+    setSplits(restoredSplits);
+    setNamed(true);
+  };
+
+  useEffect(() => {
+    if (!named) return;
+    try {
+      localStorage.setItem(`ks_guest_splits_${session.code}_${name}`, JSON.stringify(splits));
+    } catch { /* Splitting must work even when browser storage is unavailable. */ }
+  }, [splits, named, name, session.code]);
+
+  const continueGuest = () => {
+    const normalized = normalizeName(name);
+    if (!normalized) return;
+    const knownNames = [
+      ...Object.values(selections).flatMap(value => Array.isArray(value) ? value : []),
+      ...Object.values(paidMap).flatMap(value => value?.payers || (value ? [value] : [])),
+    ].map(value => typeof value === "object" && value !== null ? value.name : value).filter(value => typeof value === "string");
+    const existing = knownNames.find(value => value === normalized) ||
+      knownNames.find(value => normalizeName(value).toLowerCase() === normalized.toLowerCase());
+    let remembered = false;
+    try {
+      const saved = JSON.parse(localStorage.getItem(`ks_guest_names_${session.code}`) || "[]");
+      remembered = Array.isArray(saved) && saved.some(value => typeof value === "string" && normalizeName(value).toLowerCase() === normalized.toLowerCase());
+    } catch { /* Unknown devices should confirm a matching name. */ }
+    if (existing && !remembered) {
+      setName(normalized);
+      setNameClash(existing);
+      return;
+    }
+    resumeGuest(existing || normalized);
+  };
 
   useEffect(() => {
     // Preserve the browser's scroll-to-focus while the guest is entering a name.
@@ -1973,7 +1999,8 @@ function GuestView({ session, onBack, currency }) {
       loadSessionState(session.code).then(state => {
         setPaidMap(state.paid);
         setSelections(state.selections);
-      });
+        setSyncError("");
+      }).catch(() => setSyncError("Couldn’t refresh table status. Check your connection; showing the last saved status."));
     }, 2000);
     return () => clearInterval(t);
   }, [session.code]);
@@ -1981,7 +2008,9 @@ function GuestView({ session, onBack, currency }) {
   // Sync our selection to Supabase
   useEffect(() => {
     if (named && name) {
-      updateGuestSelection(session.code, name, sel);
+      selectionQueue.current = selectionQueue.current.catch(() => {}).then(async () => {
+        if (!await updateGuestSelection(session.code, name, sel)) throw new Error();
+      }).catch(() => setSyncError("Couldn’t save your item selection. Check your connection and select your items again."));
     }
   }, [sel, named, name, session.code]);
 
@@ -2068,9 +2097,14 @@ function GuestView({ session, onBack, currency }) {
         <div className="section-sub" style={{ marginBottom: 16 }}>So the host knows who's paid</div>
         <label className="field-label" htmlFor="guest-name">Your name</label>
         <input id="guest-name" autoComplete="given-name" className="name-in" placeholder="e.g. Ali"
-          value={name} onChange={e => setName(e.target.value)}
-          onKeyDown={e => e.key === "Enter" && name.trim() && setNamed(true)} />
-        <button className="btn btn-ink" disabled={!name.trim()} onClick={() => setNamed(true)}>
+          value={name} onChange={e => { setName(e.target.value); setNameClash(""); }}
+          onKeyDown={e => e.key === "Enter" && continueGuest()} />
+        {nameClash && <div className="error-strip" role="alert">
+          <p>Someone at this table is already using "{nameClash}". Is that you? Otherwise, pick a different name or add an initial.</p>
+          <button className="btn btn-outline" onClick={() => resumeGuest(nameClash)}>That's me</button>
+          <button className="btn btn-outline" onClick={() => { setName(`${normalizeName(nameClash)} 2`); setNameClash(""); }}>Use a different name</button>
+        </div>}
+        <button className="btn btn-ink" disabled={!name.trim()} onClick={continueGuest}>
           Continue →
         </button>
         <button className="btn btn-outline" onClick={onBack}>← Back</button>
@@ -2143,6 +2177,7 @@ function GuestView({ session, onBack, currency }) {
       <div className="receipt guest-receipt">
         <GuestReceiptHeader session={session} />
         <div className="guest-receipt-intro">
+          {syncError && <p className="error-strip" role="alert">{syncError}</p>}
           <p>Hey {name}, pick what you had.</p>
           <span>Sharing a dish? Select it, then adjust the split.</span>
         </div>
@@ -2324,15 +2359,6 @@ function HostView({ onHome, currency, user, profile }) {
   useEffect(() => {
     if (!paidMap || step !== 4) return;
 
-    // On first data load, mark everything already paid as notified
-    if (notifiedRef.current.size === 0 && Object.keys(paidMap).length > 0) {
-      Object.keys(paidMap).forEach(itemId => {
-        const payers = paidMap[itemId]?.payers || [];
-        payers.forEach(p => notifiedRef.current.add(`${itemId}-${p}`));
-      });
-      return;
-    }
-
     const newPaymentsByPayer = {};
     Object.keys(paidMap).forEach(itemId => {
       const current = paidMap[itemId]?.payers || [];
@@ -2356,6 +2382,7 @@ function HostView({ onHome, currency, user, profile }) {
   const finalise = async () => {
     if (finalising) return;
     if (!reviewReceiptItems(items).valid) { setStep(2); return; }
+    void requestNotificationPermission().catch(() => {});
     setFinalising(true);
     setErr("");
     try {
@@ -2369,7 +2396,7 @@ function HostView({ onHome, currency, user, profile }) {
         const { error } = await supabase.from("sessions").insert({
           code: c,
           items: allocateBillItems(items),
-          qr_image: null,
+          qr_image: qrForSave || null,
           paid: initialPaid,
           table_name: tableName || "My Table",
           table_date: tableDate || new Date().toISOString().split("T")[0]
@@ -2386,29 +2413,21 @@ function HostView({ onHome, currency, user, profile }) {
 
       if (!success) throw new Error("Could not create table. Please try again.");
 
-      if (qrForSave) {
-        for (let attempt = 0; attempt < 5; attempt++) {
-          const { error: qrError } = await supabase
-            .from("sessions")
-            .update({ qr_image: qrForSave })
-            .eq("code", c);
-          if (!qrError) break;
-          await new Promise(r => setTimeout(r, 800));
-        }
-        if (qrForSave.startsWith("data:")) {
-          localStorage.setItem(`ks_qr_${c}`, qrForSave);
-        }
-      }
-
       const existing = savedTables();
       existing.unshift({ code: c, name: tableName || "My Table", date: tableDate });
-      localStorage.setItem("ks_tables", JSON.stringify(existing));
-      localStorage.setItem("ks_current_code", c);
-      localStorage.setItem("ks_current_name", tableName || "My Table");
-      localStorage.setItem("ks_current_date", tableDate);
+      try {
+        if (qrForSave?.startsWith("data:")) localStorage.setItem(`ks_qr_${c}`, qrForSave);
+        localStorage.setItem("ks_tables", JSON.stringify(existing));
+        localStorage.setItem("ks_current_code", c);
+        localStorage.setItem("ks_current_name", tableName || "My Table");
+        localStorage.setItem("ks_current_date", tableDate);
+      } catch {
+        setErr("Table created, but this browser couldn’t save it. Keep the table link to reopen it later.");
+      }
 
       setItems(allocateBillItems(items));
       setCode(c);
+      notifiedRef.current = new Set();
       setPaidMap(initialPaid);
       setTableSelections({});
       setStep(4);
@@ -2425,7 +2444,8 @@ function HostView({ onHome, currency, user, profile }) {
       loadSessionState(code).then(s => {
         setPaidMap(s.paid);
         setTableSelections(s.selections);
-      });
+        setErr(current => current === "Couldn’t refresh table status. Check your connection; showing the last saved status." ? "" : current);
+      }).catch(() => setErr("Couldn’t refresh table status. Check your connection; showing the last saved status."));
     }, 2000);
     return () => clearInterval(t);
   }, [step, code]);
@@ -2596,6 +2616,7 @@ function HostView({ onHome, currency, user, profile }) {
 
         {/* STEP 4 - SHARE */}
         {step === 4 && <div className="section">
+          {err && <p className="error-strip" role="alert">{err}</p>}
           <TableOverview code={code} tableName={tableName} tableDate={tableDate}
             items={items} paidMap={paidMap} selections={tableSelections} currency={currency} />
           <button className="btn btn-outline" style={{ marginTop: 16 }} onClick={() => { setStep(0); setReceipts([]); setItems([]); setQrImg(profile?.qr_url || null); setCode(""); }}>
@@ -2765,12 +2786,13 @@ function HostReturn({ onHome, currency, user, profile }) {
     return () => { active = false; };
   }, [code, retry]);
 
-  const notifiedRef = useRef(new Set());
+  const notifiedRef = useRef(null);
   useEffect(() => {
     if (!paidMap || !session || !code) return;
 
     // On first load, mark existing as notified
-    if (notifiedRef.current.size === 0 && Object.keys(paidMap).length > 0) {
+    if (notifiedRef.current === null) {
+      notifiedRef.current = new Set();
       Object.keys(paidMap).forEach(itemId => {
         const payers = paidMap[itemId]?.payers || [];
         payers.forEach(p => notifiedRef.current.add(`${itemId}-${p}`));
@@ -2803,7 +2825,8 @@ function HostReturn({ onHome, currency, user, profile }) {
       loadSessionState(code).then(s => {
         setPaidMap(s.paid);
         setTableSelections(s.selections);
-      });
+        setError(current => current === "Couldn’t refresh table status. Check your connection; showing the last saved status." ? "" : current);
+      }).catch(() => setError("Couldn’t refresh table status. Check your connection; showing the last saved status."));
     }, 2000);
     return () => clearInterval(t);
   }, [code]);
@@ -3318,6 +3341,7 @@ export default function KakiSplit() {
               onHost={user ? () => setMode("host") : () => { setAuthIntentMode("host"); setShowAuthModal(true); }}
               onGuest={() => setMode("guest-code")}
               onReturnTable={code => {
+                void requestNotificationPermission().catch(() => {});
                 if (user) {
                   localStorage.setItem("ks_current_code", code);
                   setMode("host-return");
@@ -3360,7 +3384,13 @@ export default function KakiSplit() {
                   <div><span className="badge-strip guest-badge">👥 Guest</span></div>
                 </div>
               </div>
-              <GuestCode onJoin={s => { setGuestSession(s); setMode("guest"); }} onBack={goHome} />
+              <GuestCode onJoin={s => {
+                const url = new URL(window.location.href);
+                url.searchParams.set("table", s.code);
+                window.history.replaceState(null, "", url.pathname + url.search + url.hash);
+                setGuestSession(s);
+                setMode("guest");
+              }} onBack={goHome} />
             </>
           )}
 
