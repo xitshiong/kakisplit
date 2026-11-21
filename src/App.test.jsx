@@ -448,6 +448,26 @@ describe('joining and paying as a guest', () => {
     expect(requests).toHaveLength(count);
   });
 
+  it('closes a stale QR quote when polling sees another guest take its slot', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    const { user, rows } = await joinViaLink({ tables: [dinner({
+      items: [{ id: 'food', name: 'Food', price: 10 }],
+    })] });
+    await enterName(user);
+    await user.click(button(/Food/));
+    await user.click(button('Split Food with more people'));
+    await user.click(button('Split Food with more people'));
+    await user.click(button(/Pay host/));
+    expect(screen.getByText('MYR 3.34')).toBeVisible();
+    rows.get('1234').paid = { food: { payers: ['Bela'], total: 3 } };
+    await act(() => vi.advanceTimersByTimeAsync(2_000));
+    expect(screen.queryByRole('button', { name: 'I have paid' })).not.toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('Check the updated amount before paying');
+    expect(button(/Food.*3\.33/)).toBeVisible();
+    await user.click(button(/Pay host/));
+    expect(screen.getByText('MYR 3.33')).toBeVisible();
+  });
+
   it('retries a rejected payment update before showing success', async () => {
     const { user, rows, requests, failNext } = await joinViaLink();
     await enterName(user);

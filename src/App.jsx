@@ -7,7 +7,7 @@ import ReceiptItemEditor from "./components/ReceiptItemEditor.jsx";
 import TableOverview from "./components/TableOverview.jsx";
 import { reviewReceiptItems } from "./lib/receiptReview.mjs";
 import { allocateBillItems, canConfirmSelection, guestShareCents, isPayableItem } from "./lib/splitMoney.mjs";
-import { savedTables, localDate, formatTableDate } from "./lib/tableUi.mjs";
+import { savedTables, localDate, formatTableDate, paymentStatus } from "./lib/tableUi.mjs";
 import { savePaidWithClient } from "./lib/paidWrite.mjs";
 import { prepareQrForSave, readPaymentQr } from "./lib/paymentQr.mjs";
 
@@ -1988,6 +1988,21 @@ function GuestView({ session, onBack, currency }) {
   const myItems = items.filter(i => sel[i.id] && isPayableItem(i));
   const myTotalCents = myItems.reduce((sum, item) => sum + guestShareCents(item.price, paidMap[item.id], name, splits[item.id] || 1), 0);
   const myTotal = myTotalCents / 100;
+
+  useEffect(() => {
+    if (!showQR || !paymentQuote || paying || done) return;
+    const changed = items.some(item => {
+      if (paymentQuote[item.id] === undefined) return false;
+      const status = paymentStatus(paidMap[item.id]);
+      return (status.complete && !status.payers.includes(name)) ||
+        guestShareCents(item.price, paidMap[item.id], name, splits[item.id] || 1) !== paymentQuote[item.id];
+    });
+    if (changed) {
+      setShowQR(false);
+      setPaymentQuote(null);
+      setPaymentError("Your share changed. Check the updated amount before paying; if you already transferred, contact your host.");
+    }
+  }, [paidMap, paymentQuote, showQR, paying, done, items, name, splits]);
 
   const confirmPayment = async () => {
     if (paying || !canConfirmSelection(myItems, myTotalCents)) return;
