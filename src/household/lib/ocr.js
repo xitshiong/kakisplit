@@ -199,13 +199,16 @@ async function readWith(model, prompt, images, accessToken) {
 // ── NORMALISATION ─────────────────────────────────────────────
 
 function normaliseItem(raw, index) {
-  const qty = Number(raw?.qty);
-  const lineCents = toCents(raw?.lineTotal ?? raw?.price ?? 0);
+  const rawQty = Number(raw?.qty);
+  const qty = Number.isFinite(rawQty) && rawQty > 0 ? rawQty : 1;
   const unitCents = toCents(raw?.unitPrice ?? raw?.price ?? 0);
+  const lineCents = raw?.lineTotal != null || raw?.price != null
+    ? toCents(raw.lineTotal ?? raw.price)
+    : Math.round(qty * unitCents);
   return {
     lineNo: Number.isFinite(Number(raw?.lineNo)) ? Number(raw.lineNo) : index + 1,
     name: String(raw?.name ?? "").trim().replace(/\s+/g, " ") || "Item",
-    qty: Number.isFinite(qty) && qty > 0 ? qty : 1,
+    qty,
     unit: raw?.unit || "ea",
     unitCents: unitCents || lineCents,
     lineCents,
