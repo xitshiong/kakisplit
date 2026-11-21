@@ -120,3 +120,31 @@ it('accepts decimal commas and only permits negative whole-bill adjustments', as
   await user.click(next());
   expect(onNext).toHaveBeenCalledTimes(1);
 });
+
+it.each(['90071992547389.90', '90071992547409.92'])('explains an oversized line %s without displaying a rounded total', async price => {
+  const { user, onNext } = renderEditor([
+    { id: 'a', name: 'A', price: '10.00' },
+    { id: 'b', name: 'B', price: '10.00' },
+    { id: 'c', name: 'C', price },
+  ]);
+  expect(screen.getByText('—')).toBeVisible();
+  await user.click(next());
+  expect(screen.getByText('Amount is too large. Maximum per line is 1,000,000.00.')).toBeVisible();
+  expect(screen.queryByText('Enter an amount with up to 2 decimal places.')).not.toBeInTheDocument();
+  expect(onNext).not.toHaveBeenCalled();
+});
+
+it('displays an exact cent total and blocks an oversized aggregate bill', async () => {
+  const { user, onNext } = renderEditor([
+    { id: 'a', name: 'A', price: '999999.99' },
+    { id: 'b', name: 'B', price: '0.01' },
+  ]);
+  expect(screen.getByText('MYR 1000000.00')).toBeVisible();
+  const amount = screen.getAllByRole('textbox', { name: 'Total (MYR)' })[1];
+  await user.clear(amount);
+  await user.type(amount, '0.02');
+  expect(screen.getByText('—')).toBeVisible();
+  await user.click(next());
+  expect(screen.getByRole('alert')).toHaveTextContent('Amount is too large');
+  expect(onNext).not.toHaveBeenCalled();
+});

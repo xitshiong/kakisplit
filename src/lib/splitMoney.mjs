@@ -1,8 +1,13 @@
-export function priceCents(value) {
+export function priceCentsBigInt(value) {
   const text = String(value ?? '').trim().replace(/^(-?\d+),([0-9]{1,2})$/, '$1.$2');
   if (!/^-?(?:\d+\.?\d{0,2}|\.\d{1,2})$/.test(text)) return null;
   const [whole, fraction = ''] = text.replace(/^-/, '').split('.');
-  const cents = (BigInt(whole || '0') * 100n + BigInt(fraction.padEnd(2, '0'))) * (text.startsWith('-') ? -1n : 1n);
+  return (BigInt(whole || '0') * 100n + BigInt(fraction.padEnd(2, '0'))) * (text.startsWith('-') ? -1n : 1n);
+}
+
+export function priceCents(value) {
+  const cents = priceCentsBigInt(value);
+  if (cents === null) return null;
   return cents >= -BigInt(Number.MAX_SAFE_INTEGER) && cents <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(cents) : null;
 }
 

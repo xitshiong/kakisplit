@@ -81,7 +81,7 @@ export default function ReceiptItemEditor({ items, receipts, currency, notices, 
       <button type="button" className="add-line-btn" onClick={() => setNewItemId(onAdd())}>+ Add item</button>
       <div className="editor-total total-row grand">
         <span className="total-label">Bill total</span>
-        <span className="total-val">{review.errors.some(error => error.price) ? '—' : `${currency} ${review.total.toFixed(2)}`}</span>
+        <span className="total-val">{review.errors.some(error => error.price) || review.totalText === null ? '—' : `${currency} ${review.totalText}`}</span>
       </div>
       {showErrors && !review.valid && <p className="error-strip" role="alert">
         {review.totalError || 'Check the highlighted fields before continuing.'}
