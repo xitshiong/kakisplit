@@ -281,6 +281,27 @@ describe('joining and paying as a guest', () => {
     expect(button(/Tea.*Split 3 ways.*1\.00/, { pressed: true })).toBeVisible();
   });
 
+  it('does not infer a split from other guests highlighting the same item', async () => {
+    const { user } = await joinViaLink({ tables: [dinner({ selections: { tea: ['Ari', 'Bela'] } })] });
+    await enterName(user);
+    expect(screen.getByText('no one')).toBeVisible();
+    expect(button(/Tea/, { pressed: true })).toHaveTextContent('3.00');
+  });
+
+  it('keeps an explicit no-split choice on rejoin despite other guests highlighting the item', async () => {
+    const { user, unmount } = await joinViaLink({ tables: [dinner({ selections: { tea: ['Ari', 'Bela'] } })] });
+    await enterName(user);
+    await user.click(button('Split Tea with more people'));
+    await user.click(button('Split Tea with fewer people'));
+    expect(JSON.parse(localStorage.getItem('ks_guest_splits_1234_Ari'))).toEqual({ tea: 1 });
+    unmount();
+    render(<App />);
+    await screen.findByLabelText('Your name');
+    await enterName(user);
+    expect(screen.getByText('no one')).toBeVisible();
+    expect(button(/Tea/, { pressed: true })).toHaveTextContent('3.00');
+  });
+
   it('prefers an exact-case identity when two saved names differ only in casing', async () => {
     const { user } = await joinViaLink({ tables: [dinner({ selections: { tea: ['Ari'], noodles: ['ari'] } })] });
     await user.type(screen.getByLabelText('Your name'), 'ari');

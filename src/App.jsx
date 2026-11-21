@@ -1931,13 +1931,19 @@ function GuestView({ session, onBack, currency }) {
   const resumeGuest = guestName => {
     const restored = {};
     const restoredSplits = {};
+    let savedSplits = {};
+    try {
+      const saved = JSON.parse(localStorage.getItem(`ks_guest_splits_${session.code}_${guestName}`) || "{}");
+      if (saved && typeof saved === "object" && !Array.isArray(saved)) savedSplits = saved;
+    } catch { /* A saved split is optional. */ }
     for (const item of items) {
       const paidInfo = paidMap[item.id];
       const payers = (paidInfo?.payers || (paidInfo ? [paidInfo] : [])).map(payer => typeof payer === "object" ? payer.name : payer);
       const total = paidInfo ? (paidInfo.payers ? paidInfo.total || 1 : 1) : Infinity;
       if ((selections[item.id] || []).includes(guestName) && !payers.includes(guestName) && payers.length < total) {
         restored[item.id] = true;
-        restoredSplits[item.id] = paidInfo?.total || selections[item.id].length;
+        const savedSplit = savedSplits[item.id];
+        restoredSplits[item.id] = Number.isSafeInteger(savedSplit) && savedSplit > 0 ? savedSplit : paidInfo?.total || 1;
       }
     }
     try {
@@ -1950,6 +1956,13 @@ function GuestView({ session, onBack, currency }) {
     setSplits(restoredSplits);
     setNamed(true);
   };
+
+  useEffect(() => {
+    if (!named) return;
+    try {
+      localStorage.setItem(`ks_guest_splits_${session.code}_${name}`, JSON.stringify(splits));
+    } catch { /* Splitting must work even when browser storage is unavailable. */ }
+  }, [splits, named, name, session.code]);
 
   const continueGuest = () => {
     const normalized = normalizeName(name);
