@@ -498,6 +498,27 @@ describe('joining and paying as a guest', () => {
 });
 
 describe('creating and returning to a table', () => {
+  it.each(['new', 'returning'])('clears only the poll warning after a successful poll on a %s table', async mode => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    if (mode === 'returning') saveLocally(dinner());
+    const { user, failNext } = renderApp({ signedIn: true, tables: [dinner()] });
+    if (mode === 'new') {
+      await manualEditor(user);
+      await addItem(user, 'Tea', '3');
+      await user.click(button(/Next: Payment QR/));
+      await user.click(button(/Generate Table Link/));
+      await screen.findByRole('heading', { name: 'Friday dinner' });
+    } else {
+      await user.click(await screen.findByRole('button', { name: /Open Night market/ }));
+      await screen.findByText('0/2 items paid');
+    }
+    failNext(request => request.method === 'GET' && request.select === '*');
+    await act(() => vi.advanceTimersByTimeAsync(2_000));
+    expect(screen.getByRole('alert')).toHaveTextContent('Couldn’t refresh table status');
+    await act(() => vi.advanceTimersByTimeAsync(2_000));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
   it('notifies on the first payment of a newly created table without repeating it', async () => {
     vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
     const notify = vi.fn(function () {});

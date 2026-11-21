@@ -2389,6 +2389,7 @@ function HostView({ onHome, currency, user, profile }) {
       loadSessionState(code).then(s => {
         setPaidMap(s.paid);
         setTableSelections(s.selections);
+        setErr(current => current === "Couldn’t refresh table status. Check your connection; showing the last saved status." ? "" : current);
       }).catch(() => setErr("Couldn’t refresh table status. Check your connection; showing the last saved status."));
     }, 2000);
     return () => clearInterval(t);
@@ -2769,6 +2770,7 @@ function HostReturn({ onHome, currency, user, profile }) {
       loadSessionState(code).then(s => {
         setPaidMap(s.paid);
         setTableSelections(s.selections);
+        setError(current => current === "Couldn’t refresh table status. Check your connection; showing the last saved status." ? "" : current);
       }).catch(() => setError("Couldn’t refresh table status. Check your connection; showing the last saved status."));
     }, 2000);
     return () => clearInterval(t);
