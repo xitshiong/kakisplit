@@ -258,6 +258,19 @@ describe('home and sign-in', () => {
 });
 
 describe('joining and paying as a guest', () => {
+  it.each(['Bela', { name: 'Bela' }])('does not restore fully paid legacy items on rejoin (%j)', async payer => {
+    const { user } = await joinViaLink({ tables: [dinner({ selections: { tea: ['Ari'] }, paid: { tea: payer } })] });
+    await enterName(user);
+    expect(button(/Pay host/)).toBeDisabled();
+    expect(screen.getByText('paid by Bela')).toBeVisible();
+  });
+
+  it('recognizes object payer names when excluding a guest’s already paid modern share', async () => {
+    const { user } = await joinViaLink({ tables: [dinner({ selections: { tea: ['Ari'] }, paid: { tea: { payers: [{ name: 'Ari' }], total: 2 } } })] });
+    await enterName(user);
+    expect(button(/Pay host/)).toBeDisabled();
+  });
+
   it('warns on whitespace and case variants and restores picks only after confirming identity', async () => {
     const { user, rows } = await joinViaLink({ tables: [dinner({ selections: { tea: ['Ari Tan'] } })] });
     await user.type(screen.getByLabelText('Your name'), '  aRI   tan  ');

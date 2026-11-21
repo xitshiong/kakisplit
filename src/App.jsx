@@ -1945,8 +1945,9 @@ function GuestView({ session, onBack, currency }) {
     const restored = {};
     for (const item of items) {
       const paidInfo = paidMap[item.id];
-      const payers = paidInfo?.payers || (paidInfo ? [paidInfo] : []);
-      if ((selections[item.id] || []).includes(guestName) && !payers.includes(guestName) && payers.length < (paidInfo?.total || Infinity)) restored[item.id] = true;
+      const payers = (paidInfo?.payers || (paidInfo ? [paidInfo] : [])).map(payer => typeof payer === "object" ? payer.name : payer);
+      const total = paidInfo ? (paidInfo.payers ? paidInfo.total || 1 : 1) : Infinity;
+      if ((selections[item.id] || []).includes(guestName) && !payers.includes(guestName) && payers.length < total) restored[item.id] = true;
     }
     try {
       const key = `ks_guest_names_${session.code}`;
@@ -1964,7 +1965,7 @@ function GuestView({ session, onBack, currency }) {
     const knownNames = [
       ...Object.values(selections).flatMap(value => Array.isArray(value) ? value : []),
       ...Object.values(paidMap).flatMap(value => value?.payers || (value ? [value] : [])),
-    ].filter(value => typeof value === "string");
+    ].map(value => typeof value === "object" && value !== null ? value.name : value).filter(value => typeof value === "string");
     const existing = knownNames.find(value => normalizeName(value).toLowerCase() === normalized.toLowerCase());
     let remembered = false;
     try {
