@@ -41,10 +41,12 @@ do $$ begin
   assert public.mark_paid('ABCDEFGH','tea','Carl',2) = '{"success":false,"full":true}'::jsonb;
   assert public.mark_paid('ABCDEFGH','rice','',1) = '{"success":false}'::jsonb;
   assert public.mark_paid('ABCDEFGH','rice','Guest',101) = '{"success":false}'::jsonb;
+  assert public.mark_paid('ABCDEFGH','rice',E' \tBob \n Doe\r ',1) = '{"success":true}'::jsonb;
+  assert public.mark_paid('ABCDEFGH','rice',U&'\00A0Bob\2003Doe\FEFF',1) = '{"success":true,"alreadyPaid":true}'::jsonb;
   assert public.mark_paid('1234','legacy','Guest',1) = '{"success":true}'::jsonb;
-  assert public.set_selections('ABCDEFGH','Ari',array['tea']);
+  assert public.set_selections('ABCDEFGH',E' \tAri\n ',array['tea']);
   assert public.set_selections('ABCDEFGH','Bela',array['tea']);
-  assert public.set_selections('ABCDEFGH','Ari',array['rice']);
+  assert public.set_selections('ABCDEFGH',U&'\00A0Ari\FEFF',array['rice']);
   assert public.get_session('ABCDEFGH')->'selections'->'tea' = '["Bela"]'::jsonb;
   assert public.get_session('ABCDEFGH')->'selections'->'rice' = '["Ari"]'::jsonb;
   assert not public.set_selections('ABCDEFGH','Ari',array['missing']);

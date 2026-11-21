@@ -1912,6 +1912,12 @@ function GuestView({ session, onBack, currency }) {
   const { items = [], qrImage } = session;
 
   const [selections, setSelections] = useState({});
+  const confirmName = () => {
+    const normalized = name.trim().replace(/\s+/g, " ");
+    if (!normalized) return;
+    setName(normalized);
+    setNamed(true);
+  };
 
   useEffect(() => {
     // Preserve the browser's scroll-to-focus while the guest is entering a name.
@@ -1987,8 +1993,8 @@ function GuestView({ session, onBack, currency }) {
         <label className="field-label" htmlFor="guest-name">Your name</label>
         <input id="guest-name" autoComplete="given-name" className="name-in" placeholder="e.g. Ali"
           value={name} onChange={e => setName(e.target.value)}
-          onKeyDown={e => e.key === "Enter" && name.trim() && setNamed(true)} />
-        <button className="btn btn-ink" disabled={!name.trim()} onClick={() => setNamed(true)}>
+          onKeyDown={e => e.key === "Enter" && confirmName()} />
+        <button className="btn btn-ink" disabled={!name.trim()} onClick={confirmName}>
           Continue →
         </button>
         <button className="btn btn-outline" onClick={onBack}>← Back</button>

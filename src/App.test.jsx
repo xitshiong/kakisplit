@@ -300,6 +300,25 @@ describe('joining and paying as a guest', () => {
     expect(requests.some(request => request.method === 'PATCH')).toBe(false);
   });
 
+  it.each(['click', 'Enter'])('normalizes guest identity before selection and paid comparisons via %s', async method => {
+    const { user, rows, requests } = await joinViaLink({ tables: [dinner({
+      paid: { tea: { payers: ['Bob Doe'], total: 2 } },
+    })] });
+    await user.type(screen.getByLabelText('Your name'), '\u00a0 Bob   Doe \u00a0');
+    if (method === 'Enter') await user.keyboard('{Enter}');
+    else await user.click(button(/Continue/));
+    expect(await screen.findByText('You paid')).toBeVisible();
+    expect(screen.queryByRole('button', { name: /Tea/ })).not.toBeInTheDocument();
+    await user.click(button(/Noodles/));
+    await waitFor(() => expect(rows.get('1234').selections.noodles).toEqual(['Bob Doe']));
+    await user.click(button(/Pay host/));
+    await user.click(button('I have paid'));
+    expect(await screen.findByText('Confirmed, Bob Doe!')).toBeVisible();
+    expect(requests.filter(request => request.resource === 'rpc/mark_paid')).toEqual([
+      expect.objectContaining({ body: expect.objectContaining({ p_name: 'Bob Doe', p_item_id: 'noodles' }) }),
+    ]);
+  });
+
   it('recalculates a guest share and synchronizes selection without removing another guest', async () => {
     const { user, rows } = await joinViaLink({ tables: [dinner({ selections: { tea: ['Bela'] } })] });
     await enterName(user);

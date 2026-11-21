@@ -59,7 +59,7 @@ declare
   payers jsonb;
   total integer;
 begin
-  p_name := pg_catalog.btrim(p_name);
+  p_name := pg_catalog.btrim(pg_catalog.regexp_replace(p_name, U&'[\0009-\000D\0020\00A0\1680\2000-\200A\2028\2029\202F\205F\3000\FEFF]+', ' ', 'g'));
   if p_name is null or length(p_name) not between 1 and 100 or p_item_id is null or
      length(p_item_id) not between 1 and 200 or p_item_id in ('__proto__', 'constructor', 'prototype') or
      p_split_count is null or p_split_count not between 1 and 100 then
@@ -101,7 +101,7 @@ declare
   names jsonb;
   item_id text;
 begin
-  p_name := pg_catalog.btrim(p_name);
+  p_name := pg_catalog.btrim(pg_catalog.regexp_replace(p_name, U&'[\0009-\000D\0020\00A0\1680\2000-\200A\2028\2029\202F\205F\3000\FEFF]+', ' ', 'g'));
   if p_name is null or length(p_name) not between 1 and 100 or p_item_ids is null or cardinality(p_item_ids) > 1000 then return false; end if;
   select * into s from public.sessions where code = pg_catalog.upper(pg_catalog.regexp_replace(p_code, '[[:space:]-]', '', 'g')) for update;
   if not found or s.concluded is true then return false; end if;
